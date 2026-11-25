@@ -93,6 +93,7 @@ export interface Mount {
   readonly combined?: boolean
   /** The capability rows, all switched on at the start; none when absent. */
   readonly capabilities?: ReadonlyArray<CapabilityOffer>
+  readonly browse?: TuiInput["offer"]["browse"]
   readonly dryRun?: boolean
   /** The terminal background the palette is picked for; dark when absent. */
   readonly background?: Background
@@ -116,6 +117,7 @@ export const mount = async (options: Mount) => {
         "device" in options ? options.device : "Xcode (/Applications/Xcode.app/Contents/Developer)",
       worktrees: options.worktrees ?? true,
       capabilities: options.capabilities ?? [],
+      ...(options.browse === undefined ? {} : { browse: options.browse }),
       form: "normal (detected: a graphical session is available)",
       ...(options.combined === true
         ? {

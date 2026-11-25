@@ -13934,26 +13934,27 @@ var applyDefaults = (existing, defaults) => {
 
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
-var browsePairCommand = (runner) => {
+var browseRunnerCommand = (runner, operation) => {
   const spec = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
   switch (runner) {
     case "bunx":
-      return ["bunx", "--package", spec, "browse", "pair"];
+      return ["bunx", "--package", spec, "browse", operation];
     case "npm":
-      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", "pair"];
+      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", operation];
     case "mise":
-      return ["mise", "exec", `npm:${spec}`, "--", "browse", "pair"];
+      return ["mise", "exec", `npm:${spec}`, "--", "browse", operation];
     case "unknown":
       return;
   }
 };
+var browsePairCommand = (runner) => browseRunnerCommand(runner, "pair");
 var browsePairFix = (runner) => {
   const command = browsePairCommand(runner);
   return command === undefined ? `use your package manager to run browse pair from ${BROWSE_PACKAGE}@${BROWSE_VERSION} (setup could not identify the runner)` : `run \`${command.join(" ")}\` and enter the code in the extension's options`;
 };
-var STORE = "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg";
+var BROWSE_EXTENSION_STORE = "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg";
 var BROWSE_PAIR_FIX = browsePairFix("npm");
-var BROWSE_INSTALL_FIX = `add the browse extension from ${STORE}, then ${BROWSE_PAIR_FIX}`;
+var BROWSE_INSTALL_FIX = `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${BROWSE_PAIR_FIX}`;
 var browseDataDirectory = (env) => {
   const home = firstNonEmpty2(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
@@ -14050,23 +14051,36 @@ var isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
-var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
+var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
   const state = yield* readOptional(join14(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
+    if (profile === "." || profile === ".." || /[/\\]/.test(profile) || profile.includes("\x00"))
+      return [];
     const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join14(directory, profile, file)).pipe(map4((text) => {
-      const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
+      if (text === undefined)
+        return;
+      const parsed = decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
-      return parsed?._tag === "Some" ? parsed.value.extensions?.settings ?? {} : {};
+      return parsed._tag === "Some" ? parsed.value.extensions?.settings ?? {} : {};
     })));
-    const entry = settings.flatMap((entries) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
-    return entry === undefined ? [] : [{ browser: name, profile, enabled: !isDisabled(entry) }];
+    if (state === undefined && settings.every((value) => value === undefined))
+      return [];
+    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
+    return [
+      {
+        browser: name,
+        profile,
+        extension: entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled"
+      }
+    ];
   }));
   return found.flat();
 })).pipe(map4((installs) => installs.flat()));
+var findBrowseExtension = (env, platform = process.platform) => findBrowseProfiles(env, platform).pipe(map4((profiles) => profiles.flatMap(({ browser, profile, extension }) => extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }])));
 var readBrowseState = (env, platform = process.platform) => gen2(function* () {
   const pairing = yield* readBrowsePairing(env);
   if (pairing.state === "paired")
@@ -14087,7 +14101,7 @@ var describeBrowseState = (state, runner = "npm") => {
     };
   return {
     text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
-    fix: `add the browse extension from ${STORE}, then ${browsePairFix(runner)}`
+    fix: `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${browsePairFix(runner)}`
   };
 };
 
@@ -29545,6 +29559,143 @@ var MIGRATE_COMMANDS = [
     run: coreCommand("migrate")
   }
 ];
+import { dirname as dirname14, join as join31 } from "path";
+var {$: $2 } = globalThis.Bun;
+var NAME = "OpenCode Browse";
+var PACKAGE = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
+var Receipt = Struct({ version: String5.check(isPattern2(/^\d+\.\d+\.\d+$/)) });
+var receiptFile = (env) => join31(dirname14(userConfigFile(env)), "browse-setup.json");
+var browseEnv = { OPENCODE_BROWSER_AUTO_UPDATE: "off" };
+var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = process.platform) {
+  const runner = packageRoot === undefined ? "unknown" : packageRunner(packageRoot, env);
+  const command = browseRunnerCommand(runner, "pair")?.join(" ");
+  return yield* gen2(function* () {
+    const pairing = yield* readBrowsePairing(env);
+    const profiles = pairing.state === "paired" ? [] : yield* findBrowseProfiles(env, platform);
+    const installs = profiles.flatMap(({ browser, profile, extension }) => extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }]);
+    const state = pairing.state === "paired" ? pairing : installs.length > 0 ? { state: "installed", installs } : { state: "missing", scanned: browserDirectories(env, platform).map(({ name }) => name) };
+    const status = describeBrowseState(state, runner);
+    const snapshot = yield* readJsonObjectSnapshot(receiptFile(env));
+    const receipt = snapshot.text === undefined ? undefined : is2(Receipt)(snapshot.value) ? snapshot.value : yield* new SetupFailure({ message: "Invalid HolyAgent Browse setup receipt" });
+    const next = state.state === "paired" ? "paired" : state.state === "installed" && state.installs.some(({ enabled }) => enabled) ? "pair" : "extension";
+    if (next === "paired" && receipt?.version === BROWSE_VERSION)
+      return {
+        state: `${status.text}; ${PACKAGE} verified`,
+        runner,
+        next: "none"
+      };
+    if (command === undefined)
+      return {
+        state: `${status.text}; the HolyAgent runner could not be identified`,
+        runner,
+        next: "none"
+      };
+    const update = receipt !== undefined && receipt.version !== BROWSE_VERSION;
+    return {
+      state: update ? `${status.text}; previous managed CLI ${receipt.version}` : status.text,
+      action: update ? "Update" : "Configure",
+      command,
+      runner,
+      next,
+      profiles: profiles.map((profile) => ({ ...profile, profile: plain(profile.profile) })).sort((a, b) => Number(b.extension === "enabled") - Number(a.extension === "enabled")),
+      receipt: { text: snapshot.text }
+    };
+  }).pipe(catchTag2("SetupFailure", (error) => succeed6({ state: error.message, runner, next: "none" })));
+});
+var browseProfileLabel = ({ browser, profile }) => `${browser}, ${profile}`;
+var browseForProfile = (plan, index) => {
+  if (plan.next === "none" || plan.next === "paired")
+    return plan;
+  const profile = plan.profiles?.[index];
+  const target = profile === undefined ? "a compatible Chromium-family browser profile" : browseProfileLabel(profile);
+  const guidance = profile?.extension === "enabled" ? undefined : profile?.extension === "disabled" ? `enable the Browse extension in ${target}` : `add the official Browse extension in ${target} from ${BROWSE_EXTENSION_STORE}`;
+  return {
+    ...plan,
+    next: profile?.extension === "enabled" ? "pair" : "extension",
+    target,
+    ...guidance === undefined ? {} : { guidance }
+  };
+};
+var browseReview = (plan, selected, dryRun = false) => [
+  present(`${NAME}: ${plan.state}`),
+  ...(plan.profiles?.length ?? 0) === 0 ? [] : [
+    present(`${NAME}: detected profiles ${plan.profiles?.map(browseProfileLabel).join("; ") ?? ""}`)
+  ],
+  ...plan.action === undefined ? [] : !selected ? [skipped(`${NAME}: Skip Browser Use setup; no Browse command will run`)] : [
+    added(`${NAME}: ${plan.action} ${PACKAGE} with ${plan.runner}; keep existing pairing`),
+    ...plan.next === "pair" ? [
+      hint(`${NAME}: setup ${dryRun ? "would run" : "runs"} ${plan.command ?? "the official pair command"} after you close the screen. Enter its code in the extension Options of ${plan.target ?? "your chosen browser profile"}`)
+    ] : plan.next === "extension" ? [
+      hint(`${NAME}: ${plan.guidance ?? "add or enable the extension before pairing"}, then rerun setup to pair`)
+    ] : []
+  ]
+];
+var pairBrowseOnTerminal = (command, args, options) => {
+  const bunBin = pathWithBunBin({ ...options.env }, {
+    home: homeDirectory2(options.env),
+    bunInstall: options.env.BUN_INSTALL
+  });
+  return tryPromise2({
+    try: () => $2`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...options.env, [bunBin.key]: bunBin.value })).nothrow().then(({ exitCode }) => exitCode),
+    catch: () => 127
+  }).pipe(orElseSucceed2(() => 127));
+};
+var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair) {
+  const failure = (detail) => ({ ok: false, lines: [`! ${NAME}: ${detail}`] });
+  const version = browseRunnerCommand(plan.runner, "--version");
+  const pairCommand = browseRunnerCommand(plan.runner, "pair");
+  if (version === undefined || pairCommand === undefined || plan.receipt === undefined || plan.action === undefined || plan.next === "none")
+    return failure("no reviewed Browse setup action is available");
+  const [runner, ...versionArgs] = version;
+  if (runner === undefined)
+    return failure("no runner for the pinned Browse CLI");
+  const shell = yield* Shell;
+  const cwd = homeDirectory2(env);
+  const versionResult = yield* shell.run(runner, versionArgs, { cwd, env: browseEnv });
+  if (versionResult.exitCode !== 0) {
+    const detail = versionResult.stderr.split(/\r?\n/).map(plain).find((line) => /\b(?:error|failed|refusing)\b/i.test(line))?.trim().slice(0, 260);
+    return failure(`could not run ${PACKAGE} with ${runner} (exit ${versionResult.exitCode})${detail ? `: ${detail}` : ""}`);
+  }
+  if (versionResult.stdout.trim() !== BROWSE_VERSION)
+    return failure(`the ${runner} command did not resolve the exact CLI version ${BROWSE_VERSION}`);
+  const versionLine = present(`${NAME}: verified CLI ${PACKAGE} with ${runner}`);
+  const prior = yield* readBrowsePairing(env);
+  if (prior.state === "unpaired") {
+    if (plan.next !== "pair")
+      return {
+        ok: true,
+        lines: [
+          versionLine,
+          hint(`${NAME}: pairing is not complete; ${plan.guidance ?? "add or enable the extension"}, then rerun setup to pair`)
+        ]
+      };
+    const exit = yield* pair(runner, pairCommand.slice(1), { cwd, env: { ...env, ...browseEnv } });
+    if (exit !== 0)
+      return {
+        ok: false,
+        lines: [
+          versionLine,
+          `! ${NAME}: pairing was not confirmed (exit ${exit}); run setup again when ready to pair`
+        ]
+      };
+  }
+  const pairing = yield* readBrowsePairing(env);
+  if (pairing.state !== "paired" || prior.state === "unpaired" && !pairing.browsers.some(({ lastSeen }) => lastSeen !== undefined))
+    return failure("the pinned CLI exited but no browser pairing was found; no update was recorded");
+  const file = receiptFile(env);
+  const { text } = plan.receipt;
+  const record = { version: BROWSE_VERSION };
+  const saved = text === undefined ? (yield* readJsonObjectSnapshot(file)).text === undefined && (yield* writeJsonObject(file, record, { mode: 384 }).pipe(as2(true))) : yield* writeJsonObjectIfUnchanged(file, record, text, { mode: 384 });
+  if (!saved)
+    return failure("the HolyAgent Browse receipt changed; review setup again");
+  return {
+    ok: true,
+    lines: [versionLine, present(`${NAME}: ${describeBrowseState(pairing, plan.runner).text}`)]
+  };
+}, catchTag2("SetupFailure", ({ message }) => succeed6({
+  ok: false,
+  lines: [`! ${NAME}: ${message}`]
+})));
 var AppliedSchema = Struct({
   ok: Boolean3,
   lines: ArraySchema(String5)
@@ -29670,6 +29821,7 @@ var stopped = (reason, applyStarted = false) => ({
   }
 });
 var decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
+var BROWSE_HANDOFF = "OpenCode Browse: close this screen to ";
 var runInteractive = fn2("runInteractive")(function* (options) {
   const line = { kind: "line", notes: [] };
   if (options.undo || inCloudSession(options.env))
@@ -29694,6 +29846,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     return fail(`unavailable (${loaded.reason})`);
   const initialSwitches = features === undefined ? {} : features;
   const piAvailable = piUsed && config?.pi.enable === true;
+  const browse = options.browse !== undefined && piAvailable && config.pi.features.mcp === true && options.form.form === "normal" && offers.some(({ feature }) => feature === "browserUse") ? yield* planBrowse(options.env, options.browse.packageRoot) : undefined;
+  const browseFor = (choices) => browse !== undefined && choices.harnesses?.pi !== false && choices.capabilities["browserUse"] === true ? browseForProfile(browse, choices.browseProfile ?? 0) : undefined;
   const providerChoices = piAvailable && config !== undefined && (combined !== undefined || options.previewPi !== undefined) ? { provider: config.pi.provider, providers: enabledPiProviders(config) } : undefined;
   const withProviderChanges = (choices) => {
     const selection = choices.piProviders;
@@ -29701,7 +29855,9 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       worktrees: choices.worktrees,
       deviceAccess: choices.deviceAccess,
       capabilities: choices.capabilities,
-      ...choices.harnesses === undefined ? {} : { harnesses: choices.harnesses }
+      ...choices.harnesses === undefined ? {} : { harnesses: choices.harnesses },
+      ...choices.browseSetup === undefined ? {} : { browseSetup: choices.browseSetup },
+      ...choices.browseProfile === undefined ? {} : { browseProfile: choices.browseProfile }
     } : choices;
   };
   const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
@@ -29711,11 +29867,19 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   let reviewedChoices;
   let reviewSequence = 0;
   let reviewedReplacement;
+  let stagedBrowse;
   const replacementOf = (report) => report.lines.find((line) => line.startsWith("+ pi package: replace "));
   const input = {
     env: options.env,
     offer: {
       ...offerOf(preview, offers, options.form),
+      ...browse === undefined ? {} : {
+        browse: {
+          state: plain(browse.state),
+          ...browse.action === undefined ? {} : { action: browse.action },
+          ...browse.profiles === undefined ? {} : { profiles: browse.profiles }
+        }
+      },
       ...providerChoices === undefined ? {} : { providers: PiProvider.literals },
       ...combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }
     },
@@ -29727,6 +29891,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
+      const plan = browseFor(choices);
+      const browserReview = plan === undefined ? {} : {
+        browse: browseReview(plan, choices.browseSetup === true, options.dryRun).map(plain)
+      };
       if (combined !== undefined) {
         const sequence = ++reviewSequence;
         reviewedChoices = undefined;
@@ -29750,6 +29918,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
           file: undefined,
           choices: [],
           always: [],
+          ...browserReview,
           harnesses: plans.map(({ name, lines }) => ({ name, lines }))
         };
       }
@@ -29771,6 +29940,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
             file: undefined,
             choices: [],
             always: [],
+            ...browserReview,
             harnesses: [{ name: label("pi"), lines: report.lines }]
           };
       }
@@ -29780,11 +29950,16 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       });
       if (preview !== undefined && (next === undefined || ("line" in next)))
         return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
-      return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
+      return {
+        ...reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form)),
+        ...browserReview
+      };
     })),
     apply: (choices, signal) => {
       const chosen = withProviderChanges(choices);
-      if ((combined !== undefined || chosen.piProviders !== undefined) && reviewedChoices !== choices)
+      const plan = browseFor(choices);
+      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true;
+      if ((combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) && reviewedChoices !== choices)
         return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
       const replacement = reviewedChoices === choices ? reviewedReplacement : undefined;
       reviewedChoices = undefined;
@@ -29793,25 +29968,46 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       const changed = changedSwitches(initialSwitches, choices.capabilities);
       const confirmReplacement = (report) => report.ok && replacementOf(report) === replacement ? void_3 : fail5(new Error("The Pi package plan changed. Review it again before replacing the previous registration."));
       const applySingle = options.apply(chosen, changed, replacement !== undefined);
-      return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(selectionOf(choices), (target, index) => {
+      return runPromise2((combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(selectionOf(choices), (target, index) => {
         const replace = target === "pi" && replacement !== undefined;
         const perform = combined.run(target, chosen, changed, options.dryRun, index > 0, replace);
         return replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
       }).pipe(map4((reports) => ({
         ok: reports.length > 0 && reports.every(({ ok }) => ok),
         lines: reports.flatMap(({ lines }) => lines)
-      }))), { signal });
+      })))).pipe(map4((report) => {
+        if (plan === undefined || plan.action === undefined)
+          return report;
+        if (report.ok && wantsBrowse && !options.dryRun)
+          stagedBrowse = plan;
+        return {
+          ok: report.ok,
+          lines: [
+            ...report.lines,
+            ...options.dryRun ? browseReview(plan, wantsBrowse, true) : !wantsBrowse ? [hint("OpenCode Browse: setup skipped; no Browse command ran")] : report.ok ? [
+              hint(plan.next === "pair" ? `${BROWSE_HANDOFF}start the official pairing command` : `${BROWSE_HANDOFF}verify the pinned CLI`)
+            ] : []
+          ]
+        };
+      })), { signal });
     }
   };
   return yield* tryPromise2({
     try: () => loaded.runSetupTui(input),
     catch: (cause) => cause
-  }).pipe(flatMap2(decodeOutcome), map4((outcome) => {
+  }).pipe(flatMap2(decodeOutcome), flatMap2((outcome) => gen2(function* () {
     if (outcome._tag === "Applied") {
       const applied = outcome.applied;
+      const finishedBrowse = applied.ok && stagedBrowse !== undefined ? yield* options.notify(plain(stagedBrowse.next === "pair" ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.` : "OpenCode Browse: verifying the pinned CLI.")).pipe(andThen2(configureBrowse(options.env, stagedBrowse, options.browse?.pair ?? pairBrowseOnTerminal))) : { ok: true, lines: [] };
       return {
         kind: options.t3Workflow === true ? "applied" : "done",
-        report: { lines: applied.lines, ok: applied.ok }
+        report: {
+          lines: [
+            ...applied.lines.filter((line) => !line.startsWith(hint(BROWSE_HANDOFF))),
+            ...finishedBrowse.lines
+          ],
+          ok: applied.ok && finishedBrowse.ok
+        }
       };
     }
     return {
@@ -29823,7 +30019,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         ok: false
       }
     };
-  }), catch_2((cause) => {
+  })), catch_2((cause) => {
     const detail = oneLine5(cause);
     if (applyStarted)
       return succeed6(stopped(`failed (${detail})`, true));
@@ -29894,6 +30090,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
+      "graphical public Pi setup with Browser Use enabled can configure or update OpenCode Browse after review; Skip is the default. Setup runs only the pinned Browse CLI with the HolyAgent package runner after closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
     ],
     flags: {
@@ -29977,6 +30174,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         noTui: booleanFlag(args, "no-tui") || booleanFlag(args, "non-interactive"),
         choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined || Object.keys(capabilities).length > 0,
         form,
+        ...surface === "public" ? { browse: { packageRoot: installedPackageRoot } } : {},
         ...setupTui === undefined ? {} : { load: setupTui },
         notify: emit,
         apply: (choices, chosen, replacePiRegistration) => target === "pi" ? apply(choices, chosen, [], {
@@ -30272,7 +30470,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute10, join as join31, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute10, join as join32, relative as relative7 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
@@ -30319,7 +30517,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     if (root.exitCode !== 0)
       return failure("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute10(location) || relative7(registeredRoot, join31(location, "holyagent")) !== "")
+    if (!isAbsolute10(location) || relative7(registeredRoot, join32(location, "holyagent")) !== "")
       return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -30357,7 +30555,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join31(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join32(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
       return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)

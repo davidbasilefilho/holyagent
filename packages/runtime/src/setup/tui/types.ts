@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import type { PiProvider, PiProviderSelection } from "../../config/schema.ts"
+import type { BrowsePlan } from "../browse-setup.ts"
 
 /** The setup choices: harnesses, Pi model providers, T3 settings and capability switches. */
 export interface Choices {
@@ -9,6 +10,10 @@ export interface Choices {
   readonly deviceAccess: boolean
   /** Each offered capability's switch, by `pi.features` key. */
   readonly capabilities: Readonly<Record<string, boolean>>
+  /** True only after the person chooses Configure or Update for this run. */
+  readonly browseSetup?: boolean
+  /** The detected browser profile picked for a new Browse pairing. */
+  readonly browseProfile?: number
   /** Selected public harnesses in the combined setup. */
   readonly harnesses?: { readonly pi: boolean; readonly claude: boolean }
 }
@@ -40,6 +45,8 @@ export interface Offer {
   readonly worktrees: boolean
   /** The capability rows, in registry order; none when the config cannot be read or Pi is off. */
   readonly capabilities: ReadonlyArray<CapabilityOffer>
+  /** The public graphical Pi setup's read-only OpenCode Browse plan. */
+  readonly browse?: Pick<BrowsePlan, "state" | "action" | "profiles">
   /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
   readonly form: string
   /** Present only in bare public setup when the harness chooser is available. */
@@ -56,6 +63,8 @@ export interface ReviewLine {
 
 /** What the review screen lists for the current choices. */
 export interface Review {
+  /** Detection and what the selected Browse action will do, if Browser Use is enabled. */
+  readonly browse?: ReadonlyArray<string>
   /** The Apply action will replace one previous Pi registration that the review lists. */
   readonly replacePiRegistration?: boolean
   /** The T3 settings file setup writes; `undefined` when the T3 part has no work. */
