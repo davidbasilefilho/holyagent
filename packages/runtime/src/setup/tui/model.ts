@@ -10,6 +10,7 @@ const CAPABILITY_ROW = "capability:"
 export interface Segment {
   readonly text: string
   readonly tone?: Tone
+  readonly activeTab?: boolean
   readonly click?: Control
 }
 
@@ -479,13 +480,14 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       : [
           tabs.flatMap((tab): Line => [
             {
-              text: `[${tabLabels[tab]}]`,
-              tone: state.tab === tab ? "focus" : "option",
+              text: ` ${tabLabels[tab]} `,
+              tone: "option",
+              activeTab: state.tab === tab,
               click: { tab },
             },
             segment(" "),
           ]),
-          ...hintLines("Left/Right change harness", width),
+          ...hintLines(`${g.horizontalArrows} change harness`, width),
         ]
   const unavailable =
     combined !== undefined && state.tab === "codex"
