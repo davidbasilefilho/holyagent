@@ -84,9 +84,31 @@ test("new startup profiles disable delegation at the native common entry point",
     )
     expect(await Bun.file(join(profile, "auth.json")).exists()).toBe(false)
     await expect(Effect.runPromise(stageCodexStartup("relative"))).rejects.toThrow()
+    await expect(Effect.runPromise(stageCodexStartup(scratch, "relative.json"))).rejects.toThrow()
+    const changed = join(scratch, "changed.json")
+    await Bun.write(changed, '{"models":[{"slug":"gpt-6.2-sol","multi_agent_version":"v2"}]}')
+    expect(await Effect.runPromise(Effect.flip(stageCodexStartup(scratch, changed)))).toMatchObject(
+      {
+        detail: "Expected the unmodified Codex 0.172.0 catalog",
+      },
+    )
   } finally {
     await rm(scratch, { recursive: true, force: true })
   }
+})
+
+test("the optional V1 profile exposes the root namespace and withholds V2 native tools", () => {
+  expect(Bun.TOML.parse(codexStartupConfig("/staging/root-only-models.json"))).toEqual({
+    model: "gpt-6.2-sol",
+    model_reasoning_effort: "medium",
+    model_catalog_json: "/staging/root-only-models.json",
+    agents: { enabled: true, max_depth: 1 },
+    features: {
+      default_mode_request_user_input: true,
+      multi_agent_v2: { enabled: false, disable_native_tools: true },
+      code_mode: { direct_only_tool_namespaces: ["multi_agent_v1"] },
+    },
+  })
 })
 
 test.skipIf(codex === undefined)(
