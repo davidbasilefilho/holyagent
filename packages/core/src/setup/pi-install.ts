@@ -29,6 +29,7 @@ import {
   piSettingsFiles,
   piSettingsSources,
 } from "./pi-check.ts"
+import { reportSetupActivity } from "./progress.ts"
 import { added, failed, present, skipped } from "./report.ts"
 import { refuseLinks, type Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
@@ -353,6 +354,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`,
       ]
+    yield* reportSetupActivity(`Installing ${source}`)
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
@@ -374,6 +376,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`))
       continue
     }
+    yield* reportSetupActivity(`Removing npm:${name}`)
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },

@@ -3330,14 +3330,14 @@ var resultHeadline = (ok, dryRun) => {
   return ok ? "Setup finished." : "Setup finished with failures.";
 };
 var summarizeResult = (result, dryRun) => {
-  const scope = /^~ (?:scope|form): /;
+  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
   const warnings = [
     ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
   ];
   return [
     {
@@ -4382,15 +4382,21 @@ var fitLine = (line, width, ellipsis) => {
   }
   return kept;
 };
-var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? {
-  lines: [
-    [segment("Press Ctrl-C to stop", "option")],
+var applyingLines = (context) => {
+  const phase = context.progress?.phase;
+  const harness = context.progress?.harness;
+  const elapsed = context.elapsedSeconds ?? 0;
+  return [
+    [segment("Press Ctrl+C to stop", "option")],
     blank,
     ...heading("Applying", context.width),
-    [segment("Applying setup; this can take a moment.", "argument")]
-  ],
-  scroll: FIXED
-} : doneLayout(state, context);
+    [segment(`Elapsed ${elapsed}s`, "hint")],
+    ...harness === undefined ? [] : wrap(`Harness ${harness.index} of ${harness.total}: ${harness.label}`, context.width).map((part) => [segment(part, "hint")]),
+    ...wrap(phase === undefined ? "Preparing setup\u2026" : `Step ${phase.index} of ${phase.total}: ${phase.label}`, context.width).map((part) => [segment(part, "argument")]),
+    ...phase?.activity === undefined ? [] : wrap(phase.activity, context.width).map((part) => [segment(part, "hint")])
+  ];
+};
+var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? { lines: applyingLines(context), scroll: FIXED } : doneLayout(state, context);
 var scrollOf = (state, context) => layoutOf(state, context).scroll;
 var view = (state, context) => [title(context.look), ...layoutOf(state, context).lines].map((line) => fitLine(line, context.width, glyphs(context.look).ellipsis));
 
@@ -4411,9 +4417,21 @@ var SetupApp = (props) => {
   const look = lookFor(props.input.env, props.background);
   const palette = paletteOf(look);
   const [state, setState] = createSignal(initialState(props.input.initial));
+  const [progress, setProgress] = createSignal();
+  const [elapsedSeconds, setElapsedSeconds] = createSignal(0);
   const abort = new AbortController;
-  onCleanup(() => abort.abort());
   let ticket = 0;
+  let timer;
+  const stopTimer = () => {
+    if (timer !== undefined)
+      clearInterval(timer);
+    timer = undefined;
+  };
+  onCleanup(() => {
+    ticket += 1;
+    stopTimer();
+    abort.abort();
+  });
   let pointer;
   const context = () => ({
     rows: rowsOf(props.input.offer, state()),
@@ -4421,7 +4439,9 @@ var SetupApp = (props) => {
     dryRun: props.input.dryRun,
     width: dimensions().width,
     height: dimensions().height,
-    look
+    look,
+    progress: progress(),
+    elapsedSeconds: elapsedSeconds()
   });
   const lines = createMemo(() => view(state(), context()));
   const run = (command) => {
@@ -4440,6 +4460,8 @@ var SetupApp = (props) => {
       });
     }
     if (command === "interrupt") {
+      ticket += 1;
+      stopTimer();
       abort.abort();
       return props.done({
         _tag: "Interrupted"
@@ -4455,9 +4477,15 @@ var SetupApp = (props) => {
       });
       return;
     }
-    settle(() => props.input.apply(current.choices, abort.signal), (result) => {
+    const started = performance.now();
+    timer = setInterval(() => setElapsedSeconds(Math.floor((performance.now() - started) / 1000)), 200);
+    settle(() => props.input.apply(current.choices, abort.signal, (update) => {
+      if (mine === ticket)
+        setProgress(update);
+    }), (result) => {
       if (mine !== ticket)
         return;
+      stopTimer();
       setState((now) => finished(now, "value" in result ? result.value : {
         ok: false,
         lines: [`! setup: ${result.message}`]

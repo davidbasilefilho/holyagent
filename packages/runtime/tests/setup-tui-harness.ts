@@ -4,7 +4,6 @@ import type { T3Preview } from "../src/setup/t3-settings.ts"
 import { capabilityReview, reviewOf } from "../src/setup/tui/session.ts"
 import type { Background } from "../src/setup/tui/theme.ts"
 import type {
-  Applied,
   CapabilityOffer,
   Choices,
   Review,
@@ -97,7 +96,7 @@ export interface Mount {
   /** The terminal background the palette is picked for; dark when absent. */
   readonly background?: Background
   readonly review?: (choices: Choices) => Promise<Review>
-  readonly apply?: (choices: Choices, signal: AbortSignal) => Promise<Applied>
+  readonly apply?: TuiInput["apply"]
 }
 
 const NORMAL = { form: "normal", source: "default", reason: "no form was asked for" } as const
@@ -150,12 +149,12 @@ export const mount = async (options: Mount) => {
           )
         : options.review(choices)
     },
-    apply: (choices, signal) => {
+    apply: (choices, signal, report) => {
       applies.push(choices)
       signals.push(signal)
       return options.apply === undefined
         ? Promise.resolve({ ok: true, lines: ["+ t3 settings: added defaultThreadEnvMode"] })
-        : options.apply(choices, signal)
+        : options.apply(choices, signal, report)
     },
   }
   const setup = await testRender(
