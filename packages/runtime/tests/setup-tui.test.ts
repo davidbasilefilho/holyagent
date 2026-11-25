@@ -12,6 +12,7 @@ const shown = async (options: Parameters<typeof mount>[0]) => {
 afterEach(() => open?.destroy())
 
 const ROW = (text: string) => (line: string) => line.includes(text)
+const withoutRail = (line: string) => line.replace(/ +[█│]$/, "")
 const clickText = async (screen: Mounted, text: string, exact = false) => {
   const lines = screen.lines()
   const row = lines.findIndex(exact ? (line) => line.replace(/^❯ /, "").trim() === text : ROW(text))
@@ -334,6 +335,45 @@ describe("the setup interface, look", () => {
     expect(screen.lines()[2]).toBe("Esc cancel")
   })
 
+  test("a mouse scrollbar reaches the end and back without selecting a review action", async () => {
+    const width = 49
+    const screen = await shown({ width, height: 20 })
+    const track = () => screen.lines().flatMap((line, y) => (/[█│]$/.test(line) ? [y] : []))
+    const position = () => screen.lines().find((line) => line.startsWith("Lines "))
+    await screen.keys("enter")
+    const first = position()
+    const end = track().at(-1)
+    expect(end).toBeDefined()
+    if (end === undefined) throw new Error("No visible scrollbar")
+    await screen.click(width - 1, end)
+    expect(position()).toContain("PgUp for earlier")
+    const top = track()[0]
+    if (top === undefined) throw new Error("No visible scrollbar after scrolling")
+    await screen.click(width - 1, top)
+    expect(position()).toBe(first)
+    expect(screen.applies).toHaveLength(0)
+  })
+
+  test("the ASCII scrollbar in full results is clickable", async () => {
+    const width = 48
+    const screen = await shown({
+      width,
+      height: 20,
+      env: { LANG: "C" },
+      apply: () =>
+        Promise.resolve({
+          ok: true,
+          lines: Array.from({ length: 40 }, (_, index) => `~ Result line ${index}`),
+        }),
+    })
+    await screen.keys("enter", "enter", "d")
+    const last = screen.lines().findLastIndex((line) => line.endsWith("|"))
+    expect(last).toBeGreaterThan(0)
+    await screen.click(width - 1, last)
+    expect(screen.lines().join("\n")).toContain("Result line 39")
+    expect(screen.outcomes).toHaveLength(0)
+  })
+
   test("a long result scrolls with Page Down and every line can be read", async () => {
     const lines = Array.from({ length: 30 }, (_, index) => `+ line ${index}`)
     const screen = await shown({
@@ -346,7 +386,7 @@ describe("the setup interface, look", () => {
     expect(screen.lines().at(-1)).toBe("Lines 1-5 of 30, PgDn for more")
     const seen = new Set<string>()
     for (let page = 0; page < 8; page += 1) {
-      for (const line of screen.lines()) seen.add(line)
+      for (const line of screen.lines()) seen.add(withoutRail(line))
       await screen.wheel(3, 6, "down")
     }
     for (const line of lines) expect(seen.has(line)).toBe(true)
@@ -504,7 +544,7 @@ describe("the setup interface, a review longer than the screen", () => {
     for (let page = 0; page < 10; page += 1) {
       const text = screen.lines().join("\n")
       pages.push(text)
-      for (const line of screen.lines()) seen.add(line)
+      for (const line of screen.lines()) seen.add(withoutRail(line))
       await screen.keys("pagedown")
     }
     return { screen, text: [...seen].join("\n"), pages }
@@ -517,7 +557,7 @@ describe("the setup interface, a review longer than the screen", () => {
   ] as const) {
     test(`at ${width}x${height} every always-applied key can be read, whole`, async () => {
       const { text, pages } = await reading(width, height)
-      const flat = text.replace(/\s+/g, " ")
+      const flat = text.replace(/^Lines .*$/gm, "").replace(/\s+/g, " ")
       for (const key of [
         "backgroundActivity.schemaVersion",
         "sourceControlWritingStyle.mode",

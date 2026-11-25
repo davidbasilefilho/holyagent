@@ -78,6 +78,7 @@ export type Control =
   | { readonly row: RowId }
   | { readonly action: ReviewAction }
   | { readonly tab: Tab }
+  | { readonly scrollTo: number }
 
 const LABELS = {
   deviceAccess: "Agent device access",
@@ -281,12 +282,21 @@ export const press = (
 }
 
 /** Pointer controls use the same transitions and preconditions as the keyboard. */
-export const pressControl = (state: State, rows: ReadonlyArray<RowId>, control: Control) => {
+export const pressControl = (
+  state: State,
+  rows: ReadonlyArray<RowId>,
+  control: Control,
+  scroll: Scroll = FIXED,
+) => {
   const key = (name: string, from = state) => press(from, rows, { name, ctrl: false })
   if (typeof control === "object") {
     if ("tab" in control)
       return state.screen === "choose" && state.choices.harnesses !== undefined
         ? { state: { ...state, tab: control.tab, focus: 0 } }
+        : { state }
+    if ("scrollTo" in control)
+      return (state.screen === "review" || state.screen === "done") && scroll.max > 0
+        ? { state: { ...state, scroll: Math.min(scroll.max, Math.max(0, control.scrollTo)) } }
         : { state }
     if ("row" in control) {
       const focus = rows.indexOf(control.row)
@@ -552,20 +562,59 @@ interface Page {
  * The part of `body` that fits `room` lines from line `from` on. When it does not all fit, `room`
  * loses one line to an indicator saying which lines are shown and which keys scroll.
  */
-const pageOf = (body: ReadonlyArray<Line>, room: number, from: number): Page => {
-  if (body.length <= room) return { shown: body, indicator: undefined, scroll: FIXED }
+const pageOf = (
+  body: ReadonlyArray<Line>,
+  room: number,
+  from: number,
+  rail?: { readonly width: number; readonly look: Look },
+): Page => {
+  if (body.length <= Math.max(1, room)) return { shown: body, indicator: undefined, scroll: FIXED }
   const size = Math.max(1, room - 1)
   const max = body.length - size
   const start = Math.min(Math.max(0, from), max)
   const end = start + size
   const more =
     start === 0 ? "PgDn for more" : end === body.length ? "PgUp for earlier" : "PgUp/PgDn"
+  const visible = body.slice(start, end)
+  const shown = rail === undefined ? visible : scrollbar(visible, body.length, start, max, rail)
   return {
-    shown: body.slice(start, end),
+    shown,
     indicator: [segment(`Lines ${start + 1}-${end} of ${body.length}, ${more}`, "hint")],
     scroll: { page: Math.max(1, size - 1), max },
   }
 }
+
+/** A scrollable page gets a one-cell thumb and track, at the end of its content rows. */
+const scrollbar = (
+  shown: ReadonlyArray<Line>,
+  total: number,
+  start: number,
+  max: number,
+  { width, look }: { readonly width: number; readonly look: Look },
+): ReadonlyArray<Line> => {
+  const visible = shown.length
+  const thumb = Math.max(1, Math.round((visible * visible) / total))
+  const first = Math.round(((visible - thumb) * start) / max)
+  return shown.map((line, index) => {
+    const within = index >= first && index < first + thumb
+    const target =
+      visible === 1 ? (start === 0 ? max : 0) : Math.round((index * max) / (visible - 1))
+    const body = fitLine(line, width - 2, glyphs(look).ellipsis)
+    const used = body.reduce((sum, part) => sum + cells(part.text), 0)
+    return [
+      ...body,
+      segment(" ".repeat(width - 1 - used)),
+      {
+        text: look.unicode ? (within ? "█" : "│") : within ? "#" : "|",
+        tone: within ? "focus" : "option",
+        click: { scrollTo: target },
+      },
+    ]
+  })
+}
+
+const scrollRail = (scrolling: boolean, width: number, look: Look) =>
+  scrolling && width >= 8 ? { width, look } : undefined
 
 const REVIEW_RECOVERY =
   "Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later."
@@ -605,9 +654,9 @@ const reviewLayout = (state: State, context: Context): Layout => {
       width,
     )
   if (state.failure !== undefined) {
-    const cause = wrap(state.failure, width - 2).map((part): Line => [
-      segment(`  ${part}`, "error"),
-    ])
+    const failure = state.failure
+    const causeOf = (limit: number) =>
+      wrap(failure, limit - 2).map((part): Line => [segment(`  ${part}`, "error")])
     const recovery = hintLines(REVIEW_RECOVERY, width)
     const actions = actionLines()
     // The recovery hint and the actions are what the person needs, so they always show; the cause
@@ -617,7 +666,14 @@ const reviewLayout = (state: State, context: Context): Layout => {
       const layout = (scrolling: boolean) => {
         const top = [...keys(scrolling), ...gap, ...heading_]
         const bottom = [...gap, ...recovery, ...gap, ...actions]
-        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll)
+        const rail = scrollRail(scrolling, width, look)
+        const cause = causeOf(rail === undefined ? width : width - 2)
+        const page = pageOf(
+          cause,
+          context.height - 1 - top.length - bottom.length,
+          state.scroll,
+          rail,
+        )
         return {
           lines: [
             ...top,
@@ -635,7 +691,7 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
     // The blank separators go first when the screen is too short to leave the cause three lines.
     const spaced = build(true)
-    const chosen = spaced.shown >= Math.min(3, cause.length) ? spaced : build(false)
+    const chosen = spaced.shown >= Math.min(3, causeOf(width).length) ? spaced : build(false)
     return { lines: chosen.lines, scroll: chosen.scroll }
   }
   if (state.review === undefined) {
@@ -652,40 +708,40 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
   }
   const { review } = state
-  const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
-    ...heading(name, width),
-    ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
-    blank,
-  ])
-  const capabilities = review.capabilities ?? []
-  const nameWidth = Math.max(
-    ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
-  )
-  const entries = (lines: ReadonlyArray<ReviewLine>) =>
-    lines.flatMap((line) => reviewEntry(line, nameWidth, width))
-  const section = (title: string, lines: ReadonlyArray<ReviewLine>): ReadonlyArray<Line> =>
-    lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank]
-  const t3 = [
-    ...(review.file === undefined
-      ? []
-      : [
-          ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
-          blank,
-        ]),
-    ...section("Your choices", review.choices),
-    ...section("Always applied", review.always),
-  ]
-  const body: ReadonlyArray<Line> = [
-    ...harnesses,
-    ...section("Capabilities", capabilities),
-    ...t3,
-  ].slice(0, -1)
+  const bodyOf = (width: number) => {
+    const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
+      ...heading(name, width),
+      ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+      blank,
+    ])
+    const capabilities = review.capabilities ?? []
+    const nameWidth = Math.max(
+      ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
+    )
+    const entries = (lines: ReadonlyArray<ReviewLine>) =>
+      lines.flatMap((line) => reviewEntry(line, nameWidth, width))
+    const section = (title: string, lines: ReadonlyArray<ReviewLine>): ReadonlyArray<Line> =>
+      lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank]
+    const t3 = [
+      ...(review.file === undefined
+        ? []
+        : [
+            ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
+            blank,
+          ]),
+      ...section("Your choices", review.choices),
+      ...section("Always applied", review.always),
+    ]
+    return [...harnesses, ...section("Capabilities", capabilities), ...t3].slice(0, -1)
+  }
   const actions = actionLines()
   // The title takes one line, and the line above the actions holds the scroll indicator, if any.
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {
     const top = [...keys(scrolling), blank, ...heading_]
     const room = context.height - 1 - top.length - 1 - actions.length
-    const page = pageOf(body, room, state.scroll)
+    const rail = scrollRail(scrolling, width, look)
+    const body = bodyOf(rail === undefined ? width : width - 2)
+    const page = pageOf(body, room, state.scroll, rail)
     return {
       lines: [...top, ...page.shown, page.indicator ?? blank, ...actions],
       scroll: page.scroll,
@@ -706,16 +762,17 @@ const reportTone = (line: string): Tone =>
         : "hint"
 
 const doneLayout = (state: State, context: Context): Layout => {
-  const { width, height } = context
+  const { width, height, look } = context
   const applied = state.applied ?? { ok: false, lines: [] }
-  const body = state.details
-    ? applied.lines.flatMap((line) =>
-        wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
-      )
-    : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
-        ...heading(title, width),
-        ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
-      ])
+  const bodyOf = (width: number) =>
+    state.details
+      ? applied.lines.flatMap((line) =>
+          wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
+        )
+      : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
+          ...heading(title, width),
+          ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+        ])
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {
     const top: ReadonlyArray<Line> = [
       [{ text: "Close (Enter or q)", tone: "option", click: "close" }],
@@ -732,7 +789,9 @@ const doneLayout = (state: State, context: Context): Layout => {
         segment(part, applied.ok ? "success" : "error"),
       ]),
     ]
-    const page = pageOf(body, height - 1 - top.length, state.scroll)
+    const rail = scrollRail(scrolling, width, look)
+    const body = bodyOf(rail === undefined ? width : width - 2)
+    const page = pageOf(body, height - 1 - top.length, state.scroll, rail)
     return {
       lines: [...top, ...page.shown, ...(page.indicator === undefined ? [] : [page.indicator])],
       scroll: page.scroll,
