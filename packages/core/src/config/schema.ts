@@ -41,7 +41,6 @@ export type PiProvider = typeof PiProvider.Type
 
 /** Enabled Pi model providers and the default for routes without their own provider. */
 export interface PiProviderSelection {
-  readonly provider: PiProvider
   readonly providers: ReadonlyArray<PiProvider>
 }
 
@@ -65,7 +64,10 @@ export type RouteKey = "root" | RoleTask
 
 /** The model and reasoning level of one route-table row. */
 export interface RouteChoice {
-  /** A per-role provider override; absent uses the section's provider. */
+  /**
+   * Explicit provider for this role. With no override, selection uses the applicable routing
+   * policy.
+   */
   readonly provider?: PiProvider
   readonly model: string
   readonly thinking: Thinking
@@ -268,7 +270,8 @@ const withProviderRoutes = (pi: typeof PiAsWritten.Type): typeof PiResolved.Enco
       key,
       (() => {
         const override = pi.routes[key]
-        const provider = override.provider ?? pi.provider
+        const provider =
+          override.provider ?? (pi.providers?.length === 1 ? pi.providers[0] : pi.provider)
         const baseline = PROVIDER_ROUTES[provider][key]
         const profileModel =
           pi.profile === "fast" && key === "root" && provider === "openai-codex"
@@ -322,7 +325,7 @@ const RoutingBenchmark = Schema.Struct({
   requiredCapabilities: Schema.Array(Schema.String),
 })
 
-/** Opt-in, versioned subscription evidence and declared candidate allowlist. */
+/** Versioned routing evidence and declared candidate allowlist. */
 export const RoutingSettings = Schema.Struct({
   version: Schema.Literal(1),
   evidence: EvidenceDataset,
@@ -330,7 +333,7 @@ export const RoutingSettings = Schema.Struct({
   benchmarks: Schema.Array(RoutingBenchmark),
   maxAgeDays: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 365 })),
 })
-/** One configured subscription routing dataset. */
+/** One configured routing dataset. */
 export type RoutingSettings = typeof RoutingSettings.Type
 
 /** The `claude` section: read only by the Claude plugin. It holds no option yet. */

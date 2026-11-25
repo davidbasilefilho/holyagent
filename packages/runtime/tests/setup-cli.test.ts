@@ -91,6 +91,10 @@ describe("public setup harnesses", () => {
     await mkdir(bin)
     await writeFile(join(bin, programName("pi")), "", { mode: 0o755 })
     const config = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(home, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { providers: ["kimi-coding-global"] } }),
+    )
     const pi = join(home, "pi", "settings.json")
     const t3 = join(home, "t3", "userdata", "settings.json")
     await Bun.write(pi, JSON.stringify({ packages: piPackages(config, undefined, "headless") }))

@@ -8,7 +8,11 @@ import {
 } from "@holyagent/core"
 import { dispatchedAssignment } from "@holyagent/core/api/report.ts"
 import { agentFor, routeFor } from "@holyagent/core/domain/route.ts"
-import { selectConfiguredRoute } from "@holyagent/core/routing/selection.ts"
+import {
+  type PiRoutingAvailability,
+  piRoutingProfile,
+  selectConfiguredRoute,
+} from "@holyagent/core/routing/selection.ts"
 import { Effect } from "effect"
 
 import { AGENT_TYPES } from "./specialists.ts"
@@ -16,6 +20,14 @@ import { AGENT_TYPES } from "./specialists.ts"
 /** Matches the names Pi resolves after trimming and case folding. */
 export const isManagedProfileAgent = (value: unknown): boolean =>
   typeof value === "string" && AGENT_TYPES.includes(value.trim().toLowerCase())
+
+/** Read Pi's authenticated model catalog without trusting model/tool input. */
+export const authenticatedPiModels = (
+  getRegistry: () => { readonly getAvailable: () => PiRoutingAvailability } | undefined,
+): PiRoutingAvailability =>
+  Effect.runSync(
+    Effect.try(() => getRegistry()?.getAvailable() ?? []).pipe(Effect.orElseSucceed(() => [])),
+  )
 
 /** Refuse fuzzy provider fallback on profile launches; workflows lack a per-child veto. */
 export const refuseProfileLaunch = (
@@ -54,10 +66,8 @@ export const refuseProfileLaunch = (
   const slash = model.indexOf("/")
   const provider = model.slice(0, slash)
   const id = model.slice(slash + 1)
-  const available = Effect.runSync(
-    Effect.try(() => registry?.getAvailable()).pipe(Effect.orElseSucceed(() => undefined)),
-  )
-  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
+  const available = authenticatedPiModels(() => registry)
+  if (!available.some((entry) => entry.provider === provider && entry.id === id))
     return {
       block: true,
       reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`,
@@ -84,7 +94,7 @@ export const currentProfileRouting = (
       projectDirectories: [stateDirectory(root)],
       env,
     })
-    return config.pi.profile !== undefined
+    return piRoutingProfile(config.pi) !== undefined
   }).pipe(Effect.catch(() => Effect.succeed(undefined)))
 
 /** Validates a managed launch against fresh read-only Core state and configuration. */
@@ -92,6 +102,7 @@ export const checkProfileLaunch = (
   input: Readonly<Record<string, unknown>>,
   cwd: string,
   env: Readonly<Record<string, string | undefined>>,
+  available?: PiRoutingAvailability,
 ) =>
   Effect.gen(function* () {
     const prompt = input["prompt"]
@@ -117,7 +128,7 @@ export const checkProfileLaunch = (
       env,
     })
     const raw = env.HOLYAGENT_ROUTING_PROFILE?.trim()
-    const profile = raw ? raw : config.pi.profile
+    const profile = raw ? raw : piRoutingProfile(config.pi)
     if ((profile !== "normal" && profile !== "fast") || !config.pi.enable)
       return "The current routing profile is unavailable. Redispatch the Assignment."
     const selected = selectConfiguredRoute(
@@ -128,6 +139,7 @@ export const checkProfileLaunch = (
       found.screen === true,
       profile,
       new Date().toISOString(),
+      available,
     )
     const saved = found.specialist.intendedLaunch
     if (

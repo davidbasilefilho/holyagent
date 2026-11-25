@@ -4,6 +4,7 @@ import { loadConfigWithSource } from "../config/load.ts"
 import { IntentId } from "../domain/ids.ts"
 import { recommend } from "../domain/plan.ts"
 import { findIntent } from "../domain/project.ts"
+import { piRoutingProfile } from "../routing/selection.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { workTreeKey } from "../state/local.ts"
 import { StateMode } from "../state/mode.ts"
@@ -44,7 +45,8 @@ export const plan = (context: Context, input: typeof schemas.plan.Encoded) =>
         const active =
           source?.config.pi.enable === false
             ? false
-            : requested !== undefined || source?.config.pi.profile !== undefined
+            : requested !== undefined ||
+              (source !== undefined && piRoutingProfile(source.config.pi) !== undefined)
         const execution = active
           ? {
               ...context.execution,
