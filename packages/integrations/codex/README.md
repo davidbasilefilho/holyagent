@@ -1,22 +1,20 @@
 # Codex startup preview
 
-This developer tool stages a fresh Codex profile. It does not install a public HolyAgent setup target, edit an existing Codex profile, or change the environment of a running session.
+HolyAgent can prepare a dedicated native Codex profile and install the HolyAgent plugin through Codex's marketplace commands. Setup does not change a running session or configure credentials, sandboxing or approvals. The T3 Code workflow with Pi remains the supported public workflow while hosted Codex startup is being verified.
 
-From the checkout, pass an existing absolute staging directory. The command prints the path to a new private profile.
+Use a Codex CLI on the verified 0.172.0 line. Run these commands from the installed HolyAgent package, or select Codex in the interactive setup and review the plan.
 
 ```sh
-profile="$(bun packages/integrations/codex/src/startup.ts /absolute/staging-directory)"
-CODEX_HOME="$profile" codex plugin marketplace add "$profile/holyagent/marketplace"
-CODEX_HOME="$profile" codex plugin add holyagent@holyagent-local
+profile="$HOME/.holyagent/codex"
+holyagent setup codex --codex-home "$profile" --dry-run
+holyagent setup codex --codex-home "$profile"
 CODEX_HOME="$profile" codex features list
 ```
 
-Set `CODEX_HOME` on the process that starts Codex. The staged profile selects GPT-6.2 Sol and enables the native Default-mode question feature where the installed Codex supports it. It does not configure credentials, sandboxing, or approvals.
+Pass an absolute directory, or omit `--codex-home` to use the `codex` directory under `HOLYAGENT_HOME` or `~/.holyagent`. Start Codex with `CODEX_HOME` set **before launch**. The new profile selects GPT-6.2 Sol and enables the native Default-mode question feature. Setup can adopt an earlier staged profile with the same delegation settings. It keeps unrelated settings, refuses conflicting or modified files, and does not enable a plugin you disabled. Use another profile to change delegation modes.
 
-Native agent delegation is disabled in the default profile, including delegation from the root. Disabling only the V2 feature is not sufficient because the selected model can activate V2.
+The default profile disables native agents at the common entry point, including delegation from the root. Disabling only the V2 feature is not sufficient because Codex can select V2 from model metadata.
 
-To evaluate root-only delegation locally on the 0.172.0 runtime line, download the [unmodified Codex model catalog at that tag](https://raw.githubusercontent.com/openai/codex/rust-v0.172.0/codex-rs/models-manager/models.json) and pass the absolute path to `startup.ts` as `--root-only-catalog /absolute/models.json`. The staging command verifies the catalog fingerprint. The new profile directs native Codex to a copy of that catalog in which V2 models use V1, sets V1 depth to one, and withholds the V2 native tools. Sol remains the default model. The V1 collaboration tools stay directly visible on the root even when the model uses Code Mode.
+To test adaptive root-only delegation, download the [unmodified Codex 0.172.0 model catalog](https://raw.githubusercontent.com/openai/codex/rust-v0.172.0/codex-rs/models-manager/models.json). On a fresh profile, pass its absolute path to setup as `--root-only-catalog /absolute/models.json`. Setup checks the catalog fingerprint, selects native V1 with maximum depth one, and keeps the V2 tools unavailable. The root can work directly or delegate, while its specialists cannot delegate again.
 
-The optional profile pins the whole model catalog instead of taking live catalog updates. It is for isolated local compatibility checks, not a replacement for the hosted model catalog. Check the effective configuration on the target before enabling a supported launch. If the launcher does not select this profile or its higher-priority settings change the effective mode, use the direct-only profile.
-
-An environment setup script can stage the files before a launch, but staging alone does not prove a hosted launcher will select that profile. Verify the effective user configuration layer in the launched process before enabling hosted use.
+The optional profile pins the model catalog. It is not a replacement for the hosted catalog. Verify the effective configuration layer in the launched process before enabling native delegation on a host. If the launcher does not select the profile or later overrides change the mode, do not enable delegation there.

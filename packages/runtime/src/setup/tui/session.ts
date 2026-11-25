@@ -273,8 +273,9 @@ export interface InteractiveOptions {
   readonly previewPi?: (choices: Choices, capabilities: CapabilityChoices) => Effect.Effect<Report>
   /** Read-only preview and confirmed application of the public harness selections. */
   readonly combined?: {
+    readonly codexHome?: string
     readonly run: (
-      target: "pi" | "claude",
+      target: "pi" | "claude" | "codex",
       choices: Choices,
       capabilities: CapabilityChoices,
       dryRun: boolean,
@@ -387,8 +388,9 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   const failedReport = (report: Report) =>
     new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed")
   const selectionOf = (choices: Choices) =>
-    (["pi", "claude"] as const).filter((target) => choices.harnesses?.[target] === true)
-  const label = (target: "pi" | "claude") => (target === "pi" ? "Pi / T3 Code" : "Claude Code")
+    (["pi", "claude", "codex"] as const).filter((target) => choices.harnesses?.[target] === true)
+  const label = (target: "pi" | "claude" | "codex") =>
+    target === "pi" ? "Pi / T3 Code" : target === "claude" ? "Claude Code" : "Codex"
   let applyStarted = false
   let reviewedChoices: Choices | undefined
   let reviewSequence = 0
@@ -400,13 +402,29 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     offer: {
       ...offerOf(preview, offers, options.form),
       ...(providerChoices === undefined ? {} : { providers: PiProvider.literals }),
-      ...(combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }),
+      ...(combined === undefined
+        ? {}
+        : {
+            harnesses: {
+              piAvailable,
+              scope: options.scope,
+              ...(combined.codexHome === undefined ? {} : { codexHome: combined.codexHome }),
+            },
+          }),
     },
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
       ...(providerChoices === undefined ? {} : { piProviders: providerChoices }),
-      ...(combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }),
+      ...(combined === undefined
+        ? {}
+        : {
+            harnesses: {
+              pi: piAvailable,
+              claude: false,
+              ...(combined.codexHome === undefined ? {} : { codex: false }),
+            },
+          }),
     },
     dryRun: options.dryRun,
     review: (choices) =>
@@ -420,6 +438,8 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               return yield* Effect.fail(new Error("Enable at least one available harness."))
             if (targets.includes("pi") && !piAvailable)
               return yield* Effect.fail(new Error("Pi is not available for setup here."))
+            if (targets.includes("codex") && combined.codexHome === undefined)
+              return yield* Effect.fail(new Error("Codex setup is not available here."))
             const changed = changedSwitches(initialSwitches, choices.capabilities)
             const plans = yield* Effect.forEach(targets, (target, index) =>
               combined

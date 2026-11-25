@@ -8690,7 +8690,7 @@ var describeFailure = (error, words = CLAUDE_WORDS) => {
 
 import { constants as constants6, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
-import { resolve as resolve14 } from "path";
+import { resolve as resolve15 } from "path";
 var version = "0.4.0";
 var package_default = {
   name: "holyagent",
@@ -29538,6 +29538,341 @@ var MIGRATE_COMMANDS = [
     run: coreCommand("migrate")
   }
 ];
+
+import { join as join33 } from "path";
+
+import { randomUUID as randomUUID4 } from "crypto";
+import { lstat as lstat11, mkdir as mkdir12, readFile as readFile6, rename as rename8, rm as rm11, writeFile as writeFile7 } from "fs/promises";
+import { dirname as dirname14, isAbsolute as isAbsolute11, join as join32, resolve as resolve14 } from "path";
+
+var SKILL_default = `---
+name: holyagent-workflow
+description: Use when work has independent parts, shared files or a material risk that needs separate verification. Scope the work and judge the result against concrete evidence.
+---
+
+# HolyAgent workflow
+
+Handle a straightforward change or answer directly. Define the expected result and run the checks that exercise it.
+
+For substantial work, identify independent parts and who owns each one. Give a specialist the outcome, relevant constraints, writable paths or resources, and the evidence you need. Keep writes disjoint and reviews independent of the work under review.
+
+Use the repository's gates. Verify each material claim at the boundary it concerns, including the real host or user-facing path when it matters. Use independent review for high-impact or trust-boundary changes. Report the result, checks and unresolved limits.
+`;
+
+var CODEX_ASSET_VERSION = version;
+var CODEX_MARKETPLACE = "holyagent-local";
+var CODEX_PLUGIN = `holyagent@${CODEX_MARKETPLACE}`;
+var CODEX_MODEL = "gpt-6.2-sol";
+var CODEX_DEFAULT_EFFORT = "medium";
+var json = (value) => `${JSON.stringify(value, null, 2)}
+`;
+var plugin = "plugins/holyagent";
+var codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
+  {
+    path: ".agents/plugins/marketplace.json",
+    content: json({
+      name: CODEX_MARKETPLACE,
+      plugins: [
+        {
+          name: "holyagent",
+          source: { source: "local", path: `./${plugin}` },
+          policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
+          category: "Productivity"
+        }
+      ]
+    })
+  },
+  {
+    path: `${plugin}/.codex-plugin/plugin.json`,
+    content: json({
+      name: "holyagent",
+      version: assetVersion,
+      description: "Scope, ownership and evidence for Codex work.",
+      skills: "./skills/",
+      interface: { displayName: "HolyAgent" }
+    })
+  },
+  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: SKILL_default }
+];
+var roleProfiles = {
+  "Explorer.map": ["low", "Map the requested code paths and point to the files that own them."],
+  "Explorer.lookup": ["low", "Find a specific fact in the codebase and cite its source."],
+  "Explorer.trace": ["medium", "Trace how the target behavior reaches its callers and effects."],
+  "Librarian.lookup": ["low", "Find the requested fact in authoritative documentation."],
+  "Librarian.research": ["medium", "Reconcile primary sources and identify unresolved questions."],
+  "Worker.mechanical": ["low", "Apply the specified mechanical change and check its coverage."],
+  "Worker.implementation": ["medium", "Implement the scoped change and verify its behavior."],
+  "Worker.integration": ["medium", "Connect the components and exercise their normal entry point."],
+  "Worker.operations": ["medium", "Run the scoped operation and report its observed result."],
+  "Worker.validation": ["low", "Exercise the stated acceptance criteria and record the outcomes."],
+  "Worker.debugging": ["high", "Isolate the cause of ambiguous behavior and verify the repair."],
+  "Worker.visual": ["medium", "Implement the visual change and inspect it at the intended size."],
+  "Reviewer.visual": ["high", "Review the rendered artifact and reproduce material visual issues."],
+  "Reviewer.code": ["medium", "Find and prioritize actionable correctness regressions."],
+  "Reviewer.testing": ["medium", "Find material coverage gaps and unreliable verification."],
+  "Reviewer.audit": ["high", "Check the substantive requirements against observable evidence."],
+  "Reviewer.security": ["high", "Review security boundaries and substantiate material findings."],
+  "Reviewer.artifact": ["medium", "Review the artifact against its audience and requirements."]
+};
+var codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independence }) => {
+  const [effort, purpose] = roleProfiles[roleTask];
+  const name = `holyagent-${agent}`;
+  const scope = mutability === "ReadOnly" ? "Inspect and report without editing project files." : "Make changes within the paths or resources assigned to you.";
+  const evidence = independence === "IndependentReview" ? "Review independently of implementation. Cite concrete evidence for each material finding." : "Report what changed, the checks run and any unresolved blockers.";
+  return {
+    path: `agents/${name}.toml`,
+    content: [
+      `name = ${JSON.stringify(name)}`,
+      `description = ${JSON.stringify(purpose)}`,
+      `model = ${JSON.stringify(CODEX_MODEL)}`,
+      `model_reasoning_effort = ${JSON.stringify(effort)}`,
+      `developer_instructions = ${JSON.stringify(`${purpose} ${scope} ${evidence}`)}`,
+      ""
+    ].join(`
+`)
+  };
+});
+
+import { mkdtemp as mkdtemp5 } from "fs/promises";
+import { isAbsolute as isAbsolute10, join as join31 } from "path";
+var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace";
+var catalogName = "root-only-models.json";
+var verifiedCatalog = "d50b6749506d97e5f334dbabcb666eb1689f423cf3e88cfabdcf3c536b873068";
+var Catalog = fromJsonString2(Struct({ models: NonEmptyArray(Record(String5, Unknown2)) }));
+var codexStartupConfig = (rootOnlyCatalogPath) => [
+  `model = ${JSON.stringify(CODEX_MODEL)}`,
+  `model_reasoning_effort = ${JSON.stringify(CODEX_DEFAULT_EFFORT)}`,
+  ...rootOnlyCatalogPath === undefined ? [] : [`model_catalog_json = ${JSON.stringify(rootOnlyCatalogPath)}`],
+  "",
+  "[agents]",
+  `enabled = ${rootOnlyCatalogPath !== undefined}`,
+  "max_depth = 1",
+  "",
+  "[features]",
+  ...rootOnlyCatalogPath === undefined ? ["multi_agent_v2 = false"] : [],
+  "default_mode_request_user_input = true",
+  ...rootOnlyCatalogPath === undefined ? [] : [
+    "",
+    "[features.multi_agent_v2]",
+    "enabled = false",
+    "disable_native_tools = true",
+    "",
+    "[features.code_mode]",
+    'direct_only_tool_namespaces = ["multi_agent_v1"]'
+  ],
+  ""
+].join(`
+`);
+
+class StartupStageError extends TaggedError2("StartupStageError") {
+}
+var readRootOnlyCatalog = fn2("readRootOnlyCatalog")(function* (file) {
+  if (!isAbsolute10(file))
+    return yield* new StartupStageError({ detail: "Use an absolute path to the Codex catalog" });
+  const text = yield* tryPromise2({
+    try: () => Bun.file(file).text(),
+    catch: (cause) => new StartupStageError({ detail: String(cause) })
+  });
+  if (Bun.CryptoHasher.hash("sha256", text, "hex") !== verifiedCatalog)
+    return yield* new StartupStageError({ detail: "Expected the unmodified Codex 0.172.0 catalog" });
+  const original = yield* decodeUnknownEffect2(Catalog)(text, {
+    onExcessProperty: "error"
+  }).pipe(mapError2((cause) => new StartupStageError({ detail: String(cause) })));
+  return `${JSON.stringify({
+    models: original.models.map((model) => model["multi_agent_version"] === "v2" ? { ...model, multi_agent_version: "v1" } : model)
+  })}
+`;
+});
+var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile, version = CODEX_ASSET_VERSION) {
+  const catalog = catalogFile === undefined ? undefined : yield* readRootOnlyCatalog(catalogFile);
+  return [
+    {
+      path: "config.toml",
+      content: codexStartupConfig(catalog === undefined ? undefined : join31(target, catalogName))
+    },
+    ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
+    ...codexRoleFiles(),
+    ...codexMarketplaceFiles(version).map(({ path, content }) => ({
+      path: join31(CODEX_STARTUP_MARKETPLACE, path),
+      content
+    }))
+  ];
+});
+var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile) {
+  if (!isAbsolute10(parent))
+    return yield* new StartupStageError({ detail: "Use an absolute staging directory" });
+  if (catalogFile !== undefined)
+    yield* readRootOnlyCatalog(catalogFile);
+  const target = yield* tryPromise2({
+    try: () => mkdtemp5(join31(parent, "holyagent-codex-")),
+    catch: (cause) => new StartupStageError({ detail: String(cause) })
+  });
+  const files = yield* codexStartupFiles(target, catalogFile);
+  yield* forEach2(files, ({ path, content }) => tryPromise2({
+    try: () => Bun.write(join31(target, path), content),
+    catch: (cause) => new StartupStageError({ detail: `${path}: ${String(cause)}` })
+  }));
+  return target;
+});
+if (false) {}
+
+var Receipt = fromJsonString2(Struct({
+  version: Literal2(1),
+  files: Record(String5, String5)
+}));
+var MarketplaceResult = Struct({ marketplaceName: Literal2(CODEX_MARKETPLACE) });
+var PluginResult = Struct({
+  pluginId: Literal2(CODEX_PLUGIN),
+  version: String5
+});
+var receiptFile = join32("holyagent", "setup-v1.json");
+var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
+var fail9 = (detail) => new StartupStageError({ detail });
+var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex");
+var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) });
+var statOptional = (path) => io2(path, () => lstat11(path).then((stat) => stat, (error) => error.code === "ENOENT" ? undefined : Promise.reject(error)));
+var inside = fn2("codexSetupPath")(function* (home, relativePath) {
+  let path = home;
+  const root = yield* statOptional(home);
+  if (root !== undefined && !root.isDirectory())
+    return yield* fail9(`Not a real profile directory: ${home}`);
+  const pieces = relativePath.split(/[\\/]/);
+  if (pieces.some((piece) => piece === "" || piece === "." || piece === ".."))
+    return yield* fail9(`Invalid relative profile path: ${relativePath}`);
+  for (const [i, piece] of pieces.entries()) {
+    path = join32(path, piece);
+    const entry = yield* statOptional(path);
+    if (entry !== undefined && (entry.isSymbolicLink() || i < pieces.length - 1 && !entry.isDirectory()))
+      return yield* fail9(`Not a real profile path: ${path}`);
+  }
+  return path;
+});
+var read2 = fn2("codexSetupRead")(function* (home, entry) {
+  const file = yield* inside(home, entry);
+  const stat = yield* statOptional(file);
+  if (stat === undefined)
+    return;
+  if (!stat.isFile())
+    return yield* fail9(`Not a regular profile file: ${file}`);
+  return yield* io2(file, () => readFile6(file, "utf8"));
+});
+var record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
+var parseToml = (content) => try_2({
+  try: () => record4(Bun.TOML.parse(content)),
+  catch: () => fail9("Invalid Codex config.toml; left it unchanged")
+});
+var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+var checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
+  const currentAgents = record4(current.agents);
+  const wantedAgents = record4(wanted.agents);
+  const currentFeatures = record4(current.features);
+  const wantedFeatures = record4(wanted.features);
+  const foundV2 = record4(currentFeatures.multi_agent_v2);
+  const wantedV2 = record4(wantedFeatures.multi_agent_v2);
+  const v2Matches = wantedFeatures.multi_agent_v2 === false ? currentFeatures.multi_agent_v2 === false : foundV2.enabled === wantedV2.enabled && foundV2.disable_native_tools === wantedV2.disable_native_tools;
+  if (currentAgents.enabled !== wantedAgents.enabled || currentAgents.max_depth !== wantedAgents.max_depth || !v2Matches || !same2(current.model_catalog_json, wanted.model_catalog_json) || wantedAgents.enabled === true && !same2(record4(currentFeatures.code_mode).direct_only_tool_namespaces, record4(wantedFeatures.code_mode).direct_only_tool_namespaces))
+    return yield* fail9("Existing Codex delegation settings do not match this mode. Use a separate --codex-home, or keep its original --root-only-catalog. Nothing was written.");
+});
+var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expected, content) {
+  if (expected === content)
+    return;
+  const path = yield* inside(home, relativePath);
+  yield* io2(path, () => mkdir12(dirname14(path), { recursive: true }));
+  if ((yield* read2(home, relativePath)) !== expected)
+    return yield* fail9(`Profile changed during setup: ${path}`);
+  if (expected === undefined) {
+    yield* io2(path, () => writeFile7(path, content, { flag: "wx", mode: 384 }));
+    return;
+  }
+  const next = `${path}.${randomUUID4()}.tmp`;
+  yield* io2(path, () => writeFile7(next, content, { flag: "wx", mode: 384 }));
+  yield* gen2(function* () {
+    if ((yield* read2(home, relativePath)) !== expected)
+      return yield* fail9(`Profile changed during setup: ${path}`);
+    yield* io2(path, () => rename8(next, path));
+  }).pipe(ensuring2(io2(next, () => rm11(next, { force: true })).pipe(ignore2)));
+});
+var setupCodex = fn2("setupCodex")(function* (env, options) {
+  if (!isAbsolute11(options.home))
+    return yield* fail9("--codex-home must be an absolute path");
+  const home = resolve14(options.home);
+  if (home === dirname14(home))
+    return yield* fail9("Choose a dedicated Codex profile, not a filesystem root");
+  const version = options.version ?? CODEX_ASSET_VERSION;
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
+    return yield* fail9("Invalid HolyAgent plugin version");
+  const shell = yield* Shell;
+  const codex = yield* shell.which("codex");
+  if (isNone2(codex))
+    return yield* fail9("Codex is not on PATH. Install the native Codex CLI first.");
+  const run = (args) => shell.run("codex", args, {
+    cwd: homeDirectory2(env),
+    env: { CODEX_HOME: home, NO_COLOR: "1" }
+  }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
+  const desired = yield* codexStartupFiles(home, options.catalog, version);
+  const legacy = yield* codexStartupFiles(home, options.catalog);
+  const config = desired.find(({ path }) => path === "config.toml")?.content;
+  if (config === undefined)
+    return yield* fail9("Missing bundled Codex startup configuration");
+  const beforeConfig = yield* read2(home, "config.toml");
+  const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig);
+  if (beforeConfig !== undefined)
+    yield* checkPolicy(settings, yield* parseToml(config));
+  const market = join32(home, CODEX_STARTUP_MARKETPLACE);
+  const registered = record4(record4(settings.marketplaces)[CODEX_MARKETPLACE]);
+  if (Object.keys(registered).length > 0 && (registered.source !== market || registered.source_type !== "local"))
+    return yield* fail9(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}; kept it unchanged`);
+  const plugin = record4(record4(settings.plugins)[CODEX_PLUGIN]);
+  if (plugin.enabled === false)
+    return yield* fail9("The HolyAgent Codex plugin is disabled in this profile; left that choice unchanged");
+  const beforeReceipt = yield* read2(home, receiptFile);
+  const receipt = beforeReceipt === undefined ? { files: {} } : yield* decodeUnknownEffect2(Receipt, { onExcessProperty: "error" })(beforeReceipt).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed")));
+  const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
+    const before = yield* read2(home, asset.path);
+    if (before !== undefined && before !== asset.content && digest(before) !== receipt.files[asset.path] && before !== legacy.find(({ path }) => path === asset.path)?.content)
+      return yield* fail9(`Kept modified or unowned Codex setup file: ${join32(home, asset.path)}`);
+    return { ...asset, before };
+  }));
+  const nextReceipt = `${JSON.stringify({
+    version: 1,
+    files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
+  }, null, 2)}
+`;
+  const cache = join32("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version, ".codex-plugin", "plugin.json");
+  const installed = yield* read2(home, cache);
+  const install = plugin.enabled !== true || installed === undefined;
+  const addMarket = Object.keys(registered).length === 0;
+  const lines = [
+    `~ Codex home: ${home}`,
+    `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
+    ...beforeConfig === undefined ? ["+ Codex config: create a dedicated startup profile"] : ["= Codex config: keeping existing settings"],
+    ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
+    ...addMarket ? ["+ Codex plugin: register the local marketplace"] : [],
+    ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present`],
+    "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
+  ];
+  if (options.dryRun)
+    return { ok: true, lines };
+  const binary = yield* run(["--version"]);
+  if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
+    return yield* fail9("This startup profile requires the verified Codex 0.172.0 runtime line");
+  if ((yield* read2(home, "config.toml")) !== beforeConfig)
+    return yield* fail9(`Profile changed during setup: ${join32(home, "config.toml")}`);
+  yield* io2(home, () => mkdir12(home, { recursive: true, mode: 448 }));
+  if (beforeConfig === undefined)
+    yield* store2(home, "config.toml", undefined, config);
+  for (const asset of assets)
+    yield* store2(home, asset.path, asset.before, asset.content);
+  yield* store2(home, receiptFile, beforeReceipt, nextReceipt);
+  if (addMarket)
+    yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected marketplace")));
+  if (install) {
+    const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected plugin")));
+    if (result.version !== version)
+      return yield* fail9(`Codex installed version ${result.version}, expected ${version}`);
+  }
+  return { ok: true, lines };
+});
 var AppliedSchema = Struct({
   ok: Boolean3,
   lines: ArraySchema(String5)
@@ -29698,8 +30033,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     } : choices;
   };
   const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
-  const selectionOf = (choices) => ["pi", "claude"].filter((target) => choices.harnesses?.[target] === true);
-  const label = (target) => target === "pi" ? "Pi / T3 Code" : "Claude Code";
+  const selectionOf = (choices) => ["pi", "claude", "codex"].filter((target) => choices.harnesses?.[target] === true);
+  const label = (target) => target === "pi" ? "Pi / T3 Code" : target === "claude" ? "Claude Code" : "Codex";
   let applyStarted = false;
   let reviewedChoices;
   let reviewSequence = 0;
@@ -29710,13 +30045,25 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     offer: {
       ...offerOf(preview, offers, options.form),
       ...providerChoices === undefined ? {} : { providers: PiProvider.literals },
-      ...combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }
+      ...combined === undefined ? {} : {
+        harnesses: {
+          piAvailable,
+          scope: options.scope,
+          ...combined.codexHome === undefined ? {} : { codexHome: combined.codexHome }
+        }
+      }
     },
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
       ...providerChoices === undefined ? {} : { piProviders: providerChoices },
-      ...combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }
+      ...combined === undefined ? {} : {
+        harnesses: {
+          pi: piAvailable,
+          claude: false,
+          ...combined.codexHome === undefined ? {} : { codex: false }
+        }
+      }
     },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
@@ -29728,6 +30075,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
           return yield* fail5(new Error("Enable at least one available harness."));
         if (targets.includes("pi") && !piAvailable)
           return yield* fail5(new Error("Pi is not available for setup here."));
+        if (targets.includes("codex") && combined.codexHome === undefined)
+          return yield* fail5(new Error("Codex setup is not available here."));
         const changed = changedSwitches(initialSwitches, choices.capabilities);
         const plans = yield* forEach2(targets, (target, index) => combined.run(target, withProviderChanges(choices), changed, true, index > 0, true).pipe(map4((report) => ({ name: label(target), ...report }))));
         const error = plans.find((plan) => !plan.ok);
@@ -29850,6 +30199,42 @@ var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) 
 var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]";
 var CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]";
 var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive]");
+var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]";
+var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
+var codexPlan = (args, env, installedPackageRoot, dryRun) => gen2(function* () {
+  const catalog = stringFlag(args, "root-only-catalog");
+  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join33(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
+    return;
+  }));
+  return yield* setupCodex(env, {
+    home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
+    dryRun,
+    ...catalog === undefined ? {} : { catalog },
+    ...version === undefined ? {} : { version }
+  });
+}).pipe(provide3(shellLive(env)), catch_2((error) => succeed6({ ok: false, lines: [`! Codex setup: ${error.detail}`] })));
+var codexCommand = {
+  path: ["setup", "codex"],
+  usage: CODEX_USAGE,
+  summary: "Prepare a dedicated native Codex profile and install the HolyAgent plugin",
+  output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
+  notes: [
+    "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
+    "The verified Codex 0.172.0 runtime must already be on PATH. Setup never changes a running session.",
+    "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
+    "--dry-run never installs or writes. Explicit Codex setup is always non-interactive."
+  ],
+  flags: {
+    "codex-home": "string",
+    "root-only-catalog": "string",
+    "dry-run": "boolean",
+    "non-interactive": "boolean",
+    "no-tui": "boolean"
+  },
+  stateless: true,
+  positionals: 0,
+  run: ({ args, env, installedPackageRoot }) => codexPlan(args, env, installedPackageRoot, booleanFlag(args, "dry-run")).pipe(map4(printed))
+};
 var CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ");
 var switchFlag = fn2("switchFlag")(function* (args, name, usage) {
   const value = stringFlag(args, name);
@@ -29988,7 +30373,8 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         } : {},
         ...surface === "public" && target === undefined ? {
           combined: {
-            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+            codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? codexPlan(args, env, installedPackageRoot, dryRun) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
               target: harness,
               dryRun,
               skipSharedPrerequisites,
@@ -30001,6 +30387,13 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         return printed(interactive.report);
       if (interactive.kind === "applied")
         return surface === "public" ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env) : printed(interactive.report);
+      if (surface === "public" && target === undefined && (stringFlag(args, "codex-home") !== undefined || stringFlag(args, "root-only-catalog") !== undefined))
+        return printed({
+          ok: false,
+          lines: [
+            "! Choose Codex in a terminal, or use holyagent setup codex for unattended provisioning."
+          ]
+        });
       return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide3(shellLive(env)))
   };
@@ -30046,15 +30439,19 @@ var SETUP_COMMANDS = [
   }
 ];
 var publicPiSetup = (target) => {
-  const command = setupCommand(target, target === undefined ? "setup [pi|claude] [options]" : PI_USAGE.replace(/^setup\b/, "setup pi"));
+  const command = setupCommand(target, target === undefined ? "setup [pi|claude|codex] [options]" : PI_USAGE.replace(/^setup\b/, "setup pi"));
   const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags;
   return {
     ...command,
     summary: target === undefined ? "Configure HolyAgent (alias: install)" : command.summary,
-    flags: { ...flags, "non-interactive": "boolean" },
+    flags: {
+      ...flags,
+      "non-interactive": "boolean",
+      ...target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}
+    },
     notes: [
       ...target === undefined ? [
-        "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
+        "In a terminal, bare setup opens one review for selected Pi, Claude Code, and native Codex harnesses. Unattended bare setup still targets Pi. See holyagent setup codex --help for the dedicated native startup profile."
       ] : [],
       ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
       "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
@@ -30062,6 +30459,7 @@ var publicPiSetup = (target) => {
   };
 };
 var PUBLIC_SETUP_COMMANDS = [
+  codexCommand,
   publicPiSetup("pi"),
   {
     ...setupCommand("claude", CLAUDE_USAGE),
@@ -30265,7 +30663,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute10, join as join31, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute12, join as join34, relative as relative7 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
@@ -30297,7 +30695,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
       continue;
     }
     const local = piLocalSourcePath(env, settings, source);
-    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute10(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
+    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute12(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
       managed++;
       continue;
     }
@@ -30312,7 +30710,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     if (root.exitCode !== 0)
       return failure("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute10(location) || relative7(registeredRoot, join31(location, "holyagent")) !== "")
+    if (!isAbsolute12(location) || relative7(registeredRoot, join34(location, "holyagent")) !== "")
       return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -30350,7 +30748,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join31(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join34(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
       return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)
@@ -30553,7 +30951,7 @@ var projectContext = (given, host, surface) => gen2(function* () {
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve14(host.cwd, directory);
+  const cwd = resolve15(host.cwd, directory);
   const location = yield* tryPromise2({
     try: () => stat7(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
@@ -30601,7 +30999,7 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   if (surface === "public" && first === "setup" && command.path.length === 1 && second !== undefined && !second.startsWith("-"))
     return yield* new Usage({
       message: `Unknown setup harness ${second}`,
-      hint: "Choose pi or claude. Run `holyagent setup --help` for options."
+      hint: "Choose pi, claude or codex. Run `holyagent setup --help` for options."
     });
   const provided = argv.slice(command.path.length);
   if ((surface === "agent" || command.passthrough !== true) && requestsHelp(provided)) {
@@ -30622,9 +31020,9 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve14(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve15(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve14(host.cwd, args.positionals[0] ?? "");
+    const path = resolve15(host.cwd, args.positionals[0] ?? "");
     const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
       return;
     }));

@@ -4,6 +4,7 @@ import { isAbsolute, join } from "node:path"
 import { Console, Data, Effect, Schema } from "effect"
 
 import {
+  CODEX_ASSET_VERSION,
   CODEX_DEFAULT_EFFORT,
   CODEX_MODEL,
   codexMarketplaceFiles,
@@ -78,6 +79,27 @@ const readRootOnlyCatalog = Effect.fn("readRootOnlyCatalog")(function* (file: st
   })}\n`
 })
 
+/** Plan all native startup files without writing to the selected Codex home. */
+export const codexStartupFiles = Effect.fn("codexStartupFiles")(function* (
+  target: string,
+  catalogFile?: string,
+  version = CODEX_ASSET_VERSION,
+) {
+  const catalog = catalogFile === undefined ? undefined : yield* readRootOnlyCatalog(catalogFile)
+  return [
+    {
+      path: "config.toml",
+      content: codexStartupConfig(catalog === undefined ? undefined : join(target, catalogName)),
+    },
+    ...(catalog === undefined ? [] : [{ path: catalogName, content: catalog }]),
+    ...codexRoleFiles(),
+    ...codexMarketplaceFiles(version).map(({ path, content }) => ({
+      path: join(CODEX_STARTUP_MARKETPLACE, path),
+      content,
+    })),
+  ]
+})
+
 /** Creates a new private profile directory without inspecting or editing any existing profile. */
 export const stageCodexStartup = Effect.fn("stageCodexStartup")(function* (
   parent: string,
@@ -85,23 +107,12 @@ export const stageCodexStartup = Effect.fn("stageCodexStartup")(function* (
 ) {
   if (!isAbsolute(parent))
     return yield* new StartupStageError({ detail: "Use an absolute staging directory" })
-  const catalog = catalogFile === undefined ? undefined : yield* readRootOnlyCatalog(catalogFile)
+  if (catalogFile !== undefined) yield* readRootOnlyCatalog(catalogFile)
   const target = yield* Effect.tryPromise({
     try: () => mkdtemp(join(parent, "holyagent-codex-")),
     catch: (cause) => new StartupStageError({ detail: String(cause) }),
   })
-  const files = [
-    {
-      path: "config.toml",
-      content: codexStartupConfig(catalog === undefined ? undefined : join(target, catalogName)),
-    },
-    ...(catalog === undefined ? [] : [{ path: catalogName, content: catalog }]),
-    ...codexRoleFiles(),
-    ...codexMarketplaceFiles().map(({ path, content }) => ({
-      path: join(CODEX_STARTUP_MARKETPLACE, path),
-      content,
-    })),
-  ]
+  const files = yield* codexStartupFiles(target, catalogFile)
   yield* Effect.forEach(files, ({ path, content }) =>
     Effect.tryPromise({
       try: () => Bun.write(join(target, path), content),

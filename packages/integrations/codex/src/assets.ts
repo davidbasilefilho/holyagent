@@ -27,7 +27,9 @@ const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`
 const plugin = "plugins/holyagent"
 
 /** Files of a local marketplace containing the native workflow plugin. */
-export const codexMarketplaceFiles = (): ReadonlyArray<CodexAsset> => [
+export const codexMarketplaceFiles = (
+  assetVersion = CODEX_ASSET_VERSION,
+): ReadonlyArray<CodexAsset> => [
   {
     path: ".agents/plugins/marketplace.json",
     content: json({
@@ -46,7 +48,7 @@ export const codexMarketplaceFiles = (): ReadonlyArray<CodexAsset> => [
     path: `${plugin}/.codex-plugin/plugin.json`,
     content: json({
       name: "holyagent",
-      version: CODEX_ASSET_VERSION,
+      version: assetVersion,
       description: "Scope, ownership and evidence for Codex work.",
       skills: "./skills/",
       interface: { displayName: "HolyAgent" },

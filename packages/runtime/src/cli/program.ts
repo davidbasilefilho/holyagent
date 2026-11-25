@@ -399,7 +399,7 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
     )
       return yield* new Usage({
         message: `Unknown setup harness ${second}`,
-        hint: "Choose pi or claude. Run `holyagent setup --help` for options.",
+        hint: "Choose pi, claude or codex. Run `holyagent setup --help` for options.",
       })
     const provided = argv.slice(command.path.length)
     if ((surface === "agent" || command.passthrough !== true) && requestsHelp(provided)) {

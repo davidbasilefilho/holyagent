@@ -60,7 +60,7 @@ describe("the setup interface, review and apply", () => {
   test("retains multiple harnesses and Pi providers by keyboard without applying", async () => {
     const screen = await shown({ width: 80, height: 30, combined: true })
     await screen.keys("down", "down", "enter", "right", "enter", "right")
-    expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
+    expect(screen.lines().join("\n")).toContain("Codex setup is not available")
     await screen.keys("right", "end", "enter")
     expect(screen.reviews).toEqual([
       {
