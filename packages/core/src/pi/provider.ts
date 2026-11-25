@@ -1,5 +1,6 @@
 import { type PiPackageName, piPackageSource } from "../config/pi-packages.ts"
 import type { Config, PiProvider, RouteChoice, RouteKey, Thinking } from "../config/schema.ts"
+import { PROVIDER_ROUTES } from "../config/schema.ts"
 type PiFamily = "kimi-k3.1" | "gpt-6"
 import { APPLY_PATCH_TOOL } from "./codex/names.ts"
 import { CODEX_PROVIDER_ID, screenRoute } from "./codex/routes.ts"
@@ -91,7 +92,8 @@ export interface ModelRoute {
 }
 
 /** The profile of the provider that the config selects. */
-export const providerProfile = (config: Config): ProviderProfile => PROVIDERS[config.pi.provider]
+export const providerProfile = (config: Config): ProviderProfile =>
+  PROVIDERS[config.pi.providers?.length === 1 ? config.pi.providers[0] : config.pi.provider]
 
 /**
  * Turns a route-table row into the Pi model and thinking level to launch, with the provider the
@@ -105,9 +107,40 @@ export const routeModel = (
   options: { readonly screen?: boolean } = {},
 ): ModelRoute => {
   const row = config.pi.routes[key]
-  const profile = PROVIDERS[row.provider ?? config.pi.provider]
+  return resolvedRoute(
+    key,
+    row.provider ??
+      (config.pi.providers?.length === 1 ? config.pi.providers[0] : config.pi.provider),
+    row,
+    options.screen === true,
+  )
+}
+
+/** Model policy for one enabled provider without borrowing another provider's defaults. */
+export const enabledProviderRoute = (
+  key: RouteKey,
+  provider: PiProvider,
+  override: Partial<RouteChoice> | undefined,
+  screen: boolean,
+): ModelRoute => {
+  const baseline = PROVIDER_ROUTES[provider][key]
+  return resolvedRoute(
+    key,
+    provider,
+    { model: override?.model ?? baseline.model, thinking: override?.thinking ?? baseline.thinking },
+    screen,
+  )
+}
+
+const resolvedRoute = (
+  key: RouteKey,
+  provider: PiProvider,
+  row: RouteChoice,
+  screen: boolean,
+): ModelRoute => {
+  const profile = PROVIDERS[provider]
   const { model, thinking } =
-    options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row
+    screen && profile.screenRoute !== undefined ? profile.screenRoute(row) : row
   return {
     key,
     provider: profile.id,
@@ -118,17 +151,15 @@ export const routeModel = (
 }
 
 /**
- * The two Pi settings keys that name one model and so are written, kept and removed as a pair: a
- * model id means something only beside its provider, so a route's model next to a provider chosen
- * by hand (or the reverse) could name a model that provider lacks.
+ * The two Pi settings keys that legacy undo keeps or removes as a pair: a model id means something
+ * only beside its provider, so a route's model next to a provider chosen by hand (or the reverse)
+ * could name a model that provider lacks.
  */
 export const ROOT_MODEL_PAIR: ReadonlyArray<string> = ["defaultProvider", "defaultModel"]
 
 /**
  * The root's route as the three keys Pi's settings hold for the model a session starts on:
- * `defaultProvider`, `defaultModel` and `defaultThinkingLevel`. Setup writes the provider and the
- * model ({@link ROOT_MODEL_PAIR}) together where the user has chosen neither, and the thinking
- * level where it is unset, so the root starts on the route table's row without a launch argument.
+ * `defaultProvider`, `defaultModel` and `defaultThinkingLevel`. Setup does not apply these.
  */
 export const rootModelSettings = (config: Config) => {
   const { provider, model, thinking } = routeModel(config, "root")
@@ -148,13 +179,14 @@ export const routedModels = (config: Config): ReadonlyArray<ModelRoute> =>
 
 /** The Pi model providers available from setup selections, the default and explicit role routes. */
 export const enabledPiProviders = (config: Config): ReadonlyArray<PiProvider> => [
-  ...new Set([
-    config.pi.provider,
-    ...(config.pi.providers ?? []),
-    ...Object.values(config.pi.routes).flatMap(({ provider }) =>
-      provider === undefined ? [] : [provider],
-    ),
-  ]),
+  ...new Set(
+    config.pi.providers ?? [
+      config.pi.provider,
+      ...Object.values(config.pi.routes).flatMap(({ provider }) =>
+        provider === undefined ? [] : [provider],
+      ),
+    ],
+  ),
 ]
 
 /** The variables the launcher sets on a Pi process for the configured providers. */

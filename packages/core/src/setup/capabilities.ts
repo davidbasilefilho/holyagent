@@ -103,9 +103,9 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
   const current = currentPi.features
   const wanted = options.providers
   if (wanted !== undefined) {
-    if (!wanted.providers.includes(wanted.provider))
+    if (wanted.providers.length === 0)
       return yield* new SetupFailure({
-        message: "Select at least one Pi model provider, including the default",
+        message: "Select at least one Pi model provider",
       })
     const required = Object.entries(currentPi.routes).find(
       ([, route]) => route.provider !== undefined && !wanted.providers.includes(route.provider),
@@ -118,7 +118,7 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
   const existingProviders = enabledPiProviders(config)
   const providers =
     wanted === undefined ||
-    (wanted.provider === currentPi.provider &&
+    (config.pi.providers !== undefined &&
       wanted.providers.length === existingProviders.length &&
       wanted.providers.every((provider) => existingProviders.includes(provider)))
       ? undefined
@@ -166,7 +166,7 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
       ? []
       : [
           added(
-            `Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")}; default ${providers.provider} (${file})`,
+            `Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")} (${file})`,
           ),
         ]),
     ...changed.map(({ capability, value }) => {

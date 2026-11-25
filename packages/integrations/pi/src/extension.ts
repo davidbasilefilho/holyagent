@@ -22,6 +22,7 @@ import {
   status as coreStatus,
 } from "@holyagent/core"
 import { reconcileRows, statusFrom } from "@holyagent/core/api/status-views.ts"
+import { piRoutingProfile } from "@holyagent/core/routing/selection.ts"
 import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
@@ -51,6 +52,7 @@ import { bunFlags, fillPackageRoot } from "../../../runtime/src/pi/bun-flags.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import {
+  enabledPiProviders,
   nativeSearchInventory,
   providerEnv,
   WEB_KIT_TOOLS,
@@ -80,6 +82,7 @@ import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { activePiFamily, familyAgentPrompt, familySkillPaths } from "./families.ts"
 import { NATIVE_ROOT_FLAG, registerNativeTools } from "./native-tools.ts"
 import {
+  authenticatedPiModels,
   checkProfileLaunch,
   currentProfileRouting,
   currentUserDisabled,
@@ -611,15 +614,13 @@ const settingsFor = (
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
   const codex = codexSettings(config)
+  const enabled = enabledPiProviders(config)
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
     webMode: config.pi.features.web,
     ...(codex === undefined ? {} : { codex }),
-    ...(config.pi.provider === "openai-codex" &&
-    Object.values(config.pi.routes).every(
-      (row) => (row.provider ?? config.pi.provider) === "openai-codex",
-    )
+    ...(enabled.length === 1 && enabled[0] === "openai-codex"
       ? { uniformCodex: true as const }
       : {}),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
@@ -1265,7 +1266,7 @@ export const createExtension =
           const role = yield* roleOf
           configured = {
             ...settingsFor(config, role, bound, machineForm()),
-            profileRouting: config.pi.profile !== undefined,
+            profileRouting: piRoutingProfile(config.pi) !== undefined,
             ...(user?.pi.enable === true ? { nativeEnabled: true as const } : {}),
           }
           // Status first, then reconcile: for a project that keeps state, status makes the state
@@ -1387,6 +1388,7 @@ export const createExtension =
             return Effect.succeed({ exitCode: 127, stdout: "", stderr: "" })
           }),
         )
+      if ((config.pi.providers?.length ?? 0) > 1) return Effect.succeed(undefined)
       return requireProviderReady(run, config).pipe(
         Effect.andThen(validateModelCatalog(run, config)),
         Effect.as<Delivery | undefined>(undefined),
@@ -1864,7 +1866,12 @@ export const createExtension =
             const refusal = refuseProfileLaunch(event, active, registry)
             if (refusal !== undefined) return refusal
             if (active && managed) {
-              const reason = yield* checkProfileLaunch(event.input, ctx.cwd, env)
+              const reason = yield* checkProfileLaunch(
+                event.input,
+                ctx.cwd,
+                env,
+                authenticatedPiModels(() => registry),
+              )
               if (reason !== undefined) return { block: true, reason } satisfies ToolCallEventResult
             }
             return refuseNonSpecialist(event) ?? (yield* refuseNonSpecialistWorkflow(event))

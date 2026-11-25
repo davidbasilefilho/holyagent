@@ -95,7 +95,15 @@ describe("the setup interface, choose screen", () => {
 describe("the setup interface, review and apply", () => {
   test("retains multiple harnesses and Pi providers by keyboard without applying", async () => {
     const screen = await shown({ width: 80, height: 30, combined: true })
-    await screen.keys("down", "down", "enter", "right", "enter", "right")
+    const initial = screen.lines().join("\n")
+    expect(initial).toMatch(/Kimi for Coding[^\n]*\[x\][^\n]*enabled/)
+    expect(initial).toMatch(/OpenAI Codex[^\n]*\[ \][^\n]*disabled/)
+    expect(initial).not.toMatch(/\[x\][^\n]*default/)
+    await screen.keys("down", "down", "enter")
+    const selected = screen.lines().join("\n")
+    expect(selected).toMatch(/Kimi for Coding[^\n]*\[x\][^\n]*enabled/)
+    expect(selected).toMatch(/OpenAI Codex[^\n]*\[x\][^\n]*enabled/)
+    await screen.keys("right", "enter", "right")
     expect(screen.lines().join("\n")).toContain("Codex setup is not available")
     await screen.keys("right", "end", "enter")
     expect(screen.reviews).toEqual([
@@ -105,7 +113,6 @@ describe("the setup interface, review and apply", () => {
         capabilities: {},
         harnesses: { pi: true, claude: true },
         piProviders: {
-          provider: "kimi-coding-global",
           providers: ["kimi-coding-global", "openai-codex"],
         },
       },

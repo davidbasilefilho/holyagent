@@ -7,6 +7,7 @@ import { canonicalPiToolName } from "../../../runtime/src/domain/host.ts"
 import { CAPABILITIES, executeNative, inventory } from "../../../runtime/src/native/catalog.ts"
 import { firstPassPrompt } from "../../../runtime/src/prompts/index.ts"
 import { encodeRecord } from "../../../runtime/src/toon.ts"
+import { authenticatedPiModels } from "./profile-gate.ts"
 
 /** Explicit root capability; child sessions do not inherit extension flags on pinned Pi. */
 export const NATIVE_ROOT_FLAG = "holyagent-native-root"
@@ -83,7 +84,10 @@ export const registerNativeTools = (pi: ExtensionAPI, host: NativeHost): NativeT
                 host: "pi",
                 authorize: () => allowed(),
                 ...(["assignment dispatch", "plan"].includes(command)
-                  ? {}
+                  ? {
+                      piModels: () =>
+                        Effect.sync(() => authenticatedPiModels(() => ctx.modelRegistry)),
+                    }
                   : { deferRouting: true as const }),
                 workflowsAvailable:
                   pi

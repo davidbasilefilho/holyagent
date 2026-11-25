@@ -106,6 +106,7 @@ const choiceSession = async (options: {
     displayed = true
     const choices: Choices = {
       ...input.initial,
+      piProviders: { providers: ["kimi-coding-global"] },
       browseSetup: options.select,
       ...(options.profile === undefined ? {} : { browseProfile: options.profile }),
     }

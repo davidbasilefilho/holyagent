@@ -3383,6 +3383,7 @@ var exitPrimitive = /* @__PURE__ */ makePrimitive({
     return fiber.succeedWith(exit ?? exitFailCause(cause));
   }
 });
+var timeoutOrElse = /* @__PURE__ */ dual(2, (self, options) => flatMap(timeoutOption(self, options.duration), (option) => isNone2(option) ? options.orElse() : succeed3(option.value)));
 var timeoutOption = /* @__PURE__ */ dual(2, (self, duration) => raceFirst(asSome(self), as(sleep(duration), none2())));
 var ScopeTypeId = "~effect/Scope";
 var ScopeCloseableTypeId = "~effect/Scope/Closeable";
@@ -4637,6 +4638,7 @@ var retry2 = retry;
 var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOption2 = timeoutOption;
+var timeoutOrElse2 = timeoutOrElse;
 var sleep2 = sleep;
 var raceFirst2 = raceFirst;
 var filter3 = filter2;
@@ -8199,38 +8201,54 @@ var screenRoute = (row) => {
   return choice(TERRA, higher);
 };
 
+var observation = {
+  role: String5,
+  harness: String5,
+  provider: String5,
+  model: String5,
+  effort: String5,
+  plan: String5,
+  tier: Literals(["normal", "fast"]),
+  benchmark: String5,
+  benchmarkVersion: String5,
+  benchmarkHarness: String5,
+  qualityUnit: String5,
+  direction: Literals(["higher", "lower"]),
+  quality: Number5,
+  measuredAt: String5,
+  sourceUrl: String5,
+  confidence: String5
+};
+var AA_PI_COMPARISON = {
+  benchmark: "Artificial Analysis Coding Agent Index",
+  benchmarkVersion: "2.1",
+  benchmarkHarness: "Pi",
+  qualityUnit: "index"
+};
+var officialPiIndex = (url) => /^https:\/\/artificialanalysis\.ai\/agents\/coding-agents\/?([?#][^\s]*)?$/.test(url);
 var EvidenceDataset = Struct({
   version: Literal2(1),
   revision: String5,
   retrievedAt: String5,
   generatedAt: String5,
-  rows: ArraySchema(Struct({
-    role: String5,
-    harness: String5,
-    provider: String5,
-    model: String5,
-    effort: String5,
-    plan: String5,
-    region: String5,
-    monthlyUsd: Number5,
-    allowance: String5,
-    utilization: String5,
-    cacheAssumptions: String5,
-    tier: Literals(["normal", "fast"]),
-    benchmark: String5,
-    benchmarkVersion: String5,
-    benchmarkHarness: String5,
-    qualityUnit: String5,
-    direction: Literals(["higher", "lower"]),
-    quality: Number5,
-    taskCostUsd: Number5,
-    costKind: Literals(["subscription", "api-fallback"]),
-    measuredAt: String5,
-    sourceUrl: String5,
-    planSourceUrl: String5,
-    planSourceDate: String5,
-    confidence: String5
-  }))
+  rows: ArraySchema(Union2([
+    Struct({
+      ...observation,
+      costKind: Literal2("quality-only")
+    }),
+    Struct({
+      ...observation,
+      region: String5,
+      monthlyUsd: Number5,
+      allowance: String5,
+      utilization: String5,
+      cacheAssumptions: String5,
+      taskCostUsd: Number5,
+      costKind: Literals(["subscription", "api-fallback"]),
+      planSourceUrl: String5,
+      planSourceDate: String5
+    })
+  ]))
 });
 var rankCandidates = (dataset, candidates, comparison) => {
   const now = Date.parse(comparison.now);
@@ -8259,21 +8277,29 @@ var rankCandidates = (dataset, candidates, comparison) => {
     }
     if (!candidate.identityStable)
       reasons.push("unstable_identity");
-    const rows = dataset.rows.filter((row) => row.role === candidate.role && row.harness === candidate.harness && row.provider === candidate.provider && row.model === candidate.model && row.effort === candidate.effort && row.plan === candidate.plan && row.tier === candidate.tier && row.benchmark === comparison.benchmark && row.benchmarkVersion === comparison.benchmarkVersion && row.benchmarkHarness === comparison.benchmarkHarness && row.qualityUnit === comparison.qualityUnit);
+    const rows = dataset.rows.filter((row) => (comparison.objective === "pi-index" ? row.costKind === "quality-only" : row.costKind !== "quality-only") && row.role === candidate.role && row.harness === candidate.harness && row.provider === candidate.provider && row.model === candidate.model && row.effort === candidate.effort && row.plan === candidate.plan && row.tier === candidate.tier && row.benchmark === comparison.benchmark && row.benchmarkVersion === comparison.benchmarkVersion && row.benchmarkHarness === comparison.benchmarkHarness && row.qualityUnit === comparison.qualityUnit);
     const row = rows[0];
     if (rows.length !== 1 || row === undefined)
       reasons.push(rows.length === 0 ? "missing_evidence" : "ambiguous_evidence");
     else {
-      if (!fresh(dataset.retrievedAt) || !fresh(dataset.generatedAt) || !fresh(row.measuredAt) || !fresh(row.planSourceDate))
+      if (!fresh(dataset.retrievedAt) || !fresh(dataset.generatedAt) || !fresh(row.measuredAt))
         reasons.push("stale_evidence");
-      if (row.costKind !== "subscription")
-        reasons.push("api_price_fallback");
-      if (row.monthlyUsd > (comparison.tier === "normal" ? 100 : 20))
-        reasons.push("plan_exceeds_target");
-      if (row.direction !== "higher" || !Number.isFinite(row.quality) || row.quality < 0 || !Number.isFinite(row.taskCostUsd) || row.taskCostUsd <= 0 || !/^https?:\/\/\S+$/i.test(row.sourceUrl) || !/^https?:\/\/\S+$/i.test(row.planSourceUrl) || !row.confidence.trim() || !row.region.trim() || !row.allowance.trim() || !row.utilization.trim() || !row.cacheAssumptions.trim() || !candidate.plan.trim() || !row.benchmark.trim() || !row.benchmarkVersion.trim() || !row.benchmarkHarness.trim() || !row.qualityUnit.trim() || !Number.isFinite(row.monthlyUsd) || row.monthlyUsd <= 0 || !dataset.revision.trim())
-        reasons.push("noncomparable_evidence");
+      const comparable = row.direction === "higher" && Number.isFinite(row.quality) && row.quality >= 0 && /^https?:\/\/\S+$/i.test(row.sourceUrl) && !!row.confidence.trim() && !!candidate.plan.trim() && !!row.benchmark.trim() && !!row.benchmarkVersion.trim() && !!row.benchmarkHarness.trim() && !!row.qualityUnit.trim() && !!dataset.revision.trim();
+      if (row.costKind === "quality-only") {
+        if (!comparable || comparison.harness !== "pi" || !officialPiIndex(row.sourceUrl) || row.quality > 1 || !Object.entries(AA_PI_COMPARISON).every(([key, value]) => row[key] === value))
+          reasons.push("noncomparable_evidence");
+      } else {
+        if (!fresh(row.planSourceDate) && !reasons.includes("stale_evidence"))
+          reasons.push("stale_evidence");
+        if (row.costKind !== "subscription")
+          reasons.push("api_price_fallback");
+        if (row.monthlyUsd > (comparison.tier === "normal" ? 100 : 20))
+          reasons.push("plan_exceeds_target");
+        if (!comparable || !Number.isFinite(row.taskCostUsd) || row.taskCostUsd <= 0 || !/^https?:\/\/\S+$/i.test(row.planSourceUrl) || !row.region.trim() || !row.allowance.trim() || !row.utilization.trim() || !row.cacheAssumptions.trim() || !Number.isFinite(row.monthlyUsd) || row.monthlyUsd <= 0)
+          reasons.push("noncomparable_evidence");
+      }
     }
-    const value = row === undefined ? 0 : row.quality / row.taskCostUsd;
+    const value = row === undefined ? 0 : row.costKind === "quality-only" ? row.quality : row.quality / row.taskCostUsd;
     if (reasons.length === 0 && !Number.isFinite(value))
       reasons.push("noncomparable_evidence");
     return { candidate, reasons, unknown, value };
@@ -8801,7 +8827,7 @@ var withProviderRoutes = (pi) => {
     key,
     (() => {
       const override = pi.routes[key];
-      const provider = override.provider ?? pi.provider;
+      const provider = override.provider ?? (pi.providers?.length === 1 ? pi.providers[0] : pi.provider);
       const baseline = PROVIDER_ROUTES[provider][key];
       const profileModel = pi.profile === "fast" && key === "root" && provider === "openai-codex" ? "gpt-6.1-terra" : baseline.model;
       return {
@@ -9662,11 +9688,18 @@ var PROVIDERS = {
     screenRoute
   }
 };
-var providerProfile = (config) => PROVIDERS[config.pi.provider];
+var providerProfile = (config) => PROVIDERS[config.pi.providers?.length === 1 ? config.pi.providers[0] : config.pi.provider];
 var routeModel = (config, key, options = {}) => {
   const row = config.pi.routes[key];
-  const profile = PROVIDERS[row.provider ?? config.pi.provider];
-  const { model, thinking } = options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row;
+  return resolvedRoute(key, row.provider ?? (config.pi.providers?.length === 1 ? config.pi.providers[0] : config.pi.provider), row, options.screen === true);
+};
+var enabledProviderRoute = (key, provider, override, screen) => {
+  const baseline = PROVIDER_ROUTES[provider][key];
+  return resolvedRoute(key, provider, { model: override?.model ?? baseline.model, thinking: override?.thinking ?? baseline.thinking }, screen);
+};
+var resolvedRoute = (key, provider, row, screen) => {
+  const profile = PROVIDERS[provider];
+  const { model, thinking } = screen && profile.screenRoute !== undefined ? profile.screenRoute(row) : row;
   return {
     key,
     provider: profile.id,
@@ -9676,33 +9709,41 @@ var routeModel = (config, key, options = {}) => {
   };
 };
 var ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
-var rootModelSettings = (config) => {
-  const { provider, model, thinking } = routeModel(config, "root");
-  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
-};
 var subagentModel = ({ provider, model }) => `${provider}/${model}`;
 var enabledPiProviders = (config) => [
-  ...new Set([
+  ...new Set(config.pi.providers ?? [
     config.pi.provider,
-    ...config.pi.providers ?? [],
     ...Object.values(config.pi.routes).flatMap(({ provider }) => provider === undefined ? [] : [provider])
   ])
 ];
+var providerEnv = (config) => Object.fromEntries(enabledPiProviders(config).flatMap((provider) => Object.entries(PROVIDERS[provider].env)));
 var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
 var webChoice = (_profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" ? { source: "provider", tools: PROVIDERS["kimi-coding-global"].webTools } : {
   source: "pi-web-kit",
   tools: [...PROVIDERS["kimi-coding-global"].webTools, ...WEB_KIT_TOOLS]
 };
 
-var selectConfiguredRoute = (config, written, host, role, screen, profile, now) => {
+var piRoutingProfile = (pi) => pi.profile ?? (pi.providers === undefined ? undefined : "normal");
+var selectConfiguredRoute = (config, written, host, role, screen, profile, now, available) => {
+  const settings = config.routing;
   const override = host === "pi" ? written.pi?.routes?.[role] : undefined;
-  const base = host === "pi" ? routeModel(config, role, { screen }) : undefined;
+  const explicit = host === "pi" && config.pi.providers !== undefined;
+  const enabled = enabledPiProviders(config);
+  const mixed = explicit && enabled.length > 1;
+  const hasModel = (provider, id) => available?.some((entry) => entry.provider === provider && entry.id === id);
+  const screenCompatible = (route) => !screen || (override?.model === undefined || override.model === route.model) && (override?.thinking === undefined || override.thinking === route.thinking);
+  const pool = !explicit ? host === "pi" ? [routeModel(config, role, { screen })] : [] : enabled.filter((provider) => override?.provider === undefined || override.provider === provider).toSorted().map((provider) => enabledProviderRoute(role, provider, override, screen));
+  const excludedByDeclaration = (route) => settings?.candidates.some((candidate) => candidate.availability === "no" && candidate.harness === host && candidate.role === role && candidate.tier === profile && candidate.provider !== "anthropic" && PROVIDERS[candidate.provider].id === route.provider && candidate.model === route.model && candidate.effort === route.thinking) ?? false;
+  const eligible = pool.filter((route) => screenCompatible(route) && (!explicit || !excludedByDeclaration(route)) && (available === undefined || hasModel(route.provider, route.model)));
+  const roleOffset = Array.from(role).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const ambiguousOffline = mixed && available === undefined && override?.provider === undefined;
+  const base = ambiguousOffline || eligible.length === 0 ? undefined : eligible[roleOffset % eligible.length];
   const fallback = {
-    provider: base?.provider ?? "anthropic",
-    model: base === undefined ? routeFor(role).model : subagentModel(base),
-    effort: base?.thinking ?? routeFor(role).effort
+    provider: base?.provider ?? (host === "pi" ? "" : "anthropic"),
+    model: base === undefined ? host === "pi" ? "" : routeFor(role).model : subagentModel(base),
+    effort: base?.thinking ?? (host === "pi" ? "" : routeFor(role).effort)
   };
-  const screenConflict = screen && override !== undefined && (override.model !== undefined && override.model !== base?.model || override.thinking !== undefined && override.thinking !== base?.thinking);
+  const fallbackError = host !== "pi" || base !== undefined ? undefined : override?.provider !== undefined && !enabled.includes(override.provider) ? "The explicit Pi route uses a disabled provider; enable it or change the route." : pool.length > 0 && pool.every((route) => !screenCompatible(route)) ? "The explicit Pi route conflicts with the screen model or minimum thinking; choose a screen-compatible route." : ambiguousOffline ? "Several Pi providers are enabled but the current Pi model catalog could not be read. Dispatch through Pi or set an explicit role provider." : "No enabled Pi provider has the exact role model available with configured authentication. Check the route and sign in through Pi.";
   const policy = (reason) => ({
     ...fallback,
     profile,
@@ -9710,35 +9751,40 @@ var selectConfiguredRoute = (config, written, host, role, screen, profile, now) 
     coverage: "pending",
     ...config.routing === undefined ? {} : { evidenceRevision: config.routing.evidence.revision },
     reason,
-    ...screenConflict ? {
-      error: "The explicit Pi route conflicts with the screen model or minimum thinking; choose a screen-compatible route."
-    } : {}
+    ...fallbackError === undefined ? {} : { error: fallbackError }
   });
-  const settings = config.routing;
+  if (ambiguousOffline)
+    return policy("Benchmark evidence cannot establish current Pi model availability.");
+  const benchmarks = settings?.benchmarks.filter((item) => item.role === role && item.harness === host) ?? [];
+  const declared = benchmarks[0];
+  const benchmark = mixed ? {
+    ...AA_PI_COMPARISON,
+    requiredCapabilities: benchmarks.length === 1 ? declared?.requiredCapabilities ?? [] : []
+  } : declared;
+  const evidenceName = mixed ? "Artificial Analysis Pi Index" : "subscription";
   if (settings === undefined)
-    return policy("No subscription evidence configured; existing policy is unscored.");
-  const benchmarks = settings.benchmarks.filter((item) => item.role === role && item.harness === host);
-  const benchmark = benchmarks[0];
-  if (benchmarks.length !== 1 || benchmark === undefined || !benchmark.benchmark || !benchmark.benchmarkVersion || !benchmark.benchmarkHarness || !benchmark.qualityUnit)
-    return policy("No unique comparable role benchmark; existing policy is unscored.");
-  const configuredProviders = new Set([
-    config.pi.provider,
-    ...Object.values(config.pi.routes).flatMap((row) => row.provider === undefined ? [] : [row.provider])
-  ]);
+    return policy(`No ${evidenceName} evidence configured; routing policy is unscored.`);
+  if (!mixed && benchmarks.length !== 1 || benchmark === undefined || !benchmark.benchmark || !benchmark.benchmarkVersion || !benchmark.benchmarkHarness || !benchmark.qualityUnit)
+    return policy("No unique comparable role benchmark; routing policy is unscored.");
+  const configuredProviders = new Set(enabled);
   const candidates = settings.candidates.filter((candidate) => candidate.role === role && candidate.harness === host && candidate.tier === profile).map((candidate) => {
     const compatibleProvider = host === "pi" ? candidate.provider !== "anthropic" && configuredProviders.has(candidate.provider) : candidate.provider === "anthropic" && ["sonnet", "opus", "haiku", "fable"].includes(candidate.model);
     const compatibleEffort = host === "pi" ? !(candidate.model === "gpt-6.1-terra" && !["low", "medium", "high", "xhigh"].includes(candidate.effort)) && !(screen && ["off", "minimal", "low"].includes(candidate.effort)) : ["medium", "high", "xhigh"].includes(candidate.effort);
     const compatibleOverride = override === undefined || (override.provider === undefined || override.provider === candidate.provider) && (override.model === undefined || override.model === candidate.model) && (override.thinking === undefined || override.thinking === candidate.effort);
+    const route = host === "pi" && compatibleProvider && candidate.provider !== "anthropic" ? enabledProviderRoute(role, candidate.provider, { model: candidate.model, thinking: candidate.effort }, screen) : undefined;
+    const compatibleScreen = !explicit || route === undefined || route.model === candidate.model && route.thinking === candidate.effort;
     return {
       ...candidate,
+      availability: route !== undefined && hasModel(route.provider, candidate.model) === false ? "no" : candidate.availability,
       requiredCapabilities: [...candidate.requiredCapabilities, "configured-route"],
       capabilities: {
         ...candidate.capabilities,
-        "configured-route": compatibleProvider && compatibleEffort && compatibleOverride ? "yes" : "no"
+        "configured-route": compatibleProvider && compatibleEffort && compatibleOverride && compatibleScreen ? "yes" : "no"
       }
     };
   });
   const comparison = {
+    ...mixed ? { objective: "pi-index" } : {},
     role,
     harness: host,
     tier: profile,
@@ -9767,10 +9813,10 @@ var selectConfiguredRoute = (config, written, host, role, screen, profile, now) 
   });
   if (decision.kind !== "ranked") {
     const reasons = decision.diagnostics.flatMap((item) => item.reasons.map((reason) => `${item.candidate.model}:${reason}`)).slice(0, 3);
-    return policy(`No eligible comparable subscription evidence; existing policy is unscored${reasons.length === 0 ? "; no declared candidates" : `; ${reasons.join(", ")}`}.`);
+    return policy(`No eligible comparable ${evidenceName} evidence; routing policy is unscored${reasons.length === 0 ? "; no declared candidates" : `; ${reasons.join(", ")}`}.`);
   }
   const selected = decision.candidate;
-  const evidence = settings.evidence.rows.find((row) => row.role === role && row.harness === host && row.tier === profile && row.provider === selected.provider && row.model === selected.model && row.effort === selected.effort && row.plan === selected.plan && row.benchmark === benchmark.benchmark && row.benchmarkVersion === benchmark.benchmarkVersion && row.benchmarkHarness === benchmark.benchmarkHarness && row.qualityUnit === benchmark.qualityUnit);
+  const evidence = settings.evidence.rows.find((row) => (mixed ? row.costKind === "quality-only" : row.costKind !== "quality-only") && row.role === role && row.harness === host && row.tier === profile && row.provider === selected.provider && row.model === selected.model && row.effort === selected.effort && row.plan === selected.plan && row.benchmark === benchmark.benchmark && row.benchmarkVersion === benchmark.benchmarkVersion && row.benchmarkHarness === benchmark.benchmarkHarness && row.qualityUnit === benchmark.qualityUnit);
   const provider = host === "pi" ? PROVIDERS[selected.provider].id : "anthropic";
   return {
     provider,
@@ -9783,11 +9829,10 @@ var selectConfiguredRoute = (config, written, host, role, screen, profile, now) 
     evidenceRevision: settings.evidence.revision,
     plan: selected.plan,
     ...evidence === undefined ? {} : {
-      monthlyUsd: evidence.monthlyUsd,
-      taskCostUsd: evidence.taskCostUsd,
-      measuredAt: evidence.measuredAt
+      measuredAt: evidence.measuredAt,
+      ...evidence.costKind === "quality-only" ? {} : { monthlyUsd: evidence.monthlyUsd, taskCostUsd: evidence.taskCostUsd }
     },
-    reason: `Configured declarations; entitlement unknown; benchmark proxy ${benchmark.benchmarkHarness}.`
+    reason: mixed ? `Exact ${evidenceName} v${benchmark.benchmarkVersion} quality; no comparable subscription cost.` : `Configured declarations; entitlement unknown; benchmark proxy ${benchmark.benchmarkHarness}.`
   };
 };
 
@@ -12927,7 +12972,8 @@ var dispatch2 = (context, input) => gen2(function* () {
       projectDirectories: [stateDirectory(root)],
       env: context.env
     }) : undefined;
-    const profile = requested ?? (context.host === "pi" ? source?.config.pi.profile : undefined);
+    const profile = requested ?? (context.host === "pi" && source !== undefined ? piRoutingProfile(source.config.pi) : undefined);
+    const available = context.host === "pi" && source !== undefined && profile !== undefined && context.piModels !== undefined ? yield* context.piModels(source.config) : undefined;
     return yield* update((snapshot) => gen2(function* () {
       const id = "id" in request ? request.id : generated;
       let project = snapshot.project;
@@ -12943,7 +12989,7 @@ var dispatch2 = (context, input) => gen2(function* () {
         return yield* new InvalidDraft({
           message: `The screen capability is available under the pi host only; this is the ${context.host} host. Dispatch the Assignment without screen`
         });
-      const selected = profile === undefined || source === undefined ? undefined : selectConfiguredRoute(source.config, source.written, context.host, assignment.roleTask, assignment.screen === true, profile, at);
+      const selected = profile === undefined || source === undefined ? undefined : selectConfiguredRoute(source.config, source.written, context.host, assignment.roleTask, assignment.screen === true, profile, at, available);
       if (selected?.error !== undefined)
         return yield* new InvalidDraft({ message: selected.error });
       const route = context.host === "pi" && source !== undefined ? routeModel(source.config, assignment.roleTask, {
@@ -13840,7 +13886,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
     return [];
   const names = [
     ...new Set([
-      profile.package,
+      config.pi.providers === undefined ? profile.package : undefined,
       ...enabledPiProviders(config).map((provider) => PROVIDERS[provider].package)
     ].filter((name) => name !== undefined)),
     ...capabilityPackages(features, form, definitions, platform),
@@ -14462,9 +14508,11 @@ var headlessBrowserRoute = (config, surface) => {
     };
   return { probe: true, lines: [] };
 };
+var loadPiConfigSource = (env, cwd, scope) => loadConfigWithSource({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env });
 var loadPiConfig = (env, cwd, scope, choices = {}, providers) => {
-  const sources = { projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env };
-  const config = providers === undefined ? loadConfig(sources) : loadConfigWithSource(sources).pipe(flatMap2(({ written }) => decodeUnknownEffect2(Config)({
+  if (providers?.providers.length === 0)
+    return fail5(new SetupFailure({ message: "Select at least one Pi model provider" }));
+  const config = loadPiConfigSource(env, cwd, scope).pipe(flatMap2(({ config, written }) => providers === undefined ? succeed6(config) : decodeUnknownEffect2(Config)({
     ...written,
     pi: { ...written.pi, ...providers }
   })));
@@ -14985,8 +15033,7 @@ var PACKAGE_DEFAULTS = new Map([
   [
     PI_SETTINGS_FILE,
     {
-      codemode: { mode: "on" },
-      defaultThinkingLevel: "medium"
+      codemode: { mode: "on" }
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
@@ -15037,14 +15084,11 @@ var locate2 = (env, cwd, scope, logical) => {
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
-var routeLeaves = (config) => leaves(rootModelSettings(config));
 var planFor = (env, cwd, scope, config, form) => {
   const byFile = new Map;
   for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
-  const route = routeLeaves(config);
-  byFile.set(PI_SETTINGS_FILE, [...byFile.get(PI_SETTINGS_FILE) ?? [], ...route]);
   const targets = [];
   const unplaced = [];
   for (const [logical, all] of byFile) {
@@ -15057,7 +15101,6 @@ var planFor = (env, cwd, scope, config, form) => {
       file,
       global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
       all,
-      route: logical === PI_SETTINGS_FILE ? route : [],
       defaults: PACKAGE_DEFAULTS.get(logical)
     });
   }
@@ -15069,16 +15112,13 @@ var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
   const setIn = (content, key) => content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added";
   const setGlobally = (key) => setIn(global, key);
   const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
-  const pairHeld = target.all.some((key) => inPair(key) && (setIn(existing, key) || setGlobally(key)));
-  const leftWithPair = (key) => pairHeld && inPair(key) && !setIn(existing, key) && !setGlobally(key);
-  const free = target.all.filter((key) => !setGlobally(key) && !leftWithPair(key));
+  const free = target.all.filter((key) => !setGlobally(key));
   return {
     file: target.file,
     existing,
     keys: free.filter((key) => !isDefault(key)),
     atDefault: free.filter(isDefault).map(keyName),
-    atGlobal: target.all.filter(setGlobally).map(keyName),
-    atPair: target.all.filter(leftWithPair).map(keyName)
+    atGlobal: target.all.filter(setGlobally).map(keyName)
   };
 });
 var planAt = (env, cwd, scope, form, choices, providers) => loadPiConfig(env, cwd, scope, choices, providers).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
@@ -15110,9 +15150,6 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
     ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
     ...kept.map((entry) => `kept ${entry.path} ${show3(entry.value)} (HolyAgent sets ${show3(entry.wanted)}; yours wins)`),
     ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
-    ...target.atPair.length === 0 ? [] : [
-      `left out, the other of ${ROOT_MODEL_PAIR.join(" and ")} is yours: ${target.atPair.join(", ")}`
-    ],
     ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
   ];
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
@@ -15229,37 +15266,6 @@ var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
   return lines;
 });
 var fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``;
-var routeLine = fn2("checkRootModel")(function* (planned, existing) {
-  if (planned.route.length === 0)
-    return [];
-  const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global);
-  const states = planned.route.map((leaf) => {
-    const { path, value } = leaf;
-    const current = valueAt3(existing, path) ?? valueAt3(global, path);
-    const atDefault = planned.defaults !== undefined && equals(valueAt3(planned.defaults, path), value);
-    return {
-      key: keyName(leaf),
-      pair: inPair(leaf),
-      wanted: value,
-      current,
-      status: current === undefined ? atDefault ? "set" : "unset" : equals(current, value) ? "set" : "overridden"
-    };
-  });
-  const pairHeld = states.some((state) => state.pair && state.current !== undefined);
-  const yours = states.filter((state) => state.status === "overridden").map((state) => `${state.key} ${show3(state.current)} is yours (the route sets ${show3(state.wanted)})`);
-  const alone = states.filter((state) => pairHeld && state.pair && state.status === "unset").map((state) => `${state.key} is unset, so Pi picks it (the route sets ${show3(state.wanted)})`);
-  if (yours.length + alone.length > 0) {
-    return [
-      hint(`root model ${planned.file}: ${[...yours, ...alone].join(", ")}${yours.length > 0 ? "; Pi follows yours" : ""}`)
-    ];
-  }
-  if (states.some((state) => state.status === "unset"))
-    return [];
-  const [provider, model, thinking] = planned.route.map(({ value }) => String(value));
-  return [
-    pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`)
-  ];
-});
 var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
@@ -15272,10 +15278,7 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
       yield* refuseLinks(cwd, scope, planned.file, "write");
       const target = yield* resolveTarget(planned);
       const missing = applyDefaults(target.existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
-      return [
-        ...missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)],
-        ...yield* routeLine(planned, target.existing)
-      ];
+      return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
     }).pipe(catchTag2("SetupFailure", (error) => succeed6([
       hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
     ]))));
@@ -15414,9 +15417,9 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   const current = currentPi.features;
   const wanted = options.providers;
   if (wanted !== undefined) {
-    if (!wanted.providers.includes(wanted.provider))
+    if (wanted.providers.length === 0)
       return yield* new SetupFailure({
-        message: "Select at least one Pi model provider, including the default"
+        message: "Select at least one Pi model provider"
       });
     const required = Object.entries(currentPi.routes).find(([, route]) => route.provider !== undefined && !wanted.providers.includes(route.provider));
     if (required !== undefined)
@@ -15425,7 +15428,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
       });
   }
   const existingProviders = enabledPiProviders(config);
-  const providers = wanted === undefined || wanted.provider === currentPi.provider && wanted.providers.length === existingProviders.length && wanted.providers.every((provider) => existingProviders.includes(provider)) ? undefined : wanted;
+  const providers = wanted === undefined || config.pi.providers !== undefined && wanted.providers.length === existingProviders.length && wanted.providers.every((provider) => existingProviders.includes(provider)) ? undefined : wanted;
   const changed = chosen.filter(({ capability, value }) => current[capability.feature] !== value);
   const word = (value) => value ? "on" : "off";
   const lines = chosen.filter(({ capability, value }) => current[capability.feature] === value).map(({ capability, value }) => present(`capability ${capability.name}: already ${word(value)}`));
@@ -15458,7 +15461,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   return [
     ...lines,
     ...providers === undefined ? [] : [
-      added(`Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")}; default ${providers.provider} (${file})`)
+      added(`Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")} (${file})`)
     ],
     ...changed.map(({ capability, value }) => {
       const text = `capability ${capability.name}: ${options.dryRun ? "would turn" : "turned"} ${word(value)} (pi.features.${capability.feature} in ${file})`;
@@ -16236,7 +16239,7 @@ var schemas4 = {
     target: optionalKey2(Literals(SETUP_TARGETS)),
     installedPackageRoot: optionalKey2(String5),
     replacePiRegistration: optionalKey2(Boolean3),
-    piProviders: optionalKey2(Struct({ provider: PiProvider, providers: ArraySchema(PiProvider) })),
+    piProviders: optionalKey2(Struct({ providers: ArraySchema(PiProvider) })),
     dryRun: Boolean3,
     skipCtx7: Boolean3,
     scope: optionalKey2(Literals(SCOPES)),
@@ -16388,7 +16391,7 @@ var plan = (context, input) => gen2(function* () {
       projectDirectories: [stateDirectory(root)],
       env: context.env
     }) : undefined;
-    const active = source?.config.pi.enable === false ? false : requested !== undefined || source?.config.pi.profile !== undefined;
+    const active = source?.config.pi.enable === false ? false : requested !== undefined || source !== undefined && piRoutingProfile(source.config.pi) !== undefined;
     const execution = active ? {
       ...context.execution,
       profileRouting: true,
@@ -18823,7 +18826,7 @@ var executionConfig = (options, root) => gen2(function* () {
     return yield* new InvalidDraft({
       message: "HOLYAGENT_ROUTING_PROFILE must be normal or fast"
     });
-  const profileRouting = pi?.enable === false ? false : rawProfile !== undefined || pi?.profile !== undefined;
+  const profileRouting = pi?.enable === false ? false : rawProfile !== undefined || pi !== undefined && piRoutingProfile(pi) !== undefined;
   return {
     host,
     ttlMinutes,
@@ -18840,6 +18843,7 @@ var makeContext = (options) => gen2(function* () {
     host: options.host,
     authorize: options.authorize,
     execution,
+    ...options.piModels === undefined ? {} : { piModels: options.piModels },
     ...options.firstPass === undefined ? {} : { firstPass: options.firstPass }
   };
 });
@@ -20889,6 +20893,100 @@ var VCS_COMMANDS = [
     }).pipe(provide3(call.vcs))
   }
 ];
+var DETAIL_CHARS = 400;
+
+class ProviderNotReady extends TaggedError2("ProviderNotReady") {
+  get message() {
+    return `Provider ${this.provider} is not ready. ${this.fix}.`;
+  }
+}
+
+class ProviderInvalid extends TaggedError2("ProviderInvalid") {
+  get message() {
+    return `Provider ${this.provider} is invalid: ${this.detail}`;
+  }
+}
+var outputDetail = ({ stdout, stderr }, fallback) => [stderr.trim(), stdout.trim()].filter(Boolean).join(`
+`).slice(0, DETAIL_CHARS) || fallback;
+
+class CatalogUnavailable extends TaggedError2("CatalogUnavailable") {
+  get message() {
+    return `pi --list-models failed: ${this.detail}`;
+  }
+}
+
+class NoModelsListed extends TaggedError2("NoModelsListed") {
+  get message() {
+    return "pi --list-models listed no models, most likely because no provider has credentials; check the provider's readiness and log in first.";
+  }
+}
+
+class ListingNotRecognised extends TaggedError2("ListingNotRecognised") {
+  get message() {
+    return `pi --list-models printed no model table (a header line starting "provider model" and one row per model), so its listing format was not recognised: ${this.detail}`;
+  }
+}
+var MODELS_FIX = "Change the model in pi.routes of config.json or log in to a plan that has it.";
+
+class ModelsNotInCatalog extends TaggedError2("ModelsNotInCatalog") {
+  get message() {
+    const list = this.missing.map(({ model, routes }) => `${model} (used by ${routes.join(", ")})`).join("; ");
+    return `Provider ${this.provider} does not list: ${list}. ${MODELS_FIX}`;
+  }
+  get brief() {
+    const list = this.missing.map(({ model }) => model).join(", ");
+    return `Provider ${this.provider} does not list: ${list}. ${MODELS_FIX}`;
+  }
+}
+var Id = String5.check(isPattern2(/^\S+$/));
+var CatalogRow = Struct({ provider: Id, model: Id });
+var decodeRow = decodeUnknownOption2(CatalogRow, { onExcessProperty: "error" });
+var columnsOf = (text) => text.split(/\r?\n/).map((line) => line.trim().split(/\s+/)).filter((columns) => columns[0] !== "");
+var isHeader = ([provider, model]) => provider === "provider" && model === "model";
+var parseModelCatalog = (text) => {
+  const rows = columnsOf(text);
+  const header = rows.findIndex(isHeader);
+  const width = rows[header]?.length ?? 0;
+  return header < 0 ? [] : rows.slice(header + 1).filter((columns) => columns.length === width).flatMap(([provider, model]) => {
+    const row = decodeRow({ provider, model });
+    return isSome2(row) ? [row.value] : [];
+  });
+};
+var isEmptyListing = (text) => {
+  const rows = columnsOf(text);
+  return text.trim() === "" || rows.some(isHeader) || /^no models\b/i.test(rows[0]?.join(" ") ?? "");
+};
+var listModelCatalog = (run) => run("pi", ["--list-models"]).pipe(flatMap2((result) => {
+  if (result.exitCode !== 0)
+    return fail5(new CatalogUnavailable({
+      detail: outputDetail(result, `pi exited with code ${result.exitCode}`)
+    }));
+  const catalog = parseModelCatalog(result.stdout);
+  if (catalog.length > 0)
+    return succeed6(catalog);
+  return fail5(isEmptyListing(result.stdout) ? new NoModelsListed : new ListingNotRecognised({
+    detail: result.stdout.trim().slice(0, DETAIL_CHARS)
+  }));
+}));
+
+var cliPiModelCatalog = (cwd, env) => (config) => gen2(function* () {
+  if ((config.pi.providers?.length ?? 0) < 2 || !config.pi.enable)
+    return;
+  const executable = findCommand(env, "pi", { includeBunBin: true, strict: { cwd } });
+  if (isNone2(executable))
+    return;
+  return yield* listModelCatalog((_command, args) => spawn(executable.value, args, {
+    cwd: homeDirectory2(env),
+    env: definedEnv2({ ...env, ...providerEnv(config), PI_OFFLINE: "1" })
+  }).pipe(map4(({ code, stdout, stderr }) => ({
+    exitCode: code,
+    stdout: new TextDecoder().decode(stdout),
+    stderr
+  })), catchCause2(() => succeed6({ exitCode: 127, stdout: "", stderr: "" })))).pipe(map4((entries) => entries.map(({ provider, model }) => ({ provider, id: model }))), catchTag2("NoModelsListed", () => succeed6([])), orElseSucceed2(() => {
+    return;
+  }), timeoutOrElse2({ duration: 2000, orElse: () => succeed6(undefined) }));
+});
+
 var code_review_default = `---
 description: First-pass code review of a committed range, each finding traced to a realistic failure and labeled
 argument-hint: "[<start>...<head>]"
@@ -21118,7 +21216,14 @@ var coreCommand = (name) => (call) => gen2(function* () {
     "Reviewer.code": firstPassPrompt("Reviewer.code") ?? "",
     "Reviewer.security": firstPassPrompt("Reviewer.security") ?? ""
   };
-  const context = ["assignment dispatch", "plan"].includes(name) ? yield* makeContext({ cwd: call.cwd, env: call.env, host, authorize: () => true, firstPass }) : {
+  const context = ["assignment dispatch", "plan"].includes(name) ? yield* makeContext({
+    cwd: call.cwd,
+    env: call.env,
+    host,
+    authorize: () => true,
+    firstPass,
+    ...host === "pi" && name === "assignment dispatch" ? { piModels: cliPiModelCatalog(call.cwd, call.env) } : {}
+  }) : {
     cwd: call.cwd,
     env: call.env,
     host,
@@ -30354,7 +30459,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const piUsed = yield* piInUse(options.env);
   if (!piUsed && combined === undefined)
     return line;
-  const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+  const source = yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  const config = source?.config;
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
   const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
   const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form === "normal" && offer.unavailable === undefined && (offer.feature === "browserUse" || offer.feature === "computerUse"));
@@ -30371,10 +30479,14 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const piAvailable = piUsed && config?.pi.enable === true;
   const browse = options.browse !== undefined && piAvailable && config.pi.features.mcp === true && options.form.form === "normal" && offers.some(({ feature }) => feature === "browserUse") ? yield* planBrowse(options.env, options.browse.packageRoot) : undefined;
   const browseFor = (choices) => browse !== undefined && choices.harnesses?.pi !== false && choices.capabilities["browserUse"] === true ? browseForProfile(browse, choices.browseProfile ?? 0) : undefined;
-  const providerChoices = piAvailable && config !== undefined && (combined !== undefined || options.previewPi !== undefined) ? { provider: config.pi.provider, providers: enabledPiProviders(config) } : undefined;
+  const providerChoices = piAvailable && config !== undefined && (combined !== undefined || options.previewPi !== undefined) ? {
+    providers: source?.written.pi?.provider === undefined && source?.written.pi?.providers === undefined ? [
+      ...new Set(Object.values(source?.written.pi?.routes ?? {}).flatMap((route) => route.provider === undefined ? [] : [route.provider]))
+    ] : enabledPiProviders(config)
+  } : undefined;
   const withProviderChanges = (choices) => {
     const selection = choices.piProviders;
-    return selection !== undefined && providerChoices !== undefined && selection.provider === providerChoices.provider && selection.providers.length === providerChoices.providers.length && selection.providers.every((provider) => providerChoices.providers.includes(provider)) ? {
+    return selection !== undefined && providerChoices !== undefined && selection.providers.length === providerChoices.providers.length && selection.providers.every((provider) => providerChoices.providers.includes(provider)) ? {
       worktrees: choices.worktrees,
       deviceAccess: choices.deviceAccess,
       capabilities: choices.capabilities,
@@ -30385,6 +30497,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   };
   const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
   const selectionOf = (choices) => ["pi", "claude", "codex"].filter((target) => choices.harnesses?.[target] === true);
+  const needsProvider = (choices) => providerChoices !== undefined && (combined === undefined || selectionOf(choices).includes("pi")) && (choices.piProviders?.providers.length ?? 0) === 0;
+  const noProvider = () => new Error("Select at least one Pi model provider.");
   const label = (target) => target === "pi" ? "Pi / T3 Code" : target === "claude" ? "Claude Code" : "Codex";
   let applyStarted = false;
   let reviewedChoices;
@@ -30426,6 +30540,11 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
+      if (needsProvider(choices)) {
+        ++reviewSequence;
+        reviewedChoices = undefined;
+        return yield* fail5(noProvider());
+      }
       const plan = browseFor(choices);
       const browserReview = plan === undefined ? {} : {
         browse: browseReview(plan, choices.browseSetup === true, options.dryRun).map(plain)
@@ -30493,6 +30612,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       };
     })),
     apply: (choices, signal, reportProgress) => {
+      if (needsProvider(choices))
+        return runPromise2(fail5(noProvider()));
       const chosen = withProviderChanges(choices);
       const plan = browseFor(choices);
       const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true;
@@ -30806,6 +30927,23 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
             "! Choose Codex in a terminal, or use holyagent setup codex for unattended provisioning."
           ]
         });
+      if (surface === "public" && !booleanFlag(args, "undo") && (target === "pi" || target === undefined && t3Workflow) && (yield* piInUse(env))) {
+        const config = yield* loadPiConfigSource(env, cwd, resolved.scope).pipe(orElseSucceed2(() => {
+          return;
+        }));
+        const pi = config?.written.pi;
+        if (config?.config.pi.enable === true && pi?.provider === undefined && pi?.providers === undefined && !Object.values(pi?.routes ?? {}).some((route) => route.provider !== undefined)) {
+          const previous = yield* forEach2(piPresenceFiles(env, cwd, resolved.scope), piSettingsSources).pipe(map4((sources) => sources.flat().some(isHolyagentSource)), catchTag2("SetupFailure", (error) => succeed6(error)));
+          if (previous instanceof SetupFailure || !previous)
+            return printed({
+              ok: false,
+              lines: [
+                ...interactive.notes,
+                previous instanceof SetupFailure ? `! pi packages: ${previous.message}` : "! Pi model providers: No providers are configured. Run interactive holyagent setup pi to enable one or set pi.providers in the HolyAgent config before unattended setup."
+              ]
+            });
+        }
+      }
       return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide3(shellLive(env)))
   };

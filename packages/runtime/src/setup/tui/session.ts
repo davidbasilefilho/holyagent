@@ -21,7 +21,7 @@ import {
 } from "../browse-setup.ts"
 import type { Env } from "../environment.ts"
 import { describeForm, type FormChoice, inCi } from "../form.ts"
-import { type CapabilityChoices, loadPiConfig, piInUse } from "../pi-check.ts"
+import { type CapabilityChoices, loadPiConfigSource, piInUse } from "../pi-check.ts"
 import { hint, type Report } from "../report.ts"
 import type { Scope } from "../scope.ts"
 import type { Shell } from "../shell.ts"
@@ -346,9 +346,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   if (!piUsed && combined === undefined) return line
   // Loaded once for the run: a config that cannot be read is reported by the line-based Pi steps,
   // which then run.
-  const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(
-    Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)),
+  const source = yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(
+    Effect.orElseSucceed(() => undefined),
   )
+  const config = source?.config
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config })
   const features =
     config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features)
@@ -396,13 +397,24 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     piAvailable &&
     config !== undefined &&
     (combined !== undefined || options.previewPi !== undefined)
-      ? { provider: config.pi.provider, providers: enabledPiProviders(config) }
+      ? {
+          providers:
+            source?.written.pi?.provider === undefined &&
+            source?.written.pi?.providers === undefined
+              ? [
+                  ...new Set(
+                    Object.values(source?.written.pi?.routes ?? {}).flatMap((route) =>
+                      route.provider === undefined ? [] : [route.provider],
+                    ),
+                  ),
+                ]
+              : enabledPiProviders(config),
+        }
       : undefined
   const withProviderChanges = (choices: Choices): Choices => {
     const selection = choices.piProviders
     return selection !== undefined &&
       providerChoices !== undefined &&
-      selection.provider === providerChoices.provider &&
       selection.providers.length === providerChoices.providers.length &&
       selection.providers.every((provider) => providerChoices.providers.includes(provider))
       ? {
@@ -419,6 +431,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed")
   const selectionOf = (choices: Choices) =>
     (["pi", "claude", "codex"] as const).filter((target) => choices.harnesses?.[target] === true)
+  const needsProvider = (choices: Choices) =>
+    providerChoices !== undefined &&
+    (combined === undefined || selectionOf(choices).includes("pi")) &&
+    (choices.piProviders?.providers.length ?? 0) === 0
+  const noProvider = () => new Error("Select at least one Pi model provider.")
   const label = (target: "pi" | "claude" | "codex") =>
     target === "pi" ? "Pi / T3 Code" : target === "claude" ? "Claude Code" : "Codex"
   let applyStarted = false
@@ -470,6 +487,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     review: (choices) =>
       Effect.runPromise(
         Effect.gen(function* () {
+          if (needsProvider(choices)) {
+            ++reviewSequence
+            reviewedChoices = undefined
+            return yield* Effect.fail(noProvider())
+          }
           const plan = browseFor(choices)
           const browserReview =
             plan === undefined
@@ -560,6 +582,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         }),
       ),
     apply: (choices, signal, reportProgress) => {
+      if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
       const plan = browseFor(choices)
       const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true

@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, type ExecutionConfig } from "../domain/directive.ts"
 import { InvalidDraft } from "../domain/errors.ts"
 import type { AgentHost } from "../domain/host.ts"
 import type { RoleTask } from "../domain/route.ts"
+import { piRoutingProfile } from "../routing/selection.ts"
 import { readText } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { resolveState } from "../state/tree.ts"
@@ -22,6 +23,7 @@ export interface ContextOptions {
   readonly firstPass?: Readonly<Partial<Record<RoleTask, string>>>
   /** Current workflow-tool exposure when the host can establish it. */
   readonly workflowsAvailable?: boolean
+  readonly piModels?: Context["piModels"]
   /** Skip launch-only settings for operations that do not choose a model or warm worker. */
   readonly deferRouting?: true
 }
@@ -113,7 +115,9 @@ export const executionConfig = (options: ContextOptions, root: string) =>
         message: "HOLYAGENT_ROUTING_PROFILE must be normal or fast",
       })
     const profileRouting =
-      pi?.enable === false ? false : rawProfile !== undefined || pi?.profile !== undefined
+      pi?.enable === false
+        ? false
+        : rawProfile !== undefined || (pi !== undefined && piRoutingProfile(pi) !== undefined)
     return {
       host,
       ttlMinutes,
@@ -138,6 +142,7 @@ export const makeContext = (options: ContextOptions) =>
       host: options.host,
       authorize: options.authorize,
       execution,
+      ...(options.piModels === undefined ? {} : { piModels: options.piModels }),
       ...(options.firstPass === undefined ? {} : { firstPass: options.firstPass }),
     } satisfies Context
   })

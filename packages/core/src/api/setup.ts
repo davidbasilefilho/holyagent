@@ -38,9 +38,7 @@ export const schemas = {
     target: Schema.optionalKey(Schema.Literals(SETUP_TARGETS)),
     installedPackageRoot: Schema.optionalKey(Schema.String),
     replacePiRegistration: Schema.optionalKey(Schema.Boolean),
-    piProviders: Schema.optionalKey(
-      Schema.Struct({ provider: PiProvider, providers: Schema.Array(PiProvider) }),
-    ),
+    piProviders: Schema.optionalKey(Schema.Struct({ providers: Schema.Array(PiProvider) })),
     dryRun: Schema.Boolean,
     skipCtx7: Schema.Boolean,
     scope: Schema.optionalKey(Schema.Literals(SCOPES)),
