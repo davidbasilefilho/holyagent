@@ -438,12 +438,19 @@ describe("the specialists", () => {
       expect(body(`${route.agent}-screen`), route.agent).toBe(body(route.agent))
       expect(screen, route.agent).toEqual([...agentTools(config, route, true)])
       for (const tool of own) expect(screen, route.agent).toContain(tool)
-      for (const tool of ["ext:pi-computer-use", "mcp__browse__*", "mcp__t3*code__preview_*"])
+      for (const tool of ["mcp__browse__*", "mcp__t3*code__preview_*"])
         expect(screen, route.agent).toContain(tool)
       // The role's own file never has browse, and only the visual roles have T3's tools or computer use.
       expect(own, route.agent).not.toContain("mcp__browse__*")
       if (!route.capabilities.includes("VisualInspection")) {
-        expect(own, route.agent).not.toContain("ext:pi-computer-use")
+        expect(
+          own.some((tool) => tool.startsWith("mcp__holyagent_cua_driver__")),
+          route.agent,
+        ).toBe(false)
+        expect(
+          screen.some((tool) => tool.startsWith("mcp__holyagent_cua_driver__")),
+          route.agent,
+        ).toBe(false)
         expect(
           own.some((tool) => tool.startsWith("mcp__t3")),
           route.agent,
@@ -466,7 +473,7 @@ describe("the specialists", () => {
       ])
         expect(tools, route.agent).toContain(tool)
       // Not even a visual role, whose own file has them: the machine has no desktop to drive.
-      for (const tool of ["ext:pi-computer-use", "mcp__browse__*"])
+      for (const tool of ["mcp__holyagent_cua_driver__get_window_state", "mcp__browse__*"])
         expect(tools, route.agent).not.toContain(tool)
       expect(
         tools.some((tool) => /browse__|computer/.test(tool)),
@@ -503,16 +510,14 @@ describe("the specialists", () => {
           ? [`ext:pi-fff/${tool}`]
           : tool === "codemode"
             ? ["ext:builtin:codemode"]
-            : tool.startsWith("computer_use_")
-              ? ["ext:pi-computer-use"]
-              : tool.startsWith("moonshot_")
-                ? [
-                    "ext:pi-provider-kimi-code/moonshot_search",
-                    "ext:pi-provider-kimi-code/moonshot_fetch",
-                    "ext:pi-web-kit/web_search",
-                    "ext:pi-web-kit/web_fetch",
-                  ]
-                : [tool],
+            : tool.startsWith("moonshot_")
+              ? [
+                  "ext:pi-provider-kimi-code/moonshot_search",
+                  "ext:pi-provider-kimi-code/moonshot_fetch",
+                  "ext:pi-web-kit/web_search",
+                  "ext:pi-web-kit/web_fetch",
+                ]
+              : [tool],
       )
       expect(tools).toEqual([...new Set(covered)])
     }
@@ -543,7 +548,7 @@ describe("the specialists", () => {
     expect(tools("reviewer-code")).not.toContain("write")
     expect(tools("librarian-research")).toContain("ext:pi-provider-kimi-code/moonshot_search")
     expect(tools("reviewer-visual").some((tool) => tool.startsWith("mcp__t3"))).toBe(true)
-    expect(tools("reviewer-visual")).toContain("ext:pi-computer-use")
+    expect(tools("reviewer-visual")).toContain("mcp__holyagent_cua_driver__get_window_state")
     for (const route of ROUTES)
       for (const root of ["todo", "ask_user_question"])
         expect(tools(route.agent)).not.toContain(root)

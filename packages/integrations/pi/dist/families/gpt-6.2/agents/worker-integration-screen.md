@@ -3,7 +3,7 @@
 name: worker-integration-screen
 description: "Use for worker-integration: Connect completed components across a named integration boundary, and verify that they work together as specified. Writes inside its ownership paths; independence DependenciesTerminal. Launched for an Assignment that carries the screen capability on a machine with a graphical session: it also has the computer-use, browser-use and T3 preview tools."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, write, edit, bash, powershell, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, ext:pi-computer-use, mcp__browse__*, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, write, edit, bash, powershell, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__browse__*, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-integration specialist. Independence: DependenciesTerminal.

@@ -11134,7 +11134,6 @@ var init_pi_packages = __esm(() => {
     "@juicesharp/rpiv-todo": "2.15.0",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@aliou/pi-processes": "0.13.8",
-    "@amaster.ai/pi-computer-use": "0.1.40",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
     "@opencode/browse": "0.1.5"
@@ -11160,7 +11159,7 @@ var init_pypi_packages2 = __esm(() => {
   PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 });
 
-var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, PI_FFF_FILE = "~/.pi/agent/pi-fff.json", T3_PREFIX = "mcp__t3*code__", T3_PREVIEW_TOOLS, T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, BROWSE_PACKAGE = "@opencode/browse", BROWSE_SERVER = "browse", BROWSE_TOOLS, NPM_REGISTRY = "https://registry.npmjs.org/", npxServerArgs = (name, rest) => [
+var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, PI_FFF_FILE = "~/.pi/agent/pi-fff.json", T3_PREFIX = "mcp__t3*code__", T3_PREVIEW_TOOLS, T3_VISUAL_TOOLS, CUA_DRIVER_NAME = "holyagent_cua_driver", CUA_DRIVER_NAMESPACE, CUA_DRIVER_TOOLS, COMPUTER_USE_TOOLS, LEGACY_COMPUTER_USE_TOOLS, RETIRED_COMPUTER_USE_SETTINGS, CUA_DRIVER_SERVER, BROWSE_PACKAGE = "@opencode/browse", BROWSE_SERVER = "browse", BROWSE_TOOLS, NPM_REGISTRY = "https://registry.npmjs.org/", npxServerArgs = (name, rest) => [
   `--registry=${NPM_REGISTRY}`,
   ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
   "-y",
@@ -11214,7 +11213,35 @@ var init_capabilities = __esm(() => {
     `${T3_PREFIX}html_preview`
   ];
   T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
-  COMPUTER_USE_TOOLS = ["computer_use_*"];
+  CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`;
+  CUA_DRIVER_TOOLS = [
+    "list_apps",
+    "list_windows",
+    "get_window_state",
+    "get_accessibility_tree",
+    "verify_state",
+    "launch_app",
+    "set_window_frame",
+    "click",
+    "double_click",
+    "right_click",
+    "drag",
+    "type_text",
+    "press_key",
+    "hotkey",
+    "set_value",
+    "scroll"
+  ];
+  COMPUTER_USE_TOOLS = CUA_DRIVER_TOOLS.map((name) => `mcp__${CUA_DRIVER_NAME}__${name}`);
+  LEGACY_COMPUTER_USE_TOOLS = ["computer_use_*"];
+  RETIRED_COMPUTER_USE_SETTINGS = {
+    "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+  };
+  CUA_DRIVER_SERVER = {
+    name: CUA_DRIVER_NAME,
+    command: "cua-driver",
+    args: ["mcp"]
+  };
   BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
   BROWSE_MCP_SERVER = {
     name: BROWSE_SERVER,
@@ -11316,27 +11343,32 @@ var init_capabilities = __esm(() => {
     {
       name: "computer-use",
       feature: "computerUse",
-      description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+      description: "Lets the visual specialists drive the desktop through the official Cua Driver",
       skills: [],
       applicability: "specialists",
       defaultOn: true,
       needs: [{ kind: "display" }],
       forms: {
         headless: { unavailable: "it drives a graphical session and this machine has none" },
-        normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
-      },
-      settings: [
-        {
-          file: PI_SETTINGS_FILE,
-          content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+        normal: {
+          packages: [],
+          mcpServers: [CUA_DRIVER_SERVER],
+          needs: [
+            {
+              kind: "command",
+              command: CUA_DRIVER_SERVER.command,
+              fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi"
+            }
+          ]
         }
-      ],
-      tools: {
-        rootExclude: COMPUTER_USE_TOOLS,
-        visual: COMPUTER_USE_TOOLS,
-        screen: COMPUTER_USE_TOOLS
       },
-      health: ["needs", "packages"]
+      settings: [],
+      tools: {
+        rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+        visual: COMPUTER_USE_TOOLS,
+        screen: []
+      },
+      health: ["needs"]
     },
     {
       name: "browser-use",
@@ -20537,8 +20569,7 @@ var init_pi_settings = __esm(() => {
       PI_SETTINGS_FILE,
       {
         codemode: { mode: "on" },
-        defaultThinkingLevel: "medium",
-        "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+        defaultThinkingLevel: "medium"
       }
     ],
     [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
@@ -20611,7 +20642,8 @@ var init_pi_settings = __esm(() => {
   });
   REVERTABLE = [
     ...CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
-    ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf }))
+    ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf })),
+    ...leaves(RETIRED_COMPUTER_USE_SETTINGS).map((leaf) => ({ file: PI_SETTINGS_FILE, leaf }))
   ];
   revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
     const recorded = yield* readRecorded(env, file);
@@ -20846,7 +20878,7 @@ var init_browser_use = __esm(() => {
     const headless = options.form === "headless" ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface)) : undefined;
     const reporting = enabledCapabilities(config.pi.features, {
       provider: config.pi.provider
-    }).filter((capability) => (capability.feature !== "browserUse" || headless?.probe !== false) && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
+    }).filter((capability) => capability.feature === "browserUse" && headless?.probe !== false && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
     const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options, platform));
     return [...headless?.lines ?? [], ...lines.flat()];
   });
@@ -21081,6 +21113,8 @@ var init_pi_install = __esm(() => {
       const where = listedIn(source);
       return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)];
     });
+    if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
+      lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
     let replacement;
     if (options.installedPackageRoot !== undefined) {
       const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
@@ -32258,7 +32292,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
       "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
-      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
+      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"

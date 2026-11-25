@@ -3469,7 +3469,6 @@ var pi_packages_default = {
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.8",
-  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
   "@opencode/browse": "0.1.5"
@@ -3484,7 +3483,6 @@ var pypi_packages_default = {
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
-var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
 var SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
@@ -3499,7 +3497,33 @@ var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}html_preview`
 ];
 var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
-var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_NAME = "holyagent_cua_driver";
+var CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`;
+var CUA_DRIVER_TOOLS = [
+  "list_apps",
+  "list_windows",
+  "get_window_state",
+  "get_accessibility_tree",
+  "verify_state",
+  "launch_app",
+  "set_window_frame",
+  "click",
+  "double_click",
+  "right_click",
+  "drag",
+  "type_text",
+  "press_key",
+  "hotkey",
+  "set_value",
+  "scroll"
+];
+var COMPUTER_USE_TOOLS = CUA_DRIVER_TOOLS.map((name) => `mcp__${CUA_DRIVER_NAME}__${name}`);
+var LEGACY_COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_SERVER = {
+  name: CUA_DRIVER_NAME,
+  command: "cua-driver",
+  args: ["mcp"]
+};
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
@@ -3632,27 +3656,32 @@ var CAPABILITIES = [
   {
     name: "computer-use",
     feature: "computerUse",
-    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    description: "Lets the visual specialists drive the desktop through the official Cua Driver",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [{ kind: "display" }],
     forms: {
       headless: { unavailable: "it drives a graphical session and this machine has none" },
-      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
-    },
-    settings: [
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      normal: {
+        packages: [],
+        mcpServers: [CUA_DRIVER_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: CUA_DRIVER_SERVER.command,
+            fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi"
+          }
+        ]
       }
-    ],
-    tools: {
-      rootExclude: COMPUTER_USE_TOOLS,
-      visual: COMPUTER_USE_TOOLS,
-      screen: COMPUTER_USE_TOOLS
     },
-    health: ["needs", "packages"]
+    settings: [],
+    tools: {
+      rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+      visual: COMPUTER_USE_TOOLS,
+      screen: []
+    },
+    health: ["needs"]
   },
   {
     name: "browser-use",

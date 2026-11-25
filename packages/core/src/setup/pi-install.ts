@@ -299,6 +299,12 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     const where = listedIn(source)
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)]
   })
+  if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
+    lines.push(
+      skipped(
+        "pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead",
+      ),
+    )
   let replacement: { readonly source: string; readonly prior: string } | undefined
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(

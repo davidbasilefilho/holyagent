@@ -3,7 +3,7 @@
 name: reviewer-visual-screen
 description: "Use for reviewer-visual: Independently assess rendered output against the request's visual and interaction criteria, and report observed evidence or blockers. Read-only; independence IndependentReview. Launched for an Assignment that carries the screen capability on a machine with a graphical session: it also has the computer-use, browser-use and T3 preview tools."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, ext:pi-computer-use, mcp__browse__*, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, mcp__holyagent_cua_driver__list_apps, mcp__holyagent_cua_driver__list_windows, mcp__holyagent_cua_driver__get_window_state, mcp__holyagent_cua_driver__get_accessibility_tree, mcp__holyagent_cua_driver__verify_state, mcp__holyagent_cua_driver__launch_app, mcp__holyagent_cua_driver__set_window_frame, mcp__holyagent_cua_driver__click, mcp__holyagent_cua_driver__double_click, mcp__holyagent_cua_driver__right_click, mcp__holyagent_cua_driver__drag, mcp__holyagent_cua_driver__type_text, mcp__holyagent_cua_driver__press_key, mcp__holyagent_cua_driver__hotkey, mcp__holyagent_cua_driver__set_value, mcp__holyagent_cua_driver__scroll, mcp__browse__*, ext:builtin:codemode"
 ---
 
 You are the holyagent reviewer-visual specialist. Independence: IndependentReview.
@@ -152,7 +152,7 @@ Where to look. Call the tools from codemode scripts. The T3 Code tools below exi
 
 - Web: the record's web target, through T3 Code's integrated browser: `preview_open` and `preview_navigate`, `preview_snapshot` (accessibility tree with console and network entries, and a screenshot), `preview_act` (click, type, hover, select, drag, press, scroll, upload), `preview_resize` for viewports, `preview_set_appearance` for light and dark, and `preview_wait_for` after navigation. Open your own tab when other specialists browse in parallel: `preview_open` with `reuseExistingTab=false`, then pass the `tabId` it returns, when its description lists them.
 - TUI: the terminal frames the record's capture command produces.
-- Desktop GUI: its screenshots; use the `computer_use_*` tools of `@amaster.ai/pi-computer-use` only when your tool list has them.
+- Desktop GUI: its screenshots; use the Cua Driver desktop tools only when your tool list has them.
 - Mobile: `device_list`, `device_open`, `device_screenshot` and `device_close` for simulators and emulators; taps and typing go through the `agent-device` CLI that `device_open` prints. Report them as blocked when device access is not enabled.
 - A self-contained HTML page you build to show something: `html_preview` returns a PNG with console output. Use fixed pixel heights for charts, avoid `vh` units and `height:100%` (rejected), and leave html and body backgrounds unset so the theme variables apply.
 

@@ -4,6 +4,8 @@ import {
   BROWSE_TOOLS,
   BROWSER_USE_ALL_TOOLS,
   BROWSER_USE_TOOLS,
+  CUA_DRIVER_NAMESPACE,
+  LEGACY_COMPUTER_USE_TOOLS,
   T3_PREVIEW_TOOLS,
 } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
@@ -144,14 +146,20 @@ describe("toolArgs for the root", () => {
   test("keeps ordinary edits and excludes computer-use and web tools", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
       tools: ["+codemode", ...FFF_TOOLS.map((name) => `+${name}`)],
-      excludeTools: [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS, ...MOONSHOT],
+      excludeTools: [
+        CUA_DRIVER_NAMESPACE,
+        ...LEGACY_COMPUTER_USE_TOOLS,
+        ...BROWSE_TOOLS,
+        ...BROWSER_USE_ALL_TOOLS,
+        ...MOONSHOT,
+      ],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
         "+codemode,+grep,+find,+multi_grep,+ffgrep,+fffind,+fff-multi-grep",
         "--exclude-tools",
-        "computer_use_*,mcp__browse__*,mcp__browser_use__*,moonshot_search,moonshot_fetch",
+        "mcp__holyagent_cua_driver__*,computer_use_*,mcp__browse__*,mcp__browser_use__*,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -165,7 +173,7 @@ describe("toolArgs for the root", () => {
       withFeatures({ computerUse: false, fff: false, browserUse: false, web: "off" }),
       "root",
     )
-    expect(on.excludeTools).toEqual([...COMPUTER_USE_TOOLS])
+    expect(on.excludeTools).toEqual([CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS])
     expect(off.excludeTools).toEqual([])
   })
 
@@ -285,11 +293,7 @@ describe("the feature switches and the tool arguments", () => {
       expect(args.argv.at(-1)).toBe("--no-mcp")
       expect(args.tools.some((tool) => tool.startsWith("mcp__"))).toBe(false)
     }
-    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([
-      ...READ,
-      ...COMPUTER_USE_TOOLS,
-      "codemode",
-    ])
+    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([...READ, "codemode"])
   })
 
   test("mcp on leaves --no-mcp out", () => {
@@ -365,10 +369,6 @@ describe("toolSettings", () => {
         content: { disableDefaultAgents: true, fallbackSubagent: "none" },
       },
       { file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } },
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } },
-      },
       {
         file: BILLION_CONTEXT_FILE,
         content: BILLION_CONTEXT_GUARDRAILS_FILE,
@@ -632,18 +632,22 @@ describe("the T3 Code tools the root keeps off", () => {
 })
 
 describe("toolArgs with the screen capability", () => {
-  const SCREEN = [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...T3_PREVIEW_TOOLS]
+  const SCREEN = [...BROWSE_TOOLS, ...T3_PREVIEW_TOOLS]
   const T3_DEVICE = "mcp__t3*code__device_*"
 
-  test("a specialist of any role gets the computer-use, browse and T3 preview tools after its own", () => {
+  test("a screen assignment adds browse and T3 preview for any role but no desktop grant", () => {
     for (const role of RoleTask.literals) {
       const plain = toolArgs(DEFAULT_CONFIG, role).tools
       const screen = toolArgs(DEFAULT_CONFIG, role, undefined, { screen: true }).tools
       const added = screen.filter((tool) => !plain.includes(tool))
-      // The visual roles already have computer use and T3's tools; the others gain every one.
+      // The visual roles already have their own desktop grant and T3 tools.
       const visual = routeFor(role).capabilities.includes("VisualInspection")
       expect(added.toSorted(), role).toEqual((visual ? BROWSE_TOOLS : SCREEN).toSorted())
       for (const tool of SCREEN) expect(screen, role).toContain(tool)
+      expect(
+        screen.some((tool) => COMPUTER_USE_TOOLS.includes(tool)),
+        role,
+      ).toBe(visual)
       expect(screen.at(-1), role).toBe("codemode")
       // Only the screen tools differ, and the write tools stay as the role decides.
       expect(
@@ -689,7 +693,7 @@ describe("toolArgs with the screen capability", () => {
     expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__t3"))).toBe(false)
     // The MCP servers run in Pi's MCP extension, so their tools need it on.
     expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__"))).toBe(false)
-    expect(tools({ mcp: false })).toContain("computer_use_*")
+    expect(tools({ mcp: false }).some((tool) => COMPUTER_USE_TOOLS.includes(tool))).toBe(false)
     expect(tools({ mcp: true })).toContain("mcp__browse__*")
   })
 
@@ -741,7 +745,6 @@ describe("toolArgs with the screen capability", () => {
       toolArgs(DEFAULT_CONFIG, "root"),
     )
     const { excludeTools } = toolArgs(DEFAULT_CONFIG, "root")
-    for (const tool of [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS])
-      expect(excludeTools).toContain(tool)
+    for (const tool of [CUA_DRIVER_NAMESPACE, ...BROWSE_TOOLS]) expect(excludeTools).toContain(tool)
   })
 })
