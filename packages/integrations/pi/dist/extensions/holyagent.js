@@ -3091,6 +3091,9 @@ ContImpl.prototype = OnSuccessProto;
 var returnPayload = function() {
   return this.payload;
 };
+var succeedPayload = function(_value, fiber) {
+  return fiber.succeedWith(this.payload);
+};
 var continuationMarksStack = /* @__PURE__ */ (() => {
   const limit = /* @__PURE__ */ getStackTraceLimit();
   if (limit === 0)
@@ -3114,8 +3117,16 @@ var andThenCont = function(value) {
   const f = this.payload;
   return f(value);
 };
+var tapCont = function(value) {
+  const f = this.payload;
+  return new ContImpl(f(value), succeedPayload, value);
+};
+var tapEffectCont = function(value) {
+  return new ContImpl(this.payload, succeedPayload, value);
+};
 var asSome = (self) => map2(self, some2);
 var andThen = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, isEffect(f) ? returnPayload : andThenCont, f));
+var tap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, isEffect(f) ? tapEffectCont : tapCont, f));
 var asVoid = (self) => new ContImpl(self, returnPayload, exitVoid);
 var raceAllFirst = (all, options) => withFiber((parent) => {
   const fibers = new Set;
@@ -4310,6 +4321,7 @@ var withFiber2 = withFiber;
 var fromResult2 = fromResult;
 var flatMap2 = flatMap;
 var andThen2 = andThen;
+var tap2 = tap;
 var result2 = result;
 var option2 = option;
 var exit2 = exit;
@@ -9419,7 +9431,6 @@ var pi_packages_default = {
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.8",
-  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
   "@opencode/browse": "0.1.5"
@@ -9451,7 +9462,36 @@ var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}html_preview`
 ];
 var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
-var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_NAME = "holyagent_cua_driver";
+var CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`;
+var CUA_DRIVER_TOOLS = [
+  "list_apps",
+  "list_windows",
+  "get_window_state",
+  "get_accessibility_tree",
+  "verify_state",
+  "launch_app",
+  "set_window_frame",
+  "click",
+  "double_click",
+  "right_click",
+  "drag",
+  "type_text",
+  "press_key",
+  "hotkey",
+  "set_value",
+  "scroll"
+];
+var COMPUTER_USE_TOOLS = CUA_DRIVER_TOOLS.map((name) => `mcp__${CUA_DRIVER_NAME}__${name}`);
+var LEGACY_COMPUTER_USE_TOOLS = ["computer_use_*"];
+var RETIRED_COMPUTER_USE_SETTINGS = {
+  "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+};
+var CUA_DRIVER_SERVER = {
+  name: CUA_DRIVER_NAME,
+  command: "cua-driver",
+  args: ["mcp"]
+};
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
@@ -9585,27 +9625,32 @@ var CAPABILITIES = [
   {
     name: "computer-use",
     feature: "computerUse",
-    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    description: "Lets the visual specialists drive the desktop through the official Cua Driver",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [{ kind: "display" }],
     forms: {
       headless: { unavailable: "it drives a graphical session and this machine has none" },
-      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
-    },
-    settings: [
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      normal: {
+        packages: [],
+        mcpServers: [CUA_DRIVER_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: CUA_DRIVER_SERVER.command,
+            fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi"
+          }
+        ]
       }
-    ],
-    tools: {
-      rootExclude: COMPUTER_USE_TOOLS,
-      visual: COMPUTER_USE_TOOLS,
-      screen: COMPUTER_USE_TOOLS
     },
-    health: ["needs", "packages"]
+    settings: [],
+    tools: {
+      rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+      visual: COMPUTER_USE_TOOLS,
+      screen: []
+    },
+    health: ["needs"]
   },
   {
     name: "browser-use",
@@ -15292,7 +15337,7 @@ var toolArgs = (config, key, profile = PROVIDERS[config.pi.routes[key].provider 
     ...has(capabilities, "Write") ? [...WRITE_TOOLS, ...profile.writeTools] : [],
     ...has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : [],
     ...has(capabilities, "Search") ? webChoice(profile, features.web).tools : [],
-    ...has(capabilities, "VisualInspection") ? formEnabled.flatMap((capability) => capability.tools.visual) : [],
+    ...has(capabilities, "VisualInspection") ? formEnabled.flatMap((capability) => capability.tools.visual).filter((tool) => features.mcp || !tool.startsWith("mcp__")) : [],
     ...options.screen === true ? formEnabled.flatMap((capability) => screenTools(capability, options.form ?? "normal")).filter((tool) => features.mcp || !tool.startsWith("mcp__")) : []
   ];
   const unique = [...new Set(tools)];
@@ -15684,8 +15729,7 @@ var PACKAGE_DEFAULTS = new Map([
     PI_SETTINGS_FILE,
     {
       codemode: { mode: "on" },
-      defaultThinkingLevel: "medium",
-      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+      defaultThinkingLevel: "medium"
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
@@ -15819,7 +15863,8 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
 });
 var REVERTABLE = [
   ...CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
-  ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf }))
+  ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf })),
+  ...leaves(RETIRED_COMPUTER_USE_SETTINGS).map((leaf) => ({ file: PI_SETTINGS_FILE, leaf }))
 ];
 var revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
   const recorded = yield* readRecorded(env, file);
@@ -16068,7 +16113,7 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   const headless = options.form === "headless" ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface)) : undefined;
   const reporting = enabledCapabilities(config.pi.features, {
     provider: config.pi.provider
-  }).filter((capability) => (capability.feature !== "browserUse" || headless?.probe !== false) && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
+  }).filter((capability) => capability.feature === "browserUse" && headless?.probe !== false && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
   const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options, platform));
   return [...headless?.lines ?? [], ...lines.flat()];
 });
@@ -16166,6 +16211,16 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
 });
 
 import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
+
+var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
+  return;
+} });
+var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: () => {
+  return;
+} });
+var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
+var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
+
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -16284,6 +16339,8 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
     const where = listedIn(source);
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)];
   });
+  if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
+    lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
@@ -16323,6 +16380,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`
       ];
+    yield* reportSetupActivity(`Installing ${source}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -16341,6 +16399,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
       continue;
     }
+    yield* reportSetupActivity(`Removing npm:${name}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -16700,6 +16759,7 @@ var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dry
       lines: [added(`${command}: would install with bun add -g ${packageName}`)]
     };
   }
+  yield* reportSetupActivity(`Installing ${packageName}`);
   const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
   if (result.exitCode !== 0)
     return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
@@ -16758,38 +16818,64 @@ var setup = fn2("setup")(function* (env, options) {
     if (blockers.length > 0)
       return { lines: blockers.map((line) => `! ${line}`), ok: false };
   }
-  const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
-  const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
-    scope,
-    cwd: piOptions.cwd,
-    dryRun: options.dryRun,
-    choices,
-    ...options.piProviders === undefined ? {} : { providers: options.piProviders }
-  })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
-  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
-  const lines = [
-    ...ctx7Lines,
-    ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
-    ...capabilityLines,
-    ...piUsed && !piSteps ? [
-      skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
-    ] : [],
-    ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })) : [],
-    ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
-      dryRun: options.dryRun,
-      ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-      ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-    })) : [],
-    ...usesStandaloneSearch(env, piUsed, surface) ? yield* searchToolLines(piOptions.cwd, setupToolLine) : [],
-    ...piOnly ? [] : yield* onSettings((file) => mergeUserSettings({
-      env,
-      file,
-      subagentCacheTtl: options.subagentCacheTtl,
-      dryRun: options.dryRun
-    }))
+  let piSteps = true;
+  const whenPiSaved = () => piSteps;
+  const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
+  const report = (lines) => ({ lines });
+  const plan = [
+    ...options.skipCtx7 ? [report(() => [skipped("ctx7: skipped by flag")])] : cloud ? [report(() => [skipped(`ctx7: ${CLOUD_SKIP}`)])] : [phase("Context7", asStep("ctx7", installCtx7(env, options.dryRun)))],
+    ...piUsed ? [
+      report(() => [hint(`form: ${describeForm(form)}`)]),
+      phase("Capability settings", asStep("capabilities", applyCapabilityChoices(env, {
+        scope,
+        cwd: piOptions.cwd,
+        dryRun: options.dryRun,
+        choices,
+        ...options.piProviders === undefined ? {} : { providers: options.piProviders }
+      })).pipe(tap2((lines) => sync2(() => {
+        piSteps = !lines.some((line) => line.startsWith("! "));
+      })))),
+      report(() => piSteps ? [] : [
+        skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
+      ]),
+      phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
+      phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      ...scope === "user" ? [
+        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+          dryRun: options.dryRun,
+          ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+        })), whenPiSaved)
+      ] : []
+    ] : Object.keys(choices).length === 0 ? [] : [
+      report(() => [
+        skipped("capabilities: Pi is not in use, so the capability choices were not applied")
+      ])
+    ],
+    ...usesStandaloneSearch(env, piUsed, surface) ? [phase("Search-tool checks", searchToolLines(piOptions.cwd, setupToolLine))] : [],
+    ...piOnly ? [] : [
+      phase("Claude Code settings", onSettings((file) => mergeUserSettings({
+        env,
+        file,
+        subagentCacheTtl: options.subagentCacheTtl,
+        dryRun: options.dryRun
+      })))
+    ]
   ];
+  const total = plan.filter((step) => ("run" in step)).length;
+  const lines = [];
+  let index = 0;
+  for (const step of plan) {
+    if ("lines" in step) {
+      lines.push(...step.lines());
+      continue;
+    }
+    index += 1;
+    if (step.runIf()) {
+      lines.push(...yield* withSetupPhase({ index, total, label: step.label }, step.run));
+    }
+  }
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
 });
 
@@ -30211,6 +30297,16 @@ var checkProfileLaunch = (input, cwd, env) => gen2(function* () {
 }).pipe(catch_2(() => succeed6("Trusted Assignment routing state is unavailable. Redispatch the Assignment and retry.")));
 var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
 var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
+var desktopAgents = new Set(ROUTES.filter(({ capabilities }) => capabilities.includes("VisualInspection")).flatMap((route) => [route.agent, agentFor(route, true, "normal")]));
+var screenServersFor = (agent, servers) => servers.filter((server) => server.name === CUA_DRIVER_NAME ? agent !== undefined && desktopAgents.has(agent) : isScreenAgent(agent));
+var refuseUnassignedDesktop = (event, permitted) => {
+  const matches = (patterns) => patterns.some((pattern) => toolMatches(pattern, event.toolName));
+  if (matches(LEGACY_COMPUTER_USE_TOOLS))
+    return { block: true, reason: "HolyAgent no longer uses the legacy Pi desktop extension." };
+  if (!toolMatches(CUA_DRIVER_NAMESPACE, event.toolName))
+    return;
+  return permitted && COMPUTER_USE_TOOLS.includes(event.toolName) ? undefined : { block: true, reason: "Only assigned Cua Driver desktop primitives are available." };
+};
 var screenServers = (config, form) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => formContent(capability, form)?.mcpServers ?? []) : [];
 var withoutBrowserUseInT3 = (servers, t3) => t3 ? servers.filter((server) => server.name !== BROWSER_USE_MCP_SERVER.name) : servers;
 var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent) && T3_PREVIEW_TOOLS.some((pattern) => toolMatches(pattern, event.toolName)) ? {
@@ -30218,15 +30314,18 @@ var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent)
   reason: `${event.toolName} is T3 Code's tool, and T3 does not host this session. Use the browser tools you were given instead.`
 } : undefined;
 var registerScreenServers = (register, agent, servers, neutralDirectory, launch) => {
-  if (!isScreenAgent(agent))
-    return { registered: [], failures: [] };
-  const outcomes = servers.map((server) => runSync2(try_2({
+  const assigned = screenServersFor(agent, servers);
+  const outcomes = assigned.map((server) => runSync2(try_2({
     try: () => {
       const { command, args } = server.launchesChromium === true ? launch(server) : server;
       return register(server.name, {
         command,
         args: [...args],
-        ...server.command === "npx" || server.launchesChromium === true ? { cwd: neutralDirectory } : {}
+        ...server.name === CUA_DRIVER_NAME ? {
+          exposure: "hidden",
+          toolExposure: Object.fromEntries(CUA_DRIVER_TOOLS.map((tool) => [tool, "direct"]))
+        } : {},
+        ...server.command === "npx" || server.launchesChromium === true || server.name === CUA_DRIVER_NAME ? { cwd: neutralDirectory } : {}
       });
     },
     catch: (cause) => `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`
@@ -31129,15 +31228,16 @@ var createExtension = ({
     return reason === undefined ? undefined : notice(`apply_patch could not be activated (${reason}); change files with write and edit instead`);
   };
   let noServerTold = false;
-  const registerScreen = (servers, t3) => {
+  const registerScreen = (servers, session) => {
     const agent = childAgent(pi.getSessionName());
-    if (isScreenAgent(agent) && servers.length === 0) {
+    if (isScreenAgent(agent) && screenServersFor(agent, servers).length === 0) {
       if (noServerTold)
         return;
       noServerTold = true;
       return notice("no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing");
     }
-    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, withoutBrowserUseInT3(servers, t3), homeDirectory2(env), browserLauncher);
+    const { failures, registered } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, withoutBrowserUseInT3(servers, session.t3), homeDirectory2(env), browserLauncher);
+    session.desktopAllowed = isChild() && registered.includes(CUA_DRIVER_NAME);
     return failures.length === 0 ? undefined : notice(`an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`);
   };
   const browserLauncher = () => {
@@ -31188,6 +31288,8 @@ var createExtension = ({
       }
       native.setEnabled(coreServices === undefined && result?.nativeEnabled === true);
       taken.gatesOff = result?.gatesOff === true;
+      if (!(result?.screenServers ?? []).some(({ name }) => name === CUA_DRIVER_NAME))
+        taken.desktopAllowed = false;
       if (result?.enabled === false)
         taken.profileRouting = false;
       else if (result?.profileRouting !== undefined)
@@ -31227,7 +31329,7 @@ var createExtension = ({
         if (result?.codex !== undefined && (ctx.model?.provider === "openai-codex" || ctx.model === undefined && result.uniformCodex === true))
           taken.specialistNotice = joinOptional(taken.specialistNotice, activateApplyPatch(result.codex));
         if (result?.screenServers !== undefined)
-          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers, taken.t3));
+          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers, taken));
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined) {
@@ -31262,6 +31364,7 @@ var createExtension = ({
       excluded: runSync2(startingExclusions),
       started: false,
       t3: hostedByT3(ctx, env, isChild()),
+      desktopAllowed: false,
       t3Gate: false,
       t3Root: false,
       codex: undefined,
@@ -31332,7 +31435,7 @@ ${event.systemPrompt}` : undefined;
   });
   pi.registerToolRenderer(workflowRenderers);
   pi.on("tool_call", (event, ctx) => {
-    const gate = () => refuseExcludedTool(event, held?.excluded ?? []) ?? (isChild() ? refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ?? refusePrematureWebFallback(event, held?.webMode, pi.getAllTools().map(({ name }) => name), pi.getActiveTools()) : undefined) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(gen2(function* () {
+    const gate = () => refuseExcludedTool(event, held?.excluded ?? []) ?? refuseUnassignedDesktop(event, held?.desktopAllowed === true && isChild()) ?? (isChild() ? refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ?? refusePrematureWebFallback(event, held?.webMode, pi.getAllTools().map(({ name }) => name), pi.getActiveTools()) : undefined) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(gen2(function* () {
       const agent = event.toolName === "Agent" || event.toolName === "agent";
       const workflow = event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow";
       const type = agent ? event.input["subagent_type"] : undefined;

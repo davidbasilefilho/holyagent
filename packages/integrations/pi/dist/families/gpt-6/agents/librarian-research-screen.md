@@ -3,7 +3,7 @@
 name: librarian-research-screen
 description: "Use for librarian-research: Investigate a bounded question using authoritative sources, and separate sourced facts from inference. Read-only; independence DependenciesTerminal. Launched for an Assignment that carries the screen capability on a machine with a graphical session: it also has the computer-use, browser-use and T3 preview tools."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:pi-web-kit/web_search, ext:pi-web-kit/web_fetch, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, ext:pi-computer-use, mcp__browse__*, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:pi-web-kit/web_search, ext:pi-web-kit/web_fetch, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__browse__*, ext:builtin:codemode"
 ---
 
 You are the holyagent librarian-research specialist. Independence: DependenciesTerminal.

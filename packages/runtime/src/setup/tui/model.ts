@@ -2,7 +2,7 @@ import type { PiProvider } from "../../config/schema.ts"
 import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
-import type { Applied, Choices, Offer, Review, ReviewLine } from "./types.ts"
+import type { Applied, Choices, Offer, Review, ReviewLine, SetupDisplayProgress } from "./types.ts"
 
 const CAPABILITY_ROW = "capability:"
 const BROWSE_ROW = "capability:browseSetup"
@@ -12,6 +12,7 @@ const BROWSE_PROFILE = "capability:browseProfile"
 export interface Segment {
   readonly text: string
   readonly tone?: Tone
+  readonly activeTab?: boolean
   readonly click?: Control
 }
 
@@ -379,6 +380,8 @@ export interface Context {
   readonly width: number
   readonly height: number
   readonly look: Look
+  readonly progress?: SetupDisplayProgress | undefined
+  readonly elapsedSeconds?: number
 }
 
 const KEY_GAP = "   "
@@ -481,7 +484,9 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     return `${box} ${word}`
   })
   const labels = rows.map((row) => labelOf(row, offer))
-  const valueWidth = Math.max(0, ...values.map(cells))
+  // Reserve the longest state even when all visible choices are enabled. On narrow terminals
+  // changing one choice must not move every state column.
+  const valueWidth = cells("[ ] disabled")
   const labelWidth = Math.min(
     Math.max(0, ...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
@@ -525,14 +530,19 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       : [
           tabs.flatMap((tab): Line => [
             {
-              text: `[${tabLabels[tab]}]`,
-              tone: state.tab === tab ? "focus" : "option",
+              text: ` ${tabLabels[tab]} `,
+              tone: "option",
+              activeTab: state.tab === tab,
               click: { tab },
             },
             segment(" "),
           ]),
-          ...hintLines("Left/Right change harness", width),
+          ...hintLines(`${g.horizontalArrows} change harness`, width),
         ]
+  const choiceHint = (text: string) =>
+    combined === undefined
+      ? hintLines(text, width)
+      : wrap(text, width - 2).map((line): Line => [segment(`  ${line}`, "hint")])
   const unavailable =
     combined !== undefined && state.tab === "codex"
       ? "Public Codex setup is not available on this build."
@@ -553,15 +563,14 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
         ]),
     ...group("Capabilities", configCount, rows.length),
     ...(context.height >= 20 ? [button] : []),
-    ...(unavailable === undefined ? [] : hintLines(unavailable, width)),
+    ...(unavailable === undefined ? [] : choiceHint(unavailable)),
     ...(combined?.claude === true && state.tab === "claude"
-      ? hintLines(
+      ? choiceHint(
           `Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`,
-          width,
         )
       : []),
-    ...(focused === undefined ? [] : hintLines(hintOf(focused, offer, state.choices), width)),
-    ...hintLines(`Environment: ${offer.form}`, width),
+    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices))),
+    ...choiceHint(`Environment: ${offer.form}`),
   ]
 }
 
@@ -875,21 +884,39 @@ const fitLine = (line: Line, width: number, ellipsis: string): Line => {
   return kept
 }
 
+const applyingLines = (context: Context): ReadonlyArray<Line> => {
+  const phase = context.progress?.phase
+  const harness = context.progress?.harness
+  const elapsed = context.elapsedSeconds ?? 0
+  return [
+    [segment("Press Ctrl+C to stop", "option")],
+    blank,
+    ...heading("Applying", context.width),
+    [segment(`Elapsed ${elapsed}s`, "hint")],
+    ...(harness === undefined
+      ? []
+      : wrap(`Harness ${harness.index} of ${harness.total}: ${harness.label}`, context.width).map(
+          (part): Line => [segment(part, "hint")],
+        )),
+    ...wrap(
+      phase === undefined
+        ? "Preparing setup…"
+        : `Step ${phase.index} of ${phase.total}: ${phase.label}`,
+      context.width,
+    ).map((part): Line => [segment(part, "argument")]),
+    ...(phase?.activity === undefined
+      ? []
+      : wrap(phase.activity, context.width).map((part): Line => [segment(part, "hint")])),
+  ]
+}
+
 const layoutOf = (state: State, context: Context): Layout =>
   state.screen === "choose"
     ? { lines: chooseLines(state, context), scroll: FIXED }
     : state.screen === "review"
       ? reviewLayout(state, context)
       : state.screen === "applying"
-        ? {
-            lines: [
-              [segment("Press Ctrl-C to stop", "option")],
-              blank,
-              ...heading("Applying", context.width),
-              [segment("Applying setup; this can take a moment.", "argument")],
-            ],
-            scroll: FIXED,
-          }
+        ? { lines: applyingLines(context), scroll: FIXED }
         : doneLayout(state, context)
 
 /** How far the screen the state is on scrolls, for {@link press}. */

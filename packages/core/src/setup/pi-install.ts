@@ -29,6 +29,7 @@ import {
   piSettingsFiles,
   piSettingsSources,
 } from "./pi-check.ts"
+import { reportSetupActivity } from "./progress.ts"
 import { added, failed, present, skipped } from "./report.ts"
 import { refuseLinks, type Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
@@ -299,6 +300,12 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     const where = listedIn(source)
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)]
   })
+  if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
+    lines.push(
+      skipped(
+        "pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead",
+      ),
+    )
   let replacement: { readonly source: string; readonly prior: string } | undefined
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(
@@ -353,6 +360,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`,
       ]
+    yield* reportSetupActivity(`Installing ${source}`)
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
@@ -374,6 +382,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`))
       continue
     }
+    yield* reportSetupActivity(`Removing npm:${name}`)
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
