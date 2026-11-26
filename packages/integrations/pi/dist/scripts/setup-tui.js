@@ -85,10 +85,17 @@ var constUndefined = /* @__PURE__ */ constant(undefined);
 var constVoid = constUndefined;
 
 var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
+var ownKeys = (obj) => {
+  const names = Object.getOwnPropertyNames(obj);
+  const syms = Object.getOwnPropertySymbols(obj);
+  return syms.length > 0 ? [...names, ...syms] : names;
+};
 var getAllObjectKeys = (obj) => {
-  const keys = new Set(Reflect.ownKeys(obj));
-  if (obj.constructor === Object)
-    return keys;
+  const own = ownKeys(obj);
+  const proto = Object.getPrototypeOf(obj);
+  if (proto === Object.prototype || proto === null)
+    return own;
+  const keys = new Set(own);
   if (obj instanceof Error) {
     keys.delete("stack");
     for (const key of errorSiteKeys) {
@@ -96,26 +103,22 @@ var getAllObjectKeys = (obj) => {
         keys.delete(key);
     }
   }
-  const proto = Object.getPrototypeOf(obj);
   let current = proto;
   while (current !== null && current !== Object.prototype) {
-    const ownKeys = Reflect.ownKeys(current);
-    for (let i = 0;i < ownKeys.length; i++) {
-      keys.add(ownKeys[i]);
-    }
+    for (const key of ownKeys(current))
+      keys.add(key);
     current = Object.getPrototypeOf(current);
   }
-  if (keys.has("constructor") && typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
+  if (typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
     keys.delete("constructor");
   }
   return keys;
 };
 var byReferenceInstances = /* @__PURE__ */ new WeakSet;
-var viewBytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
-var isArrayBufferLike = (u) => u instanceof ArrayBuffer || typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer;
-var bufferBytes = (buffer) => {
+var objectKind = (u) => Array.isArray(u) ? 5 : ArrayBuffer.isView(u) ? u instanceof DataView ? 7 : 6 : Object.getPrototypeOf(u) === Object.prototype ? 0 : u instanceof Date ? 1 : u instanceof RegExp ? 2 : u instanceof Map ? 3 : u instanceof Set ? 4 : u instanceof ArrayBuffer ? 8 : typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer ? 9 : 0;
+var toBytes = (u, kind) => {
   try {
-    return new Uint8Array(buffer);
+    return kind === 7 ? new Uint8Array(u.buffer, u.byteOffset, u.byteLength) : new Uint8Array(u);
   } catch {
     return;
   }
@@ -125,6 +128,7 @@ var backEdges = 0;
 var addBackEdge = () => {
   backEdges++;
 };
+var hashCache = /* @__PURE__ */ new WeakMap;
 
 function ownEnumerableKeys(self) {
   const keys = Object.keys(self);
@@ -181,12 +185,14 @@ var hash = (self) => {
     case "object": {
       if (self === null) {
         break;
-      } else if (self instanceof Date) {
+      }
+      const kind = objectKind(self);
+      if (kind === 1) {
         if (Number.isNaN(self.getTime())) {
           return string("Invalid Date");
         }
         return string(self.toISOString());
-      } else if (self instanceof RegExp) {
+      } else if (kind === 2) {
         return string(self.toString());
       } else {
         if (byReferenceInstances.has(self)) {
@@ -208,16 +214,14 @@ var hash = (self) => {
             h = self[symbol]();
           } else if (typeof self === "function") {
             h = random(self);
-          } else if (isArrayBufferLike(self)) {
-            const bytes = bufferBytes(self);
-            h = bytes === undefined ? random(self) : array(bytes);
-          } else if (self instanceof DataView) {
-            h = array(viewBytes(self));
-          } else if (Array.isArray(self) || ArrayBuffer.isView(self)) {
-            h = array(self);
-          } else if (self instanceof Map) {
+          } else if (kind >= 7) {
+            const bytes = toBytes(self, kind);
+            h = bytes === undefined ? random(self) : hashIndexed(bytes);
+          } else if (kind >= 5) {
+            h = hashIndexed(self);
+          } else if (kind === 3) {
             h = hashMap(self);
-          } else if (self instanceof Set) {
+          } else if (kind === 4) {
             h = hashSet(self);
           } else {
             h = structure(self);
@@ -235,10 +239,11 @@ var hash = (self) => {
   return optimize(mix(string(String(self))));
 };
 var random = (self) => {
-  if (!randomHashCache.has(self)) {
-    randomHashCache.set(self, optimize(Math.random() * 4294967296 | 0));
+  let h = randomHashCache.get(self);
+  if (h === undefined) {
+    randomHashCache.set(self, h = optimize(Math.random() * 4294967296 | 0));
   }
-  return randomHashCache.get(self);
+  return h;
 };
 var mix = (h) => {
   h ^= h >>> 16;
@@ -288,11 +293,17 @@ var array = (arr) => {
   }
   return optimize(h);
 };
+var hashIndexed = (arr) => {
+  let h = 6151;
+  for (let i = 0;i < arr.length; i++) {
+    h = combine(h, hash(arr[i]));
+  }
+  return optimize(h);
+};
 var hashMap = /* @__PURE__ */ unordered(/* @__PURE__ */ string("Map"), ([k, v]) => combine(hash(k), hash(v)));
 var setSeed = /* @__PURE__ */ string("Set");
 var hashSet = /* @__PURE__ */ unordered(setSeed, (element) => combine(setSeed, hash(element)));
 var randomHashCache = /* @__PURE__ */ new WeakMap;
-var hashCache = /* @__PURE__ */ new WeakMap;
 var visitedObjects = /* @__PURE__ */ new WeakSet;
 
 var symbol2 = "~effect/Equal";
@@ -303,106 +314,122 @@ function equals() {
   return compareBoth(arguments[0], arguments[1]);
 }
 function compareBoth(self, that) {
-  if (self === that)
-    return true;
   if (self == null || that == null)
-    return false;
+    return self === that;
   const selfType = typeof self;
-  if (selfType !== typeof that) {
-    return false;
+  if (selfType !== "object" && selfType !== "function") {
+    return self === that || self !== self && that !== that;
   }
-  if (selfType === "number" && self !== self && that !== that) {
+  if (self === that) {
+    if (pathLeft.length > 0 && !hashCache.has(self))
+      hash(self);
     return true;
   }
-  if (selfType !== "object" && selfType !== "function") {
-    return false;
-  }
-  if (byReferenceInstances.has(self) || byReferenceInstances.has(that)) {
+  if (selfType !== typeof that || byReferenceInstances.has(self) || byReferenceInstances.has(that)) {
     return false;
   }
   return compareObjects(self, that);
 }
 function compareObjects(self, that) {
   const depth = pathLeft.length;
-  for (let i = depth;i-- > 0; ) {
-    if (pathLeft[i] === self && pathRight[i] === that)
-      return true;
+  const prev = seen.get(self);
+  if (prev === that)
+    return true;
+  let known;
+  if (!depth || prev !== undefined) {
+    known = results.get(self);
+    const cached = known?.get(that);
+    if (cached !== undefined)
+      return cached;
   }
-  if (depth)
-    return compareOnPath(self, that);
-  let known = results.get(self);
-  if (!known)
-    results.set(self, known = new WeakMap);
-  let result = known.get(that);
-  if (result === undefined)
-    known.set(that, result = compareOnPath(self, that));
-  return result;
-}
-function compareOnPath(self, that) {
+  let revisited = false;
+  for (let i = depth;i-- > 0; ) {
+    const sameLeft = pathLeft[i] === self;
+    if (sameLeft || pathRight[i] === that) {
+      addBackEdge();
+      if (sameLeft && pathRight[i] === that)
+        return true;
+      revisited = true;
+    }
+  }
+  if (revisited && hash(self) !== hash(that))
+    return false;
+  const seenBack = backEdges;
   pathLeft.push(self);
   pathRight.push(that);
+  let result;
   try {
-    return compareStructure(self, that);
+    result = compareStructure(self, that);
   } finally {
     pathLeft.pop();
     pathRight.pop();
+    if (!depth)
+      seen.clear();
   }
+  if (seenBack !== backEdges)
+    return result && hash(self) === hash(that);
+  if (depth && prev === undefined) {
+    if (result)
+      seen.set(self, that);
+  } else {
+    if (!known)
+      results.set(self, known = new WeakMap);
+    known.set(that, result);
+  }
+  return result;
 }
 var pathLeft = [];
 var pathRight = [];
+var seen = /* @__PURE__ */ new Map;
 var results = /* @__PURE__ */ new WeakMap;
 function compareStructure(self, that) {
-  if (hash(self) !== hash(that)) {
+  const selfHash = hashCache.get(self);
+  if (selfHash !== undefined && selfHash !== (hashCache.get(that) ?? selfHash))
     return false;
-  } else if (self instanceof Date) {
-    if (!(that instanceof Date))
+  const kind = objectKind(self);
+  if (kind === 1 || kind === 2) {
+    if (objectKind(that) !== kind)
       return false;
-    const selfTime = self.getTime();
-    const thatTime = that.getTime();
-    return selfTime === thatTime || Number.isNaN(selfTime) && Number.isNaN(thatTime);
-  } else if (self instanceof RegExp) {
-    return that instanceof RegExp && self.toString() === that.toString();
+    if (kind === 2)
+      return self.toString() === that.toString();
+    if (hash(self) !== hash(that))
+      return false;
+    const a = self.getTime();
+    const b = that.getTime();
+    return a === b || a !== a && b !== b;
   }
   const bothEquals = isEqual(self);
   if (bothEquals !== isEqual(that) || typeof self === "function" && !bothEquals) {
     return false;
-  } else if (bothEquals) {
+  }
+  if ((bothEquals || isHash(self) || isHash(that)) && hash(self) !== hash(that)) {
+    return false;
+  }
+  if (bothEquals) {
     return self[symbol2](that);
-  } else if (Array.isArray(self)) {
-    if (!Array.isArray(that) || self.length !== that.length) {
-      return false;
-    }
-    return compareArrays(self, that);
-  } else if (isArrayBufferLike(self)) {
-    if (!isArrayBufferLike(that) || self instanceof ArrayBuffer !== that instanceof ArrayBuffer) {
-      return false;
-    }
-    const selfBytes = bufferBytes(self);
-    const thatBytes = bufferBytes(that);
+  }
+  if (kind !== objectKind(that)) {
+    return false;
+  }
+  if (kind >= 7) {
+    const selfBytes = toBytes(self, kind);
+    const thatBytes = toBytes(that, kind);
     return selfBytes !== undefined && thatBytes !== undefined && compareTypedArrays(selfBytes, thatBytes);
-  } else if (ArrayBuffer.isView(self)) {
-    const selfIsDataView = self instanceof DataView;
-    if (!ArrayBuffer.isView(that) || self.byteLength !== that.byteLength || selfIsDataView !== that instanceof DataView) {
-      return false;
-    }
-    if (selfIsDataView) {
-      return compareTypedArrays(viewBytes(self), viewBytes(that));
-    }
-    return compareTypedArrays(self, that);
-  } else if (self instanceof Map) {
-    if (!(that instanceof Map) || self.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self, that, entryHash, equalEntries);
-  } else if (self instanceof Set) {
-    if (!(that instanceof Set) || self.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self, that, hash, compareBoth);
+  } else if (kind === 5) {
+    return compareArrays(self, that);
+  } else if (kind === 6) {
+    return self.byteLength === that.byteLength && compareTypedArrays(self, that);
+  } else if (kind === 3) {
+    return self.size === that.size && compareHashed(self, that, entryHash, equalEntries);
+  } else if (kind === 4) {
+    return self.size === that.size && compareHashed(self, that, hash, compareBoth);
   }
   return compareRecords(self, that);
 }
 function compareArrays(self, that) {
+  if (self.length !== that.length) {
+    return false;
+  }
   for (let i = 0;i < self.length; i++) {
     if (!compareBoth(self[i], that[i])) {
       return false;
@@ -424,11 +451,12 @@ function compareTypedArrays(self, that) {
 function compareRecords(self, that) {
   const selfKeys = getAllObjectKeys(self);
   const thatKeys = getAllObjectKeys(that);
-  if (selfKeys.size !== thatKeys.size) {
+  const thatIsSet = thatKeys instanceof Set;
+  if ((selfKeys instanceof Set ? selfKeys.size : selfKeys.length) !== (thatIsSet ? thatKeys.size : thatKeys.length)) {
     return false;
   }
   for (const key of selfKeys) {
-    if (!thatKeys.has(key) || !compareBoth(self[key], that[key])) {
+    if (!(thatIsSet ? thatKeys.has(key) : Object.hasOwn(that, key)) || !compareBoth(self[key], that[key])) {
       return false;
     }
   }
@@ -3480,11 +3508,11 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.14",
-  "@tintinweb/pi-subagents": "0.26.2",
+  "@tintinweb/pi-subagents": "0.26.3",
   "billion-context": "0.1.216",
-  "@juicesharp/rpiv-todo": "2.15.0",
-  "@juicesharp/rpiv-ask-user-question": "2.15.0",
-  "@aliou/pi-processes": "0.13.8",
+  "@juicesharp/rpiv-todo": "2.16.0",
+  "@juicesharp/rpiv-ask-user-question": "2.16.0",
+  "@aliou/pi-processes": "0.13.9",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
   "@opencode/browse": "0.1.5"
