@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mwxnj1vs-h8jy",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.integration",
+  "slug": "discover-installed-browsers-including",
+  "objective": "Discover installed browsers including Helium, Chromium variants and Gecko for the setup selection without conflating discovery and integration support",
+  "state": "Ready",
+  "scope": [
+    "Node-safe Core browser discovery only, and one new focused fixture test"
+  ],
+  "constraints": [
+    "Do not change TUI, profiles, registry, user installs, selected defaults or version control. No broad disk scans."
+  ],
+  "criteria": [
+    {
+      "text": "Discover known Helium, Chromium and Firefox installation layouts and expose integration compatibility separately",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Exercise Windows Helium and representative Chromium and Firefox layouts, false positives and optional manual paths with fixture state",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/setup/browse.ts",
+    "packages/runtime/tests/setup-browser-discovery.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:32:28.744Z"
+}
