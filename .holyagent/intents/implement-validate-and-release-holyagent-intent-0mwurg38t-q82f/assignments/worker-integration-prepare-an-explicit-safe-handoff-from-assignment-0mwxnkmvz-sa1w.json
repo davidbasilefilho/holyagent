@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwxnkmvz-sa1w",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.integration",
+  "slug": "prepare-an-explicit-safe-handoff-from",
+  "objective": "Prepare an explicit safe handoff from public Codex setup to the official ChatGPT desktop browser extension flow",
+  "state": "Ready",
+  "scope": [
+    "Browser handoff implementation and one new isolated fixture test, not the presentation or other capabilities"
+  ],
+  "constraints": [
+    "Do not launch a browser by discovery alone, do not force install or claim a connection, and do not write personal profiles or version control."
+  ],
+  "criteria": [
+    {
+      "text": "Only a supported native desktop and browser offer the official handoff",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Opening follows explicit choice and existing native approval prompts remain",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Use isolated Windows and macOS or documented Linux detection fixtures and capture official opener arguments",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/codex-browser-handoff.ts",
+    "packages/runtime/tests/setup-codex-browser-handoff.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:33:42.624Z"
+}
