@@ -28871,9 +28871,8 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
     return yield* fail9("Invalid HolyAgent plugin version");
   const shell = yield* Shell;
-  const codex = yield* shell.which("codex");
-  if (isNone2(codex))
-    return yield* fail9("Codex is not on PATH. Install the native Codex CLI first.");
+  if (!options.dryRun && isNone2(yield* shell.which("codex")))
+    return yield* fail9("Codex is not on PATH. Apply from an environment with the verified native Codex CLI. A setup preview does not require it.");
   const run = (args) => shell.run("codex", args, {
     cwd: homeDirectory2(env),
     env: { CODEX_HOME: home, NO_COLOR: "1" }
@@ -31514,7 +31513,8 @@ var codexCommand = {
   output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
   notes: [
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
-    "The verified Codex 0.172.0 runtime must already be on PATH. Setup never changes a running session.",
+    "Apply requires the verified Codex 0.172.0 runtime on PATH. Preview does not. Setup never changes a running session.",
+    "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
     "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
     "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide."

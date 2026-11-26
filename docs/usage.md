@@ -45,7 +45,7 @@ Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It re
 
 In an interactive terminal, run bare `holyagent setup` to review Pi, Claude and Codex together. Use the left and right arrows or click a tab, enable the harnesses you want, and review the selected changes before applying. Pi starts selected when available. Claude and Codex are opt-in. Cancel to leave all harnesses unchanged. Bare unattended setup still targets Pi.
 
-For the native Codex preview, run `holyagent setup codex --dry-run` to review the separate profile and plugin install, then omit `--dry-run` to apply. This does not change a running session or your usual Codex profile. Set `CODEX_HOME` before starting the native Codex process. See the [Codex startup guide](../packages/integrations/codex/README.md) for the verified runtime line, the root-only option and the hosted validation limits.
+For native Codex only, run `holyagent setup codex --non-interactive --dry-run`. Preview works without a backend and writes nothing. Omit `--dry-run` to apply where the verified native Codex CLI is on PATH. Pass `--codex-home <absolute-path>` to choose the profile. The command does not require or configure Pi, T3 Code or Claude Code. Set `CODEX_HOME` before starting the native process to use the separate profile. See the [Codex startup guide](../packages/integrations/codex/README.md) for the verified runtime, the root-only option and hosted validation limits.
 
 Check activation in the harness you selected. For Pi, open T3 Code once to initialize it, make `pi` available on PATH, run `holyagent setup pi` and open a new T3 thread with the Pi provider. For native Codex, prepare its profile before launch and verify the new process sees the HolyAgent plugin and startup guidance. A resolved npm tag, `holyagent --version`, a dry run or a setup receipt proves that step only. None attaches HolyAgent to an already running thread.
 
@@ -172,9 +172,9 @@ On Pi the specialists' `find` and `grep` tools are [fff](https://github.com/dmtr
 
 ### The T3 Code setup screen
 
-In a terminal, use `bunx holyagent@dev setup` to try the development setup. Without `setup` the public command shows help. Use Left and Right or click a harness tab. Enable Pi and Claude together if needed. Codex public setup is not available on this build.
+In a terminal, use `bunx holyagent@dev setup` to try the development setup. Without `setup` the public command shows help. Use ← and → or click a harness tab. Enable only Codex for native Codex setup, or select multiple harnesses and review their changes together. Without a terminal, use `bunx holyagent@dev setup codex --non-interactive` for Codex only. Bare unattended setup still targets Pi.
 
-When Pi is enabled, its tab lists the two model providers HolyAgent supports: Kimi for Coding (global) and OpenAI Codex (ChatGPT). Enable either or both. Setup keeps the current default while it remains selected and respects explicit per-role routes. T3 settings such as new threads in worktrees and agent device access appear only when offered by the scope and host.
+When Pi is enabled, its tab lists Kimi for Coding (global) and OpenAI Codex (ChatGPT). Enable either or both. These checkboxes do not select a primary provider. Setup seeds the editable model and effort for new Pi and T3 sessions from the root route only when native preferences are untouched. It respects later choices and explicit per-role routes. T3 settings such as new threads in worktrees and the Device Simulator appear only when supported by the scope and host.
 
 Use Up and Down to move and Enter to change the focused option. Focus or click **Review choices** to open the plan. Nothing is written until you choose **Apply** or explicitly confirm a package replacement. Escape, `q` or Ctrl-C cancels. A capability flag or `--non-interactive` skips the screen. See [the detailed setup controls](pi/t3-code.md#the-setup-screen-and-its-flags).
 

@@ -216,9 +216,10 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
     return yield* fail("Invalid HolyAgent plugin version")
   const shell = yield* Shell
-  const codex = yield* shell.which("codex")
-  if (Option.isNone(codex))
-    return yield* fail("Codex is not on PATH. Install the native Codex CLI first.")
+  if (!options.dryRun && Option.isNone(yield* shell.which("codex")))
+    return yield* fail(
+      "Codex is not on PATH. Apply from an environment with the verified native Codex CLI. A setup preview does not require it.",
+    )
   const run = (args: ReadonlyArray<string>) =>
     shell
       .run("codex", args, {
