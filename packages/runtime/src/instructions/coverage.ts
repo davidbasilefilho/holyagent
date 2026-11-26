@@ -30,7 +30,7 @@ const EXISTING_COVERAGE = {
     },
     "R-VISUAL-ITERATION": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, rendered evidence and conditions",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -62,6 +62,30 @@ const EXISTING_COVERAGE = {
         "complete and accept baseline collection before dispatching any task source-writing Assignment",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
+    "R-HILLCLIMB-BASELINE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reproducible baseline",
+    },
+    "R-HILLCLIMB-TRIAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reversible change",
+    },
+    "R-HILLCLIMB-STOP": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "no meaningful gain",
+    },
+    "R-HILLCLIMB-VISUAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "A pixel difference alone does not establish improvement",
+    },
+    "R-HILLCLIMB-SCENARIOS": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "separate installation from use",
+    },
+    "R-HILLCLIMB-REUSE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "`performance-iteration` for controlled measurement",
+    },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -73,13 +97,17 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "Stack PRs only when the project or user explicitly requires it.",
     },
+    "R-RECOVER": {
+      section: "root/recover-work.md",
+      phrase: "Keep access, approval and sandbox boundaries",
+    },
     "R-TASKLIST": {
       section: "root/task-list.md",
       phrase: "Use a task list for delegated or multi-step work and handoffs",
     },
     "R-TURN": {
       section: "root/task-list.md",
-      phrase: "End your turn only when done or nothing can move",
+      phrase: "Finish authorized work through verification",
     },
     "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
     "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
@@ -95,7 +123,7 @@ const EXISTING_COVERAGE = {
     },
     "R-DECIDE": {
       section: "root/task-list.md",
-      phrase: "Send every pending decision through AskUserQuestion",
+      phrase: "never assume consent",
     },
     "R-REASK": {
       section: "root/asking.md",
@@ -124,7 +152,7 @@ const EXISTING_COVERAGE = {
       section: "root/search.md",
       phrase: "Search file contents with `holyagent-cli rg`",
     },
-    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop that dispatch" },
     "R-ROUTE": {
       section: "root/routing.md",
       phrase: "Pick a specialist whose agent description fits and whose result you can verify",
@@ -146,7 +174,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STOP": {
       section: "root/dispatch.md",
-      phrase: "only for conflicting new requirements or information",
+      phrase: "Honor cancellation or loss of authorization promptly",
     },
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
@@ -163,7 +191,8 @@ const EXISTING_COVERAGE = {
     "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      phrase:
+        "Your own final pass, after any required independent visual review, decides acceptance",
     },
     "R-OWNEDROUTES": {
       section: "root/skills.md",
@@ -203,7 +232,7 @@ const EXISTING_COVERAGE = {
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
-      phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
+      phrase: "Run `gh pr checks <n> --watch` once",
     },
     "R-NOASK": {
       section: "root/asking.md",
@@ -212,7 +241,7 @@ const EXISTING_COVERAGE = {
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-MERGEWAIT": {
       section: "root/version-control.md",
-      phrase: "do not ask whether to merge or how",
+      phrase: "Call a PR merge-ready only after independent review",
     },
     "R-GUIDE": { section: "skills/instruction-writing/SKILL.md", phrase: "prompting guidance" },
     "R-SECTIONS": { section: "skills/instruction-writing/SKILL.md", phrase: "in its own file" },
@@ -395,7 +424,7 @@ const EXISTING_COVERAGE = {
     },
     "R-VISUAL-ITERATION": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, rendered evidence and conditions",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -427,6 +456,30 @@ const EXISTING_COVERAGE = {
         "complete and accept baseline collection before dispatching any task source-writing Assignment",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
+    "R-HILLCLIMB-BASELINE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reproducible baseline",
+    },
+    "R-HILLCLIMB-TRIAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reversible change",
+    },
+    "R-HILLCLIMB-STOP": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "no meaningful gain",
+    },
+    "R-HILLCLIMB-VISUAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "A pixel difference alone does not establish improvement",
+    },
+    "R-HILLCLIMB-SCENARIOS": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "separate installation from use",
+    },
+    "R-HILLCLIMB-REUSE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "`performance-iteration` for controlled measurement",
+    },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -504,7 +557,7 @@ const EXISTING_COVERAGE = {
       phrase: "Read the detail you need to verify the result",
     },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "Handle small, low-risk work directly" },
-    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop that dispatch" },
     "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
@@ -514,7 +567,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STOP": {
       section: "root/dispatch.md",
-      phrase: "only when a new requirement or new information conflicts with that running work",
+      phrase: "Honor cancellation or loss of authorization promptly",
     },
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CACHE-REUSE": {
@@ -553,14 +606,21 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
     },
+    "R-RECOVER": {
+      section: "root/recover-work.md",
+      phrase: "Keep access, approval and sandbox boundaries",
+    },
     "R-TASKLIST": {
       section: "root/task-list.md",
       phrase: "Use a task list for delegated or multi-step work and handoffs",
     },
-    "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
+    "R-TURN": {
+      section: "root/task-list.md",
+      phrase: "Finish authorized work through verification",
+    },
     "R-DECIDE": {
       section: "root/task-list.md",
-      phrase: "Every pending decision goes through `ask_user_question`",
+      phrase: "never assume consent",
     },
     "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
     "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
@@ -577,7 +637,7 @@ const EXISTING_COVERAGE = {
     },
     "R-MERGEWAIT": {
       section: "root/version-control.md",
-      phrase: "do not ask whether to merge or how",
+      phrase: "Call a PR merge-ready only after independent review",
     },
     "R-COMMIT-OWNER": {
       section: "root/version-control.md",
@@ -740,7 +800,8 @@ const EXISTING_COVERAGE = {
     },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      phrase:
+        "Your own final pass, after any required independent visual review, decides acceptance",
     },
     "R-EVIDENCE": {
       section: "skills/evidence-judging/SKILL.md",
@@ -752,7 +813,7 @@ const EXISTING_COVERAGE = {
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
-      phrase: "Run `gh pr checks <n> --watch` as a background process",
+      phrase: "Run `gh pr checks <n> --watch` once",
     },
     "R-GUIDE": {
       section: "skills/instruction-writing/SKILL.md",
@@ -778,7 +839,7 @@ const EXISTING_COVERAGE = {
     },
     "R-VISUAL-ITERATION": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, rendered evidence and conditions",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -810,6 +871,30 @@ const EXISTING_COVERAGE = {
         "complete and accept baseline collection before dispatching any task source-writing Assignment",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
+    "R-HILLCLIMB-BASELINE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reproducible baseline",
+    },
+    "R-HILLCLIMB-TRIAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "smallest reversible change",
+    },
+    "R-HILLCLIMB-STOP": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "no meaningful gain",
+    },
+    "R-HILLCLIMB-VISUAL": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "A pixel difference alone does not establish improvement",
+    },
+    "R-HILLCLIMB-SCENARIOS": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "separate installation from use",
+    },
+    "R-HILLCLIMB-REUSE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "`performance-iteration` for controlled measurement",
+    },
     "R-GPT-PROSE": {
       section: "specialist/conduct.md",
       phrase: "For human-facing prose, write directly and specifically",
@@ -887,7 +972,7 @@ const EXISTING_COVERAGE = {
       phrase: "Read the detail you need to verify the result",
     },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "Handle small, low-risk work directly" },
-    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop that dispatch" },
     "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
@@ -897,7 +982,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STOP": {
       section: "root/dispatch.md",
-      phrase: "only when a new requirement or new information conflicts with that running work",
+      phrase: "Honor cancellation or loss of authorization promptly",
     },
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CACHE-REUSE": {
@@ -936,14 +1021,21 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
     },
+    "R-RECOVER": {
+      section: "root/recover-work.md",
+      phrase: "Keep access, approval and sandbox boundaries",
+    },
     "R-TASKLIST": {
       section: "root/task-list.md",
       phrase: "Use a task list for delegated or multi-step work and handoffs",
     },
-    "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
+    "R-TURN": {
+      section: "root/task-list.md",
+      phrase: "Finish authorized work through verification",
+    },
     "R-DECIDE": {
       section: "root/task-list.md",
-      phrase: "Every pending decision goes through the structured question tool",
+      phrase: "never assume consent",
     },
     "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
     "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
@@ -960,7 +1052,7 @@ const EXISTING_COVERAGE = {
     },
     "R-MERGEWAIT": {
       section: "root/version-control.md",
-      phrase: "do not ask whether to merge or how",
+      phrase: "Call a PR merge-ready only after independent review",
     },
     "R-COMMIT-OWNER": {
       section: "root/version-control.md",
@@ -1123,7 +1215,8 @@ const EXISTING_COVERAGE = {
     },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
-      phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      phrase:
+        "Your own final pass, after any required independent visual review, decides acceptance",
     },
     "R-EVIDENCE": {
       section: "skills/evidence-judging/SKILL.md",
@@ -1135,7 +1228,7 @@ const EXISTING_COVERAGE = {
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
-      phrase: "Run `gh pr checks <n> --watch` as a background process",
+      phrase: "Run `gh pr checks <n> --watch` once",
     },
     "R-GUIDE": {
       section: "skills/instruction-writing/SKILL.md",

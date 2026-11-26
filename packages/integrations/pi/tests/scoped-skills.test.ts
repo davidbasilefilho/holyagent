@@ -56,7 +56,7 @@ test("Pi role prompts route only mapped family guidance and keep bodies out", as
   const { OWNED_GUIDANCE } = await import("../../../runtime/src/instructions/skills.ts")
   const { PI_ROOT_PROMPTS } = await import("../../../runtime/src/pi/root-prompt.ts")
   const { agentFiles } = await import("../src/agents.ts")
-  for (const family of ["kimi-k3.1", "gpt-6"] as const) {
+  for (const family of ["kimi-k3.1", "gpt-6", "gpt-6.2"] as const) {
     const agents = await agentFiles(family)
     for (const route of ROUTES) {
       const prompt = agents.find((file) => file.path.endsWith(`/${route.agent}.md`))?.content ?? ""
@@ -70,6 +70,8 @@ test("Pi role prompts route only mapped family guidance and keep bodies out", as
     }
     const root = PI_ROOT_PROMPTS[family]
     expect(root).toContain(`/guidance/${family}/visual-judging/SKILL.md`)
+    expect(root).toContain(`/guidance/${family}/hillclimb-iteration/SKILL.md`)
+    expect(root).not.toContain("# Hillclimb iteration")
     expect(root).not.toContain("# Library documentation lookup")
   }
 })
@@ -118,8 +120,10 @@ test("npm's package whitelist ships all family guidance without advertising owne
     expect(expected.length).toBeGreaterThan(0)
     expect(paths.filter((path) => path.startsWith("guidance/"))).toEqual(expected)
     expect(paths.some((path) => path.startsWith("skills/"))).toBe(false)
-    for (const family of ["gpt-6", "kimi-k3.1"])
+    for (const family of ["gpt-6", "gpt-6.2", "kimi-k3.1"]) {
       expect(paths).toContain(`guidance/${family}/documentation-lookup/SKILL.md`)
+      expect(paths).toContain(`guidance/${family}/hillclimb-iteration/SKILL.md`)
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
   }

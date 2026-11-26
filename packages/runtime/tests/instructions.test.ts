@@ -145,6 +145,7 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
       "dev-server",
       "documentation-lookup",
       "evidence-judging",
+      "hillclimb-iteration",
       "instruction-writing",
       "mobile-design",
       "performance-iteration",
@@ -183,10 +184,14 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
     expect(performance?.content).toContain("Rerun an intermediate revision when behavior changes")
     expect(performance?.content).not.toContain("each source commit")
     const visual = skills.find((skill) => skill.path === "visual-judging/SKILL.md")
-    expect(visual?.content).toContain("Before any task source edits")
-    expect(visual?.content).toContain("After the root creates each source commit")
-    expect(visual?.content).toContain("before independent review, acceptance or push")
-    expect(visual?.content).toContain("outside the source commit")
+    expect(visual?.content).toContain("before editing")
+    expect(visual?.content).toContain(
+      "Preserve the original revision, rendered evidence and conditions",
+    )
+    expect(visual?.content).toContain(
+      "Recheck intermediate revisions when they change the evidence or risk",
+    )
+    expect(visual?.content).toContain("bind acceptance to the tested revision")
     const design = skills.find((skill) => skill.path === "web-design/SKILL.md")
     expect(design?.content).toContain("fluid component and route animation")
   })

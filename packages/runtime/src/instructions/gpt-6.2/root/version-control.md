@@ -23,7 +23,7 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 
 ### Merging
 
-When reviewed PRs are green, do not ask whether to merge or how; report them in the final report as ready to merge and wait, since merging needs the user to name it. On that word, merge at once without asking the method, choosing in this order: the repository's convention (merge settings, CONTRIBUTING, the history of merged PRs), else the method the user chose earlier, else the holyagent default (squash, as above). For a required stack, follow its reviewed merge order and recheck each actual base.
+Call a PR merge-ready only after independent review and applicable gates pass for its current head, with no unresolved blocker in the repository’s merge requirements. Merge only within authorization already given or newly granted. Recheck head, approvals and checks before merging. Otherwise leave it unmerged and report what is missing. Choose the repository method first, then the user’s choice, then HolyAgent’s squash default. For an authorized stack, recheck each actual base.
 
 ### Branch deletion
 

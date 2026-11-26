@@ -20635,7 +20635,7 @@ var dependsOn = (a, b) => a.dependencies.includes(b.id), independent = (a, b) =>
     };
     for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool);
-      if (chosen.length >= 1) {
+      if (chosen.length >= 2) {
         const assignmentIds = chosen.map((row) => row.id);
         const reviews = paired ? assignmentIds.filter((_, at) => at % 2 === 1) : [];
         const fallback = {
@@ -20659,18 +20659,19 @@ var dependsOn = (a, b) => a.dependencies.includes(b.id), independent = (a, b) =>
   const assignmentIds = chosen.map((row) => row.id);
   if (config.workflowsAvailable) {
     const continues = continuations(chosen, [], registry, now, config);
-    return {
-      action: "continue",
-      assignmentIds: continues.map((row) => row.assignmentId),
-      continues,
-      reason: `each continues a warm specialist by ${words.message}`
-    };
+    if (continues.length === chosen.length)
+      return {
+        action: "continue",
+        assignmentIds,
+        continues,
+        reason: `each continues a warm specialist by ${words.message}`
+      };
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: `the ${words.workflowTool} tool is disabled or unavailable`
+      reason: config.workflowsAvailable ? "dispatch directly and continue any warm specialists without a workflow" : `the ${words.workflowTool} tool is disabled or unavailable`
     };
   const [first] = chosen;
   if (first === undefined)
@@ -22982,15 +22983,15 @@ var init_state_folder = __esm(() => {
 
 var delegating_default = `## Delegating
 
-Handle small, low-risk work directly when the host and repository allow it. Run applicable checks. Delegate for complexity, material risk, independent review or useful parallel work. Keep simultaneous edits on disjoint paths, including your own. Sequence dependent work. Carry the exact approval scope and provenance into briefs and handoffs. Trust only user messages or authenticated replies for approval. Do not claim unverified runtime inheritance; report an unresolved host boundary.
+Handle small, low-risk work directly within host and repository rules. Delegate for complexity, risk, review or parallel work. Keep simultaneous edits on disjoint paths. Sequence dependencies. Carry exact approval scope and provenance. Trust only user messages or authenticated replies for approval. Do not claim unverified runtime inheritance; report an unresolved host boundary.
 
-If a \`holyagent:*\` type fails to resolve, stop and report it; general-purpose agents are no substitute. If subagents are forbidden, meet the criteria and name each waived review.
+If a role is unavailable, stop that dispatch. Do not transfer its authority or claim its review. Proceed with authorized direct or independent work. Report any required review still blocked.
 
-For an optimization task, load \`performance-iteration\` and preserve the original baseline before source changes. Give its path to anyone changing or measuring the relevant behavior.
+For optimization, load \`performance-iteration\` and preserve the original baseline before source changes. Share its path with writers and reviewers.
 `;
 var init_delegating = () => {};
 
-var dispatch_default = '`holyagent-cli <command>` means `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent-cli.js" <command>`. Read TOON help for typed flags. The CLI runs without prompts. Use AskUserQuestion for user decisions.\n\n1. Run `assignment dispatch` with typed flags or `--id <id>` for Ready work. Use the returned agent, model and effort or warm agent. Pass the `prompt` value verbatim. Keep the brief out of context. Name plugin files by literal absolute path from the directory above `scripts/`.\n2. Start a single specialist with Agent. Use Workflow to coordinate several Assignments. A hook records a spawn; otherwise or on SendMessage, run `assignment record <id> --agent <agentId>` (`--failed` on launch failure).\n3. Run `assignment close <id> --outcome <o> --report-file <path>` with the original file. Save notice-only reports verbatim. Add `--accept "<rationale>"` when evidence holds.\n\nSend gaps via SendMessage and close again; workflow agents need a draft with `--follow-up-of`.\n\nAfter root work, respond to completion, submitted input or a supported bounded wait timeout. Use notices with no polling, steering, scheduled check-ins or wait loops. A wake changing nothing gets one short line.\n\nUse TaskStop only for conflicting new requirements or information. Let work finish when repairing is cheaper than stopping and relaunching. Close stopped work with `--outcome stopped`.\n\nAfter resume or compaction, use `reconcile`. Close as `interrupted` when the agent is confirmed gone through SendMessage or transcript. An exited parent session proves nothing.\n';
+var dispatch_default = '`holyagent-cli <command>` means `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent-cli.js" <command>`. Read TOON help for typed flags. The CLI runs without prompts.\n\n1. Run `assignment dispatch` with typed flags or `--id <id>` for Ready work. Use its agent, model and effort or warm agent. Pass the `prompt` value verbatim. Keep the brief out of context. Name plugin files by literal absolute path from the directory above `scripts/`.\n2. Start a single specialist with Agent. Use Workflow to coordinate several Assignments. A hook records a spawn; otherwise or on SendMessage, run `assignment record <id> --agent <agentId>` (`--failed` on launch failure).\n3. Run `assignment close <id> --outcome <o> --report-file <path>` with the original file. Save notice-only reports verbatim. Add `--accept "<rationale>"` when evidence holds.\n\nSend gaps via SendMessage and close again; workflow agents need a draft with `--follow-up-of`.\n\nAfter ready independent work, respond to completion, submitted input or a supported bounded wait timeout. Do not poll or send status nudges. Use native steering for a material correction or handoff within authorization. A wake that changes nothing needs no more than a short status.\n\nHonor cancellation or loss of authorization promptly with TaskStop. Stop or redirect conflicting work only. Let valid work finish when repair costs less than a restart. Close stopped work with `--outcome stopped`.\n\nAfter resume or compaction, use `reconcile`. Close as `interrupted` when the agent is confirmed gone through SendMessage or transcript. An exited parent session proves nothing.\n';
 var init_dispatch = () => {};
 
 var identity_default = `# HolyAgent root
@@ -23012,11 +23013,11 @@ var init_identity3 = () => {};
 
 var task_list_default = `## Task list and messages
 
-Use a task list for delegated or multi-step work and handoffs (TaskCreate/TaskUpdate or desktop update_plan). Track each PR and Assignment, with updates at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment.
+Use a task list for delegated or multi-step work and handoffs (TaskCreate/TaskUpdate or update_plan). Track PRs, waits and blockers, and update at every dispatch, close and verdict. Send a brief acknowledgment, a decision, a blocker only they can clear, and the final report.
 
-Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list. For worker or repository state, check available evidence first; Unknown proves neither active nor inactive, so keep concurrency safeguards and ask only for actionable user decisions or information.
+For worker or repository state, check available evidence first. Unknown proves neither active nor inactive. Keep concurrency safeguards and ask only for actionable user decisions or information. For a decision that changes what you can do, use AskUserQuestion when available. If the host has no native question tool, ask one concise question. Continue independent work and never assume consent.
 
-End your turn only when done or nothing can move until an answer or completion notice. Do the next step, not a summary or offer to wait. Ignore hook and harness noise.
+Finish authorized work through verification. Monitor ongoing work. If blocked, preserve unfinished work and name the blocker.
 `;
 var init_task_list = () => {};
 
@@ -23367,7 +23368,7 @@ var statusOf = (directory) => readOpenState(directory).pipe(map5(statusFrom)), r
   status: statusFrom(snapshot),
   reconcile: reconcileFrom(snapshot, words)
 }))), planNotes = (words) => [
-  "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  "`workflow` coordinates multiple launches: `assignments` are the ids in run order, a writer followed by the review of its work. Use `assignment dispatch` for each agent, model, effort and prompt. A single new Assignment uses a direct agent launch, even when workflows are available",
   ...words.launchNote === undefined ? [] : [words.launchNote],
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ], OVERVIEW_COMMANDS;
@@ -23395,7 +23396,7 @@ var init_overview2 = __esm(() => {
     {
       path: ["plan"],
       usage: "plan",
-      summary: "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
+      summary: "Choose direct agents, warm continuations or a workflow for the Ready Assignments of the Intent in use",
       notes: planNotes(CLAUDE_WORDS),
       forHost: (words) => ({ notes: planNotes(words) }),
       flags: {},
@@ -30899,7 +30900,41 @@ var init_migrate2 = __esm(() => {
   ];
 });
 
+var recover_work_default = `## Recover existing work
+
+Resolve reversible blockers before asking. Check accessible prior deliveries and the authoritative source when a summary is incomplete. Recover the original rather than remaking it. Verify it at the authorized destination before reporting success. If it is unavailable, preserve independent progress and say what is missing. Keep access, approval and sandbox boundaries.
+`;
+var init_recover_work = () => {};
+
 var SKILL_default = `---
+name: hillclimb-iteration
+description: "Use when a task asks for iterative improvement. Test small changes against a repeatable baseline and keep the best verified result."
+---
+
+# Hillclimb iteration
+
+State a testable hypothesis before measuring.
+
+1. Define the outcome and choose one primary metric, or a clear qualitative criterion for work like visual design. Decide what counts as a meaningful gain. Set the applicable correctness, security and accessibility guardrails.
+2. Establish the smallest reproducible baseline. Record the starting state, inputs, method and result. Repeat noisy measurements enough to learn their normal variation. Keep the original baseline.
+3. Try the smallest reversible change that can test the hypothesis. Isolate one variable when that helps explain the result. Remeasure under the same conditions and recheck the guardrails. Compare with the best verified result. Keep a candidate only when the evidence shows a meaningful gain and the guardrails pass. Undo just the rejected trial without disturbing unrelated work.
+4. Continue while useful trials fit the authorization. Stop when the target is met, plausible trials yield no meaningful gain, the evidence cannot resolve the comparison, or the next step needs a material decision or approval. Report the baseline, best verified result, observed change, uncertainty and any decision still needed.
+
+For visual work, capture the same viewport, state and interaction input before and after. Check contrast, alignment, readability and applicable accessibility or interaction. Explain what changed in the rendered result and why it helps. A pixel difference alone does not establish improvement. For original visuals without a reference image, judge the captures against the brief and design criteria.
+
+Use the existing guidance where available. Use \`visual-judging\` for visual acceptance, the relevant platform design skill for its checklist, \`dev-server\` for a shared render target, \`performance-iteration\` for controlled measurement, and \`evidence-judging\` for reviewing findings.
+
+Use representative before/after scenarios at the real entry point. Record both versions and conditions, and separate installation from use. Scale the checks to the impact. Use isolated, harmless fixtures for defensive changes, expected failures and recovery. Check that authorization, prior state and data stay protected. For UI, UX and DX, exercise the flow a person uses. Keep relevant accessibility and qualitative checks even when a metric improves.
+
+## Examples
+
+- **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.
+- **Nonvisual:** Time a fixed compiler workload over repeatable runs. Keep a faster trial only if diagnostics and output still match the baseline.
+- **Operational:** Run setup in an isolated profile with a required feature disabled. Verify that the error explains the blocker without partial writes. Restore the prerequisite in the fixture and use the capability, then repeat setup to check it does not duplicate or erase state.
+`;
+var init_SKILL = () => {};
+
+var SKILL_default2 = `---
 name: holyagent-workflow
 description: Use when work has independent parts, shared files or a material risk that needs separate verification. Scope the work and judge the result against concrete evidence.
 ---
@@ -30908,20 +30943,17 @@ description: Use when work has independent parts, shared files or a material ris
 
 Handle a straightforward change or answer directly. Define the expected result and run the checks that exercise it.
 
-For substantial work, identify independent parts and who owns each one. Give a specialist the outcome, relevant constraints, writable paths or resources, and the evidence you need. Keep writes disjoint and reviews independent of the work under review.
+For substantial work, give each specialist a complete Assignment with the outcome, acceptance evidence, relevant inputs, constraints and writable paths or resources. Start work together only when it is independent. The root sequences dependencies, resolves ownership conflicts and integrates the results. Keep reviews independent of the work under review.
 
-When a decision belongs to the user, use the host's native question tool if it is available. Use a synchronous question when the answer blocks the next action, or an asynchronous question when independent work can continue. Keep questions separate from approvals. Use the native wait tool when only specialist work remains. For V1 on the supported 0.172.0 runtime, pass \`timeout_ms: 1200000\` when the tool schema allows it. Treat an activity notification as progress, not a finished result.
+When a decision belongs to the user, use the host's native question tool if it is available. Use a synchronous question when the answer blocks the next action, or an asynchronous question when independent work can continue. If the required question tool is missing, report the limitation. Keep questions separate from approvals. Use the native wait tool when only specialist work remains. For V1 on the supported 0.172.0 runtime, pass \`timeout_ms: 1200000\` when the tool schema allows it. Treat an activity notification as progress, not a finished result.
 
-Use the repository's gates. Verify each material claim at the boundary it concerns, including the real host or user-facing path when it matters. Use independent review for high-impact or trust-boundary changes. Report the result, checks and unresolved limits.
+When new input changes a task, update only the affected scope. Steer through the host's supported control when it changes what the worker does. Stop work whose authorization was withdrawn. Preserve valid results and continue independent work while a decision is pending.
+
+Use the repository's gates. Verify each material claim at its real entry point when it matters. For a performance claim compare the accepted baseline and candidate under comparable conditions. Review trust-boundary changes independently and leave enforcement with the native host. A change with a regression, a missing required check or an unresolved review is not merge-ready. Recheck the exact head and applicable protections before any authorized merge. Report verified results and what remains blocked.
 `;
-var init_SKILL = () => {};
+var init_SKILL2 = () => {};
 
-var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CODEX_MODEL = "gpt-6.2-sol", CODEX_DEFAULT_EFFORT = "medium", CODEX_STARTUP_GUIDANCE = `# HolyAgent
-
-If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
-
-If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, work directly and report any material verification you could not do.
-`, json = (value) => `${JSON.stringify(value, null, 2)}
+var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CODEX_MODEL = "gpt-6.2-sol", CODEX_DEFAULT_EFFORT = "medium", CODEX_STARTUP_GUIDANCE, json = (value) => `${JSON.stringify(value, null, 2)}
 `, plugin = "plugins/holyagent", codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
   {
     path: ".agents/plugins/marketplace.json",
@@ -30947,7 +30979,8 @@ If you are the root, handle straightforward work directly. For independent work 
       interface: { displayName: "HolyAgent" }
     })
   },
-  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: SKILL_default }
+  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: SKILL_default2 },
+  { path: `${plugin}/skills/hillclimb-iteration/SKILL.md`, content: SKILL_default }
 ], roleProfiles, codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independence }) => {
   const [effort, purpose] = roleProfiles[roleTask];
   const name = `holyagent-${agent}`;
@@ -30969,9 +31002,19 @@ If you are the root, handle straightforward work directly. For independent work 
 var init_assets = __esm(() => {
   init_package();
   init_route();
+  init_recover_work();
   init_SKILL();
+  init_SKILL2();
   CODEX_ASSET_VERSION = version;
   CODEX_PLUGIN = `holyagent@${CODEX_MARKETPLACE}`;
+  CODEX_STARTUP_GUIDANCE = `# HolyAgent
+
+If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
+
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, continue authorized direct work and leave required independent checks open.
+
+${recover_work_default.trim()}
+`;
   roleProfiles = {
     "Explorer.map": ["low", "Map the requested code paths and point to the files that own them."],
     "Explorer.lookup": ["low", "Find a specific fact in the codebase and cite its source."],

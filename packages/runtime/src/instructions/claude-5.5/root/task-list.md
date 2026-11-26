@@ -1,7 +1,7 @@
 ## Task list and messages
 
-Use a task list for delegated or multi-step work and handoffs (TaskCreate/TaskUpdate or desktop update_plan). Track each PR and Assignment, with updates at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment.
+Use a task list for delegated or multi-step work and handoffs (TaskCreate/TaskUpdate or update_plan). Track PRs, waits and blockers, and update at every dispatch, close and verdict. Send a brief acknowledgment, a decision, a blocker only they can clear, and the final report.
 
-Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list. For worker or repository state, check available evidence first; Unknown proves neither active nor inactive, so keep concurrency safeguards and ask only for actionable user decisions or information.
+For worker or repository state, check available evidence first. Unknown proves neither active nor inactive. Keep concurrency safeguards and ask only for actionable user decisions or information. For a decision that changes what you can do, use AskUserQuestion when available. If the host has no native question tool, ask one concise question. Continue independent work and never assume consent.
 
-End your turn only when done or nothing can move until an answer or completion notice. Do the next step, not a summary or offer to wait. Ignore hook and harness noise.
+Finish authorized work through verification. Monitor ongoing work. If blocked, preserve unfinished work and name the blocker.

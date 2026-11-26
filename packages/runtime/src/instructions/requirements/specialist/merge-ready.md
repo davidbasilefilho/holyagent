@@ -14,12 +14,3 @@ The mergeability rubric is fixed text in the instructions of every role that wri
   | repo-standards | Does it follow the project's stated rules and conventions?            | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                           | An unstated convention                  |
 
 - R-MERGE-BLOCKER: A blocker in any dimension fails the change. Acceptance needs support for every blocking criterion.
-
-Reference only (no id; nothing here is run by HolyAgent):
-
-The Artificial Analysis Coding Agent Index v2.0 combines FrontierCode v1.1, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA. They set what a coding agent is judged on, and so what the design should keep measurable:
-
-- mergeable implementation (FrontierCode v1.1): the dimensions above;
-- terminal work (Terminal-Bench 4.0): completing real command-line tasks end to end;
-- repo understanding (SWE-Atlas-QnA-AA): answering questions about a codebase from its source;
-- tokens, cache use, cost and time per task: the efficiency side of the same tasks.

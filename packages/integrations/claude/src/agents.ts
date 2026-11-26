@@ -144,6 +144,7 @@ export const HISTORY_RULES_FILE = "../shared/history-rules.md"
  */
 export const ROOT_SECTIONS: ReadonlyArray<string> = [
   ...ROOT_CORE_FILES,
+  "recover-work.md",
   "user-messages.md",
   "routing.md",
   "context.md",

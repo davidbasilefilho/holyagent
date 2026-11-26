@@ -209,10 +209,8 @@ describe("workflow recommendation", () => {
   test("a review that depends on the writer waits for its acceptance and is not paired", () => {
     const rows = [writer("w"), review("r", { dependencies: ["w"], independentFrom: ["w"] })]
     expect(plan(rows)).toMatchObject({
-      action: "workflow",
+      action: "subagent",
       assignmentIds: ["w"],
-      fallback: { afterwards: [] },
-      reason: PARALLEL,
     })
   })
 
@@ -231,8 +229,7 @@ describe("workflow recommendation", () => {
     const check = review("r", { independentFrom: ["w"] })
     expect(plan([...rows, check])).toBeUndefined()
     expect(plan([succeeded({ id: "w" }), check])).toMatchObject({
-      action: "workflow",
-      reason: PARALLEL,
+      action: "subagent",
       assignmentIds: ["r"],
     })
   })
@@ -243,12 +240,12 @@ describe("workflow recommendation", () => {
       assignmentIds: ["r1", "r2"],
     })
     expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])).toMatchObject({
-      reason: PARALLEL,
+      action: "subagent",
       assignmentIds: ["r1"],
     })
   })
 
-  test("other independent Assignments run side by side, and a single one is a one-entry workflow", () => {
+  test("two independent Assignments can use a workflow but a single ready one launches directly", () => {
     expect(plan([validation("v1"), validation("v2")])).toMatchObject({
       action: "workflow",
       reason: PARALLEL,
@@ -257,7 +254,7 @@ describe("workflow recommendation", () => {
     })
     expect(plan([writer("w"), validation("v")])).toMatchObject({ reason: PARALLEL })
     expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])).toMatchObject({
-      reason: PARALLEL,
+      action: "subagent",
       assignmentIds: ["v1"],
     })
   })
@@ -266,15 +263,11 @@ describe("workflow recommendation", () => {
     const follow = writer("w2", { followUpOf: "assignment-old" })
     const warm = [{ assignmentId: "w2", agentId: "agent-1" }]
     expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
-      action: "workflow",
-      assignmentIds: ["w1"],
-      continues: warm,
+      action: "subagent",
+      assignmentIds: ["w1", "w2"],
     })
-    expect(plan([writer("w1"), follow], [warmFor()])).toHaveProperty(
-      "reason",
-      `${PARALLEL}; the Assignments in continues go by SendMessage to their warm specialists`,
-    )
     expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
+      action: "workflow",
       assignmentIds: ["w1", "w3"],
       continues: warm,
     })
@@ -338,14 +331,14 @@ describe("workflow recommendation", () => {
     })
   })
 
-  test("a single startable Assignment with a warm specialist is continue, otherwise a one-entry workflow (a subagent without workflows)", () => {
+  test("a single startable Assignment reuses its warm specialist or takes the direct path", () => {
     const row = writer("w", { followUpOf: "assignment-old" })
     expect(plan([row], [warmFor()])).toMatchObject({
       action: "continue",
       continues: [{ assignmentId: "w", agentId: "agent-1" }],
     })
     expect(plan([row], [warmFor()], DEFAULT_CONFIG)).toMatchObject({ action: "continue" })
-    expect(plan([row])).toMatchObject({ reason: PARALLEL, assignmentIds: ["w"] })
+    expect(plan([row])).toMatchObject({ action: "subagent", assignmentIds: ["w"] })
     expect(plan([row], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
       assignmentIds: ["w"],

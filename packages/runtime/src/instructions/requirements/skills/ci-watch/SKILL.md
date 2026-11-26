@@ -1,1 +1,1 @@
-- R-CI: Judge CI with the ci-watch skill: the aggregate of the current head's checks, watched with gh pr checks --watch through Monitor, the only CI wait, with missing data Unknown; treat review-bot findings as claims to verify.
+- R-CI: Judge CI on the current head with the ci-watch skill. Use a supported bounded background watcher or a completion notification. Respect host wait limits, do not repeatedly poll, and mark missing data Unknown. Include actual branch protection, required reviews and mergeability in readiness. Treat review-bot findings as claims to verify.

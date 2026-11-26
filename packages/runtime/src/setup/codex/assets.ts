@@ -1,5 +1,7 @@
 import { version } from "../../../../../package.json" with { type: "json" }
 import { type RoleTask, ROUTES } from "../../../../core/src/domain/route.ts"
+import recoverWork from "../../instructions/gpt-6.2/root/recover-work.md" with { type: "text" }
+import hillclimb from "../../instructions/gpt-6.2/skills/hillclimb-iteration/SKILL.md" with { type: "text" }
 import workflow from "./skills/holyagent-workflow/SKILL.md" with { type: "text" }
 
 /** The package version used by Codex's plugin cache. */
@@ -22,7 +24,9 @@ export const CODEX_STARTUP_GUIDANCE = `# HolyAgent
 
 If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
 
-If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, work directly and report any material verification you could not do.
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, continue authorized direct work and leave required independent checks open.
+
+${recoverWork.trim()}
 `
 
 /** One UTF-8 file to stage under the marketplace root or Codex home. */
@@ -34,7 +38,7 @@ export interface CodexAsset {
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`
 const plugin = "plugins/holyagent"
 
-/** Files of a local marketplace containing the native workflow plugin. */
+/** Files of a local marketplace containing the native HolyAgent plugin. */
 export const codexMarketplaceFiles = (
   assetVersion = CODEX_ASSET_VERSION,
 ): ReadonlyArray<CodexAsset> => [
@@ -63,6 +67,7 @@ export const codexMarketplaceFiles = (
     }),
   },
   { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: workflow },
+  { path: `${plugin}/skills/hillclimb-iteration/SKILL.md`, content: hillclimb },
 ]
 
 const roleProfiles = {

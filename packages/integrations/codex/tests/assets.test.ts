@@ -16,10 +16,10 @@ import {
 } from "../src/assets.ts"
 import { CODEX_STARTUP_MARKETPLACE, codexStartupConfig, stageCodexStartup } from "../src/startup.ts"
 
-test("the local marketplace points at the one packaged skill and release-versioned plugin", () => {
+test("the local marketplace contains both native skills in the release-versioned plugin", async () => {
   const files = new Map(codexMarketplaceFiles().map(({ path, content }) => [path, content]))
   const plugin = "plugins/holyagent"
-  expect(files.size).toBe(3)
+  expect(files.size).toBe(4)
   expect(JSON.parse(files.get(".agents/plugins/marketplace.json") ?? "")).toMatchObject({
     name: CODEX_MARKETPLACE,
     plugins: [{ name: "holyagent", source: { source: "local", path: `./${plugin}` } }],
@@ -31,8 +31,14 @@ test("the local marketplace points at the one packaged skill and release-version
   })
   const skill = files.get(`${plugin}/skills/holyagent-workflow/SKILL.md`)
   expect(skill).toContain("Handle a straightforward change or answer directly.")
-  expect(skill).toContain("Keep writes disjoint and reviews independent")
+  expect(skill).toContain("resolves ownership conflicts and integrates the results")
   expect(skill).not.toMatch(/holyagent-cli|openai-codex\/|AskUserQuestion|wait_agent/)
+  const hillclimb = files.get(`${plugin}/skills/hillclimb-iteration/SKILL.md`)
+  expect(hillclimb).toBe(
+    await Bun.file(
+      "packages/runtime/src/instructions/gpt-6.2/skills/hillclimb-iteration/SKILL.md",
+    ).text(),
+  )
 })
 
 test("the native role files project the shared catalog and preserve host settings", () => {
@@ -160,6 +166,7 @@ test.skipIf(codex === undefined)(
         JSON.parse(await run("debug", "prompt-input", "Check the scope")),
       )
       expect(prompt).toContain("holyagent:holyagent-workflow")
+      expect(prompt).toContain("holyagent:hillclimb-iteration")
       expect(prompt).not.toContain("spawn_agent")
       const features = await run("features", "list")
       expect(features).toMatch(/^default_mode_request_user_input[ \t]+[^\r\n]+[ \t]+true$/m)

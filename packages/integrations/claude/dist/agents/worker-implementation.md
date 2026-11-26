@@ -121,4 +121,5 @@ Writers follow these rules. A reviewer reports duplication of logic or instructi
 User and third-party skills remain available.
 Read the relevant guidance when its situation applies.
 - library documentation is needed: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/documentation-lookup/SKILL.md`
+- the task asks for iterative improvement against a measurable or visual criterion: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/hillclimb-iteration/SKILL.md`
 - writing or reviewing model-facing instructions: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/instruction-writing/SKILL.md`

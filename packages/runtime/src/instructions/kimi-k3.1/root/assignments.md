@@ -45,7 +45,7 @@ Resolve or report remaining blockers and pending Assignments before closing the 
 The final report gives, with the reason for each:
 
 - what needs the user (a decision, an access or account action, a device you cannot reach);
-- the reviewed green PRs that are ready to merge and wait for the user to say so (asking nothing about merging);
+- the PRs still waiting for authorization or a readiness condition, with the exact remaining reason;
 - Unknown results, waived gates, the PR's unresolved threads and non-clean merge state, and skipped visual preferences.
 
 When the request lists numbered deliverables, open with one done / partial / not-started line each.

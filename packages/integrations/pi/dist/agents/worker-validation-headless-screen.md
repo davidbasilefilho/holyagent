@@ -70,7 +70,7 @@ Leave to the root every command that changes git, GitHub or holyagent-cli state:
 
 When you need such a change, say so in the report.
 
-Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`. `holyagent-cli <command>` means `${HOLYAGENT_PI_ROOT}/scripts/holyagent-cli.js <command>`.
+Open to you, for read-only operations: `git status`, `diff`, `log`, `show`, `blame` and `ls-remote`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`. `holyagent-cli <command>` means `${HOLYAGENT_PI_ROOT}/scripts/holyagent-cli.js <command>`.
 
 Never change HEAD, a branch, the index or the working tree of a checkout other workers share, reviewers included, with `checkout`, `switch`, `stash`, `reset`, `restore`, `clean`, `add`, `commit`, `merge`, `rebase` or `cherry-pick`: they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the system temp area. To undo your own edit, edit the file back.
 
