@@ -201,7 +201,15 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed)
     if (blockers.length > 0)
-      return { lines: blockers.map((line) => `! ${line}`), ok: false } satisfies Report
+      return {
+        lines: [
+          ...blockers.map((line) => `! ${line}`),
+          hint(
+            "If you meant native Codex, see holyagent setup codex --help to prepare its profile before launch. Neither a package install nor a dry run activates the current session.",
+          ),
+        ],
+        ok: false,
+      } satisfies Report
   }
   // A failed capability write blocks the dependent phases. They remain in the plan but never
   // report progress as though they ran.

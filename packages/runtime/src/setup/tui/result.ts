@@ -31,7 +31,7 @@ export const setupNotice = (line: string): "status" | "next" | "warning" | undef
   const detail = line.slice(2)
   if (/^(?:scope|form|setup harness|Codex home|Startup): /i.test(detail)) return "status"
   if (
-    /^(?:Start Codex with this CODEX_HOME\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(
+    /^(?:Start Codex with this CODEX_HOME\b|If you meant native Codex\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(
       detail,
     )
   )

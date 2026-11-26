@@ -21,19 +21,22 @@ describe.each(sets)("root question policy: %s", (set) => {
 
   test("investigates before escalation and preserves unknown worker status", async () => {
     const text = await section("asking")
-    expect(text).toMatch(
-      /before escalating a question that depends on worker or repository state, check worker status, ownership, heartbeats and repository status/i,
-    )
-    expect(text).toMatch(/or (?:delegate that investigation|through a specialist)/i)
+    expect(text).toMatch(/before escalating a question that depends on worker or repository state/i)
+    expect(text).toMatch(/check (?:the accessible )?worker status, ownership/i)
+    expect(text).toMatch(/repository (?:status|evidence)/i)
     expect(text).toMatch(/Unknown proves neither active nor inactive/i)
-    expect(text).toMatch(/information the user can actually provide/i)
+    expect(text).toMatch(/information the user can (?:actually )?provide/i)
   })
 
-  test("uses a structured tool for every question", async () => {
-    const text = await section("asking")
+  test("uses the host's native question tool when available and never infers approval", async () => {
+    const text = await section("task-list")
     expect(text).toMatch(
-      /(?:AskUserQuestion|structured question tool|ask_user_question)[^.]*every type of question/i,
+      /(?:AskUserQuestion|native question tool|ask_user_question)[^.]*available/i,
     )
+    expect(text).toMatch(
+      /(?:otherwise|unavailable|no native question tool)[^.]*one concise question/i,
+    )
+    expect(text).toMatch(/never (?:assume|default to) consent/i)
   })
 
   test("carries scoped approval context without claiming trusted inheritance", async () => {

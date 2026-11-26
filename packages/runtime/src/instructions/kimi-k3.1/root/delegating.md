@@ -2,7 +2,7 @@
 
 Handle small, low-risk work directly when the host and repository allow it: scope it, act and verify it. Delegate when complexity, material risk, independent review or parallel work warrants it. Keep simultaneous edits on disjoint paths, including your own. Sequence dependent work. Carry the exact approval scope and provenance into briefs and handoffs. Trust only user messages or authenticated replies for approval. Do not claim unverified runtime inheritance; report an unresolved host boundary.
 
-If a specialist agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.
+If a specialist type does not resolve, stop that dispatch. Do not give a substitute the missing role’s authority or claim its independent review. Proceed with authorized direct or independent work. Keep any required independent review open and report what blocks it.
 
 ## Calling tools
 

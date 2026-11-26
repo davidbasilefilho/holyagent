@@ -5,7 +5,7 @@ description: "Use before the first Worker.visual or Reviewer.visual dispatch, an
 
 # Judging visual work
 
-Judge rendered work from what renders, not from a passing build or a report's claims.
+Judge rendered work from what renders, not from a passing build or a report's claims. Inspect bounded visual work directly when the user, repository and risk allow it. Use independent visual review when required or useful.
 
 ## Pick the platform skill
 
@@ -17,7 +17,7 @@ The platform skill is the only design guidance the two specialists get: the shar
 
 ## Accept
 
-Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance:
+Your own final pass, after any required independent visual review, decides acceptance:
 
 - Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (read its file), and accept only when they pass.
 - Check the spacing rules of the design core on those captures as well: padding inside every container, a gap around every block, shared column edges and no line starting with closing punctuation. Accept only when neither the worker's report of places that still touch nor the reviewer's observations name a place where content touches a rule, border or edge, and treat a worker report that neither names such places nor says none remain, or a reviewer report without the comparison, as incomplete. <!-- O26 -->
@@ -37,8 +37,8 @@ A departure from the platform skill's direction rules that has none of these eff
 
 Repair a material finding without asking when the repair keeps the user's requirements and needs no choice between fixes; otherwise ask through the structured question tool with a recommended default. Run the repair to a clean inspection: <!-- O3, O7 -->
 
-- Dispatch Worker.visual with the findings as criteria and say "round N of 3" in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean; then repeat your final pass on the captures that changed.
-- Allow at most three rounds per finding, counted across Worker.visual dispatches; after three, report the finding as a blocker.
+- Dispatch Worker.visual with the findings as criteria and include the evidence in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean; then repeat your final pass on the captures that changed.
+- Stop when the criterion is met, when no reproducible gain remains, or when a trade-off or permission requires a decision. Keep the best result, preserve other states and report remaining material blockers.
 - Name each skipped preference in the final report, without a fix.
 
 ## Explanatory pages
@@ -47,6 +47,6 @@ When a visual explanation or chart carries what prose cannot, build one self-con
 
 ## Iteration evidence
 
-Before any task source edits, dispatch a qualified specialist to collect and preserve the immutable original revision, visual evidence and conditions. After the root creates each source commit, dispatch an appropriate existing visual or operations specialist to collect evidence without source edits on that actual commit before independent review, acceptance or push. Compare it with both the original baseline and the immediately previous commit: for the first commit the previous revision is the original; advance the previous revision after each commit and never overwrite the original. Use screenshots and real interaction, plus video when the host supports it. Record revisions, evidence paths and conditions; exploratory precommit checks do not substitute for committed evidence. Mark unavailable comparisons Unknown with a concrete reason and a blocker when the requested target requires them; never substitute the last PR for the original baseline.
+Preserve the original revision, rendered evidence and conditions before editing. Compare the final relevant revision with that baseline at the same sizes and interaction states. Include video when motion matters. Recheck intermediate revisions when they change the evidence or risk. Collect evidence yourself when appropriate, or assign a qualified specialist when independence or access requires one. Report any missing comparison and bind acceptance to the tested revision.
 
 Associate reports and artifacts with the commit SHA outside the source commit as needed, and point persisted state and handoff to them. Do not create recursive evidence-only commits. Use this evidence in review and acceptance alongside the final captures.

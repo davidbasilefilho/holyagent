@@ -1059,7 +1059,7 @@ describe("command line", () => {
     const plan = await help("plan")
     for (const part of [
       "a writer followed by the review of its work",
-      "as the root workflow text says",
+      "A single new Assignment uses a direct agent launch",
       "`continues` lists Ready work that continues a warm specialist",
       "Workflow tool is disabled or unavailable",
       "`afterwards` reviews launch once the writers they depend on are terminal",
@@ -1155,14 +1155,12 @@ describe("plan", () => {
     expect(data(await cli(["plan"]))).toMatchObject({ action: "subagent", assignments: ids })
   })
 
-  test("a single Ready Assignment is a one-entry workflow, and direct subagents only without the tool", async () => {
+  test("a single Ready Assignment takes the direct path even with workflows enabled", async () => {
     await createIntent()
     const id = String(data(await cli(["assignment", "create"], writer())).id)
-    expect(data(await cli(["plan"]))).toMatchObject({
-      action: "workflow",
-      assignments: [id],
-      fallback: { action: "subagent", assignments: [id] },
-    })
+    const enabled = data(await cli(["plan"]))
+    expect(enabled).toMatchObject({ action: "subagent", assignments: [id] })
+    expect(enabled).not.toHaveProperty("fallback")
     expect(
       data(await cli(["plan"], undefined, { CLAUDE_CODE_DISABLE_WORKFLOWS: "1" })),
     ).toMatchObject({
@@ -1171,7 +1169,7 @@ describe("plan", () => {
     })
   })
 
-  test("work that continues a warm specialist is listed beside the workflow", async () => {
+  test("a single new Assignment and a warm continuation need no workflow", async () => {
     await createIntent()
     const first = await runToClose(writer(), "agent-1", true)
     const follow = String(
@@ -1183,12 +1181,13 @@ describe("plan", () => {
     )
     const plan = data(await cli(["plan"]))
     expect(plan).toMatchObject({
-      action: "workflow",
-      assignments: [other],
-      continues: [{ assignment: follow, agent: "agent-1" }],
+      action: "subagent",
+      parallel: true,
     })
-    expect(String(plan.reason)).toContain("SendMessage")
-    expect(plan.fallback).toMatchObject({ assignments: [other] })
+    expect(plan.assignments).toHaveLength(2)
+    expect(plan.assignments).toEqual(expect.arrayContaining([follow, other]))
+    expect(plan).not.toHaveProperty("fallback")
+    expect(String(plan.reason)).toContain("continue any warm specialists")
   })
 
   test("a single Ready Assignment with a warm specialist is a continue", async () => {

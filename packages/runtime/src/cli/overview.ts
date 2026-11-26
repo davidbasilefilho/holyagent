@@ -33,7 +33,7 @@ export const resumeOf = (directory: string, words: HostWords = CLAUDE_WORDS) =>
  * to write, run, record and close a workflow; these notes name only what the command prints.
  */
 const planNotes = (words: HostWords): ReadonlyArray<string> => [
-  "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  "`workflow` coordinates multiple launches: `assignments` are the ids in run order, a writer followed by the review of its work. Use `assignment dispatch` for each agent, model, effort and prompt. A single new Assignment uses a direct agent launch, even when workflows are available",
   ...(words.launchNote === undefined ? [] : [words.launchNote]),
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`,
 ]
@@ -58,7 +58,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     path: ["plan"],
     usage: "plan",
     summary:
-      "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
+      "Choose direct agents, warm continuations or a workflow for the Ready Assignments of the Intent in use",
     notes: planNotes(CLAUDE_WORDS),
     forHost: (words) => ({ notes: planNotes(words) }),
     flags: {},

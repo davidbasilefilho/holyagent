@@ -16,8 +16,8 @@ Reuse is the CLI's decision: `assignment dispatch` prints either `continue` with
 
 ## Waiting
 
-Start ready independent work together. After ready root work, respond to completion, submitted input or a supported bounded wait timeout. Return to workflow notices when no completion event exists; no polling, steering, scheduled check-ins or wait loops. A wake changing nothing gets one short line.
+Start ready independent work together. After ready root work, respond to completion, submitted input or a supported bounded wait timeout. Use completion notices where no wait exists. Do not poll or send status nudges. Use native steering for a material correction or handoff that changes the work, within authorization. A wake that changes nothing needs no more than a short status.
 
-Stop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.
+Honor cancellation or loss of authorization promptly with the host’s stop control. When a new requirement conflicts, stop or redirect only the affected work. Let valid work finish when repair costs less than a restart. Close stopped work with `--outcome stopped`.
 
 After a resume or compaction, `reconcile` is in context: continue from it, and close a Running Assignment as `interrupted` only once its agent is confirmed gone (the agent's status or its transcript; an exited parent session proves nothing). <!-- O22 -->

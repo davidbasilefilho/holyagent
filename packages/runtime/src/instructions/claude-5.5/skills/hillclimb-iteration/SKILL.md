@@ -1,0 +1,27 @@
+---
+name: hillclimb-iteration
+description: "Use when a task asks for iterative improvement. Choose small trials, compare evidence and retain the best verified result."
+---
+
+# Hillclimb iteration
+
+State a testable hypothesis before measuring.
+
+1. Name the outcome, one primary metric or a clear qualitative criterion, and what gain would be worth keeping. Set applicable correctness, security and accessibility guardrails so the metric cannot reward a regression.
+2. Use the smallest reproducible baseline. Record the starting state, inputs, method and result. Repeat noisy runs to establish ordinary variation. Preserve the original baseline.
+3. Use the smallest reversible change that can test the hypothesis. Isolate one variable when that makes the cause clear. Recheck the guardrails and remeasure under the same conditions. Compare with the best verified result. Keep the candidate when it shows a meaningful gain and passes the guardrails. Undo only the rejected trial's own changes.
+4. Continue useful trials within the authorized scope. Stop at the target, when plausible trials yield no meaningful gain, when the evidence cannot settle the comparison, or before a step that needs a material user decision or approval. Report the baseline, best verified result, observed change, uncertainty and any decision still needed.
+
+Compare visual captures at the same viewport, state and interaction input. Inspect contrast, alignment, readability and applicable accessibility or interaction. Say what the visible change does for the intended result. A pixel difference alone does not establish improvement. For original visuals, use the brief and platform criteria as the target when there is no reference image.
+
+Use related guidance where available. `visual-judging` and the relevant platform design skill own visual acceptance and its checklist. Use `dev-server` for the shared render target, `performance-iteration` for controlled measurement and `evidence-judging` for reviewing findings.
+
+Size the evaluation to the risk. Test representative behavior through the real entry point before and after, and record the versions and conditions. Record the result and separate installation from use. For defensive or operational changes, use isolated, harmless fixtures to exercise failure and recovery. Verify that permissions, data and prior state stay protected. For UI, UX or DX, test the key user or developer flow, not just the appearance or one numeric score.
+
+For a material change, record revisions, commands, samples and keep or revert decisions, including failed trials. Check that the treatment ran. Use a negative control when a successful install or a passing check could hide a missing effect. Alternate the order of repeated runs when it can bias the result. Report noise and sample count. A correct fix is not a measured speedup.
+
+## Examples
+
+- **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.
+- **Nonvisual:** Time a fixed compiler workload over repeatable runs. Keep a faster trial only if diagnostics and output still match the baseline.
+- **Operational:** Run setup in an isolated profile with a required feature disabled. Verify that the error explains the blocker without partial writes. Restore the prerequisite in the fixture and use the capability, then repeat setup to check it does not duplicate or erase state.

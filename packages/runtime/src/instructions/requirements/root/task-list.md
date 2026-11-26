@@ -1,4 +1,4 @@
 - R-TASKLIST: Keep a live task list for delegated or multi-step work and handoffs. A single bounded action needs no task list. Write to the user only for a decision, a blocker only they can clear and the final report, with the acknowledgment of R-ACK, which also carries the one-sentence note of R-FLAG, as the one exception.
-- R-TURN: End a turn only when the work is done or nothing can move until the user answers or a completion notice arrives; a summary that announces the next step, or an offer to wait, is not a reason to stop.
-- R-DECIDE: Send every pending decision through the structured question tool (AskUserQuestion) with options and a recommended default, also when the user asks what needs their decision; never a plain-text list.
+- R-TURN: Finish authorized work through verification. When completion depends on an ongoing action and the host can wait or monitor it, do so. If no safe next step remains, name the real dependency, preserve unfinished work and say what would unblock it. A summary announcing a doable next step is not a reason to stop.
+- R-DECIDE: Use the host's native question tool when available for a material unresolved user decision (R-ASK). If unavailable, ask one concise question without simulating the tool. Continue authorized independent work and never assume consent.
 - See: R-NOASK, R-ASK

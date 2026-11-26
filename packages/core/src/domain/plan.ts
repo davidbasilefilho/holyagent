@@ -162,12 +162,13 @@ const continuations = (
  * out, see {@link dispatchBlock}; a review waits for the unfinished work it names in
  * independentFrom), or undefined when none can. With workflows available it names the first shape
  * the set fits for the root's inline script: writers with the reviews of their work, as writer and
- * review ids in turn, or independent Assignments (a single one is a one-entry workflow), each with
- * its direct-subagent fallback. Work that would continue a warm specialist, which a workflow cannot
- * message, is listed beside it as `continues`, or is the whole `continue` recommendation when
- * nothing else is ready. Without workflows it takes the Assignments that can run side by side as
- * `subagent` work. With the key of the work tree the root dispatches from in `workTree`, a Running
- * writer in another work tree does not block the paths it owns, as in `assignment dispatch`.
+ * review ids in turn, or two or more independent Assignments, each with its direct-subagent
+ * fallback. Work that would continue a warm specialist, which a workflow cannot message, is listed
+ * beside it as `continues`, or is the whole `continue` recommendation when nothing else is ready. A
+ * single new dispatch goes directly to its agent, even if the host has workflows. Without workflows
+ * it takes the Assignments that can run side by side as `subagent` work. With the key of the work
+ * tree the root dispatches from in `workTree`, a Running writer in another work tree does not block
+ * the paths it owns, as in `assignment dispatch`.
  */
 export const recommend = (
   project: Project,
@@ -195,8 +196,8 @@ export const recommend = (
     }
     for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool)
-      // A single Assignment is a one-entry workflow; pairs come two by two.
-      if (chosen.length >= 1) {
+      // A workflow coordinates multiple launches. A lone launch does not need the extra layer.
+      if (chosen.length >= 2) {
         const assignmentIds = chosen.map((row) => row.id)
         // Pairs run as writer then review, so without the workflow the reviews wait for their
         // writers.
@@ -230,20 +231,23 @@ export const recommend = (
   if (chosen.length === 0) return undefined
   const assignmentIds = chosen.map((row) => row.id)
   if (config.workflowsAvailable) {
-    // Every spawnable Assignment went into a workflow above, so what is left continues warm ones.
+    // No new workflow is justified. Keep the continuation route when all chosen work can reuse.
     const continues = continuations(chosen, [], registry, now, config)
-    return {
-      action: "continue",
-      assignmentIds: continues.map((row) => row.assignmentId),
-      continues,
-      reason: `each continues a warm specialist by ${words.message}`,
-    }
+    if (continues.length === chosen.length)
+      return {
+        action: "continue",
+        assignmentIds,
+        continues,
+        reason: `each continues a warm specialist by ${words.message}`,
+      }
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: `the ${words.workflowTool} tool is disabled or unavailable`,
+      reason: config.workflowsAvailable
+        ? "dispatch directly and continue any warm specialists without a workflow"
+        : `the ${words.workflowTool} tool is disabled or unavailable`,
     }
   const [first] = chosen
   if (first === undefined) return undefined

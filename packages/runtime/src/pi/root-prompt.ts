@@ -7,6 +7,7 @@ import gpt62Dispatch from "../instructions/gpt-6.2/root/dispatch.md" with { type
 import gpt62Identity from "../instructions/gpt-6.2/root/identity.md" with { type: "text" }
 import gpt62InstructionGuidelines from "../instructions/gpt-6.2/root/instruction-guidelines.md" with { type: "text" }
 import gpt62PrText from "../instructions/gpt-6.2/root/pr-text.md" with { type: "text" }
+import gpt62RecoverWork from "../instructions/gpt-6.2/root/recover-work.md" with { type: "text" }
 import gpt62Routing from "../instructions/gpt-6.2/root/routing.md" with { type: "text" }
 import gpt62Search from "../instructions/gpt-6.2/root/search.md" with { type: "text" }
 import gpt62Skills from "../instructions/gpt-6.2/root/skills.md" with { type: "text" }
@@ -25,6 +26,7 @@ import gptDispatch from "../instructions/gpt-6/root/dispatch.md" with { type: "t
 import gptIdentity from "../instructions/gpt-6/root/identity.md" with { type: "text" }
 import gptInstructionGuidelines from "../instructions/gpt-6/root/instruction-guidelines.md" with { type: "text" }
 import gptPrText from "../instructions/gpt-6/root/pr-text.md" with { type: "text" }
+import gptRecoverWork from "../instructions/gpt-6/root/recover-work.md" with { type: "text" }
 import gptRouting from "../instructions/gpt-6/root/routing.md" with { type: "text" }
 import gptSearch from "../instructions/gpt-6/root/search.md" with { type: "text" }
 import gptSkills from "../instructions/gpt-6/root/skills.md" with { type: "text" }
@@ -43,6 +45,7 @@ import kimiDispatch from "../instructions/kimi-k3.1/root/dispatch.md" with { typ
 import kimiIdentity from "../instructions/kimi-k3.1/root/identity.md" with { type: "text" }
 import kimiInstructionGuidelines from "../instructions/kimi-k3.1/root/instruction-guidelines.md" with { type: "text" }
 import kimiPrText from "../instructions/kimi-k3.1/root/pr-text.md" with { type: "text" }
+import kimiRecoverWork from "../instructions/kimi-k3.1/root/recover-work.md" with { type: "text" }
 import kimiRouting from "../instructions/kimi-k3.1/root/routing.md" with { type: "text" }
 import kimiSearch from "../instructions/kimi-k3.1/root/search.md" with { type: "text" }
 import kimiSkills from "../instructions/kimi-k3.1/root/skills.md" with { type: "text" }
@@ -67,6 +70,7 @@ export const PI_ROOT_SECTIONS: ReadonlyArray<string> = [
   "delegating.md",
   "dispatch.md",
   "task-list.md",
+  "recover-work.md",
   "user-messages.md",
   "routing.md",
   "context.md",
@@ -92,6 +96,7 @@ const TEXTS: Readonly<Record<PiFamily, Readonly<Record<string, string>>>> = {
     "identity.md": kimiIdentity,
     "instruction-guidelines.md": kimiInstructionGuidelines,
     "pr-text.md": kimiPrText,
+    "recover-work.md": kimiRecoverWork,
     "routing.md": kimiRouting,
     "search.md": kimiSearch,
     "skills.md": kimiSkills,
@@ -112,6 +117,7 @@ const TEXTS: Readonly<Record<PiFamily, Readonly<Record<string, string>>>> = {
     "identity.md": gptIdentity,
     "instruction-guidelines.md": gptInstructionGuidelines,
     "pr-text.md": gptPrText,
+    "recover-work.md": gptRecoverWork,
     "routing.md": gptRouting,
     "search.md": gptSearch,
     "skills.md": gptSkills,
@@ -132,6 +138,7 @@ const TEXTS: Readonly<Record<PiFamily, Readonly<Record<string, string>>>> = {
     "identity.md": gpt62Identity,
     "instruction-guidelines.md": gpt62InstructionGuidelines,
     "pr-text.md": gpt62PrText,
+    "recover-work.md": gpt62RecoverWork,
     "routing.md": gpt62Routing,
     "search.md": gpt62Search,
     "skills.md": gpt62Skills,

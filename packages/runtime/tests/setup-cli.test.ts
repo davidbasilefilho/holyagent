@@ -64,6 +64,48 @@ const publicCli = (argv: ReadonlyArray<string>) =>
   )
 
 describe("public setup harnesses", () => {
+  test("unattended Codex preview without any backend writes nothing and apply names its own prerequisite", async () => {
+    const profile = join(home, "isolated-codex")
+    const result = await publicCli([
+      "setup",
+      "codex",
+      "--non-interactive",
+      "--dry-run",
+      "--codex-home",
+      profile,
+    ])
+    expect(result.code).toBe(0)
+    expect(result.stderr).toBe("")
+    expect(result.stdout).toContain("Start Codex with this CODEX_HOME set before launch")
+    expect(result.stdout).not.toContain("\u001b")
+    expect(result.stdout).not.toMatch(/install the Pi backend|open T3 Code once|Claude settings/)
+    const apply = await publicCli(["setup", "codex", "--non-interactive", "--codex-home", profile])
+    expect(apply.code).toBe(1)
+    expect(apply.stdout).toContain("Codex is not on PATH")
+    expect(apply.stdout).not.toContain("\u001b")
+    expect(apply.stdout).not.toMatch(/install the Pi backend|open T3 Code once|Claude settings/)
+    for (const file of [
+      join(profile, "config.toml"),
+      join(home, "pi", "settings.json"),
+      join(home, "t3", "userdata", "settings.json"),
+      settings(),
+    ])
+      expect(await Bun.file(file).exists()).toBe(false)
+  })
+
+  test("a Pi preview with no backend or initialized T3 names each next step without activating another host", async () => {
+    const result = await publicCli(["setup", "pi", "--dry-run", "--non-interactive"])
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain("open T3 Code once")
+    expect(result.stdout).toContain("then run holyagent setup pi")
+    expect(result.stdout).toContain("install the Pi backend from https://pi.dev")
+    expect(result.stdout).toContain("see holyagent setup codex --help")
+    expect(result.stdout).toContain("activates the current session")
+    expect(await Bun.file(join(home, "t3", "userdata", "settings.json")).exists()).toBe(false)
+    expect(await Bun.file(join(home, ".holyagent", "codex", "config.toml")).exists()).toBe(false)
+    expect(await Bun.file(settings()).exists()).toBe(false)
+  })
+
   test("install is shown inline once and uses setup's exact help and validation", async () => {
     const help = await publicCli(["--help"])
     const setup = help.stdout.split("\n").filter((line) => line.startsWith("setup "))

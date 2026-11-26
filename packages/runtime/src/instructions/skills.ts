@@ -263,6 +263,17 @@ export const OWNED_GUIDANCE: ReadonlyArray<{
     roles: ["root"],
   },
   {
+    name: "hillclimb-iteration",
+    when: "the task asks for iterative improvement against a measurable or visual criterion",
+    roles: [
+      "root",
+      "Worker.implementation",
+      "Worker.integration",
+      "Worker.debugging",
+      "Worker.visual",
+    ],
+  },
+  {
     name: "instruction-writing",
     when: "writing or reviewing model-facing instructions",
     roles: ["root", "Worker.implementation", "Reviewer.artifact"],

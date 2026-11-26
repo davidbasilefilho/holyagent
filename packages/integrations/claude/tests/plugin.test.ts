@@ -59,13 +59,14 @@ const REQUIREMENTS = readdirSync(join(ROOT, "packages/runtime/src/instructions/r
   .map((path) => read("packages/runtime/src/instructions/requirements", path))
   .join("\n")
 const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
-/** The skills of the plugin, which only the root loads. */
+/** Owned guidance in the generated plugin. */
 const SKILLS = [
   "ci-watch",
   "desktop-design",
   "dev-server",
   "documentation-lookup",
   "evidence-judging",
+  "hillclimb-iteration",
   "instruction-writing",
   "mobile-design",
   "performance-iteration",
@@ -266,13 +267,12 @@ describe("hooks", () => {
     ...extra,
   })
 
-  test("are exactly the session, rules, subagent-start, reminder, workflow and launch hooks, in exec form that runs bun on the bundle, with no shell", () => {
+  test("are exactly the session, rules, reminder, workflow and launch hooks, in exec form that runs bun on the bundle, with no shell", () => {
     expect(hooks).toEqual({
       SessionStart: [
         { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },
       ],
       UserPromptSubmit: [{ hooks: [command("root-rules")] }],
-      SubagentStart: [{ hooks: [command("subagent-start")] }],
       PreToolUse: [
         {
           matcher: "Bash",
@@ -310,13 +310,17 @@ describe("hooks", () => {
   })
 
   test("no hook that carries version-control rules can block, and no hook is a Bash guard", () => {
-    const carriers = [...(hooks.SubagentStart ?? []), ...(hooks.PreToolUse ?? [])]
+    const carriers = (hooks.PreToolUse ?? [])
       .filter((group) => group.matcher !== "Workflow")
       .flatMap((group) => group.hooks)
       .filter((hook) => (hook.args as Array<string>).at(-1) !== "root-rules")
-    expect(carriers).toHaveLength(5)
+    expect(carriers).toHaveLength(4)
     for (const hook of carriers) expect(hook).not.toHaveProperty("onFailure")
     expect(JSON.stringify(hooks)).not.toContain("redirect")
+  })
+
+  test("does not resend a specialist's state rules at SubagentStart", () => {
+    expect(hooks.SubagentStart).toBeUndefined()
   })
 
   test("the reminder rules start on git with commit or push anywhere after it, and on vcs with commit or pr after it, and on nothing else", () => {
@@ -425,7 +429,7 @@ describe("agents", () => {
     for (const rule of [
       "Acknowledge every user message",
       "names an action",
-      "Send every pending decision through AskUserQuestion",
+      "use AskUserQuestion when available",
       "Never work around an unresolved denial through another tool, script, or link",
       "After an explicit user denial, stop that line of work",
       "A brief acknowledgment is always allowed",
@@ -439,9 +443,9 @@ describe("agents", () => {
     for (const rule of [
       "Handle small, low-risk work directly",
       "Keep the brief out of context",
-      "no polling, steering, scheduled check-ins or wait loops",
+      "Do not poll or send status nudges",
       "Never force-push",
-      "Ignore hook and harness noise",
+      "a harness demand for visible output after an empty reply",
       "recheck the affected evidence on the final head before pushing",
       "Read the detail you need to verify the result",
     ])
@@ -587,22 +591,22 @@ describe("agents", () => {
       expect({ part, found: requirement?.includes(part) }).toEqual({ part, found: true })
   })
 
-  test("the root never asks whether or how to merge reviewed green PRs: it reports them ready, and merges on the user's word by convention, earlier answer, then default", () => {
+  test("the root checks the current head, required protections and authorization before merging", () => {
     const content = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
     for (const part of [
-      "do not ask whether to merge or how; report them in the final report as ready to merge and wait",
-      "merging needs the user to name it",
-      "merge at once without asking the method",
-      "the repository's convention (merge settings, CONTRIBUTING, the history of merged PRs)",
-      "else the method the user chose earlier, else the holyagent default",
+      "Call a PR merge-ready only after independent review and applicable gates pass for its current head",
+      "Merge only within authorization already given or newly granted",
+      "Recheck head, approvals and checks before merging",
+      "Otherwise leave it unmerged and report what is missing",
+      "Choose the repository method first",
       "retarget the next PR to the base, since its commits are no longer in the base's history: if the base's tree equals the merged PR's head tree, reconcile the next branch with `git merge -s ours <base>`",
-      "the reviewed green PRs that are ready to merge and wait for the user to say so (asking nothing about merging)",
+      "the PRs still waiting for authorization or a readiness condition, with the exact remaining reason",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     const ciWatch = generated.find((file) =>
       file.path.endsWith("guidance/claude-5.5/ci-watch/SKILL.md"),
     )?.content
-    expect(ciWatch).toContain("report the PR as ready to merge and do not ask whether to merge")
+    expect(ciWatch).toContain("Required reviews, checks and other blockers must hold")
     expect(ciWatch).not.toContain("merging still needs the user's approval")
     const requirements = REQUIREMENTS
     for (const id of ["R-NOASK", "R-MERGEWAIT"])
@@ -618,12 +622,12 @@ describe("agents", () => {
       "a fact a specialist can establish",
       "Ask only a question that passes this test",
       "These common questions fail the test",
-      "whether to merge reviewed green PRs, or by which method",
+      "whether or how to merge (follow the authorization and readiness rules in Version control)",
       "whether to delete branches",
       "confirmation of a plan the user did not ask for",
       "whether to continue or to wait",
-      "Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list.",
-      "Use AskUserQuestion for every type of question, including when the user asks what needs their decision.",
+      "For a decision that changes what you can do, use AskUserQuestion when available.",
+      "If the host has no native question tool, ask one concise question.",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     expect(content).not.toContain("Ask only when the answer materially changes the result")
@@ -919,8 +923,8 @@ describe("agents", () => {
       "Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it",
       "Address optional changes only when materially useful and within scope",
       "A validated vulnerability introduced or worsened",
-      "no polling, steering, scheduled check-ins or wait loops",
-      "A wake changing nothing gets one short line",
+      "Do not poll or send status nudges",
+      "A wake that changes nothing needs no more than a short status",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",
       "resolving conflicts in tests or generated files",
@@ -1265,7 +1269,7 @@ describe("agents", () => {
       "Use before the first Worker.visual or Reviewer.visual dispatch",
     )
     for (const part of [
-      "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      "Your own final pass, after any required independent visual review, decides acceptance",
       "inform the decision and do not make it",
       "`web-design`, `mobile-design`, `desktop-design` or `tui-design`",
       "`guidance/<family>/<name>/SKILL.md` under the plugin folder",
@@ -1324,16 +1328,16 @@ describe("agents", () => {
       "visual-judging": [
         "A discrepancy is material, and starts a repair whatever its size",
         "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
-        'say "round N of 3"',
-        "at most three rounds per finding",
-        "after three, report the finding as a blocker",
+        "include the evidence in the brief",
+        "when no reproducible gain remains",
+        "report remaining material blockers",
         "`html_render`",
       ],
       "ci-watch": [
-        "Watch with Monitor running `gh pr checks <n> --watch`",
-        "the only CI wait",
-        "Failed, Unknown, Pending, Passed",
-        "claims to verify",
+        "Run `gh pr checks <n> --watch` once with Monitor",
+        "Wait for a completion signal or use a supported bounded wait",
+        "a skipped check does not prove behavior",
+        "Verify review-bot claims before changing code",
       ],
       "instruction-writing": [
         "US English",
@@ -1398,10 +1402,8 @@ describe("agents", () => {
     for (const route of ROUTES)
       expect(deniedTools(`agents/${route.agent}.md`)).toContain("TaskStop")
     const dispatch = read(`${CLAUDE}/root`, "dispatch.md")
-    expect(dispatch).toContain("only for conflicting new requirements or information")
-    expect(dispatch).toContain(
-      "Let work finish when repairing is cheaper than stopping and relaunching",
-    )
+    expect(dispatch).toContain("Honor cancellation or loss of authorization promptly")
+    expect(dispatch).toContain("Let valid work finish when repair costs less than a restart")
     expect(dispatch).toContain("Close stopped work with `--outcome stopped`")
     expect(dispatch).not.toMatch(/no polling, steering or stopping/)
     expect(REQUIREMENTS).not.toContain("steering or stopping")
@@ -1426,7 +1428,7 @@ describe("agents", () => {
       [
         "G1",
         `${CLAUDE}/root/task-list.md`,
-        "End your turn only when done or nothing can move until an answer or completion notice",
+        "Finish authorized work through verification",
         ["agents/holyagent.md"],
       ],
       [

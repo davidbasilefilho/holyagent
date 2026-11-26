@@ -6,11 +6,8 @@ description: "Use when a branch or PR has been pushed and its CI needs watching 
 
 # CI
 
-Watch with Monitor running `gh pr checks <n> --watch`: it prints checks as they change and ends when they settle (exit 0 when all pass, 1 when one fails), so its completion is the wake-up and the only CI wait. For a commit without a PR, read `gh run list --commit <sha>`. `gh pr view <n> --json mergeStateStatus,reviewDecision` gives the merge state and review decision.
+Run `gh pr checks <n> --watch` once with Monitor if available. Wait for a completion signal or use a supported bounded wait. Do not poll or exceed host limits. If no reliable result is available, leave the gate Unknown and say what is missing. For a commit without a PR use `gh run list --commit <sha>`.
 
-- Aggregate in this order: Failed, Unknown, Pending, Passed. Missing or unreadable data is Unknown, in-progress checks are Pending, and skipped or neutral results satisfy branch protection but are not validation and never make Passed alone.
-- A snapshot belongs to one head SHA. After a push or merge-forward, watch the new SHA; an old approval or merge-state read is history.
-- Diagnose a failure from the current attempt's logs (`gh run view <id> --log-failed`). After the same gate fails twice, reproduce it with the repository's own script before pushing again. Call a failure environmental only after reproducing it on the base; one the base lacks is the change's.
-- A repository with no CI workflow has the gate Unknown (none configured); finish on local gates and independent review. A watch that ends without a result leaves the gate Unknown, since no data is Unknown, not Passed.
-- A PR is merge-ready when independent review of that head left no open blockers and its CI is Passed; merging waits until the user names it, so report the PR as ready to merge and do not ask whether to merge. Record an unresolved review thread or a merge state other than clean in the PR's task and the final report.
-- Treat review-bot findings as claims to verify: fix the real ones with review, and answer the rest on the thread when replying is authorized.
+- Bind review and checks to the current head SHA. Missing data is Unknown, active checks are Pending, and a skipped check does not prove behavior. After a new SHA, inspect that SHA.
+- Read `gh pr view <n> --json headRefOid,mergeStateStatus,reviewDecision` and the actual repository requirements. Required reviews, checks and other blockers must hold as well as independent assessment. Follow the root’s merge authorization rule.
+- Diagnose from the current attempt’s logs. Reproduce an alleged baseline failure on the base before treating it as environmental. Verify review-bot claims before changing code.

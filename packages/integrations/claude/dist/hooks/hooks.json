@@ -37,24 +37,6 @@
         ]
       }
     ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun",
-            "args": [
-              "--no-env-file",
-              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
-              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
-              "hook",
-              "subagent-start"
-            ],
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

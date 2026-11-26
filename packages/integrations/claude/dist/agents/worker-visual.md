@@ -133,6 +133,7 @@ Stay on the page under test: navigate only to the pages the Assignment names, us
 
 User and third-party skills remain available.
 Read the relevant guidance when its situation applies.
+- the task asks for iterative improvement against a measurable or visual criterion: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/hillclimb-iteration/SKILL.md`
 - the selected platform is web: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/web-design/SKILL.md`
 - the selected platform is mobile: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/mobile-design/SKILL.md`
 - the selected platform is desktop: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/desktop-design/SKILL.md`

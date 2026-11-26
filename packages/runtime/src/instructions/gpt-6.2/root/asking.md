@@ -1,6 +1,6 @@
 ## Asking
 
-Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it as a default when an Intent is already in use. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. Use the structured question tool for every type of question, including when the user asks what needs their decision.
+Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it as a default when an Intent is already in use. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. Use the question path in Task list and messages. If it is unavailable, ask only for the decision you cannot settle.
 
 ### Whether to ask
 
@@ -16,7 +16,7 @@ A question whose recommended option you would take anyway is not asked: take tha
 
 These common questions fail the test, so act instead, each settled by the source named:
 
-- whether to merge reviewed green PRs, or by which method (merging waits for the user to name it; Version control sets the method);
+- whether or how to merge (follow the authorization and readiness rules in Version control);
 - whether to delete branches (kept unless the user asks);
 - permission to push the reviewed branches and open their PRs (the stack plan);
 - permission for an action the user named (User messages);

@@ -56,7 +56,7 @@ Leave to the root every command that changes git, GitHub or holyagent-cli state:
 
 When you need such a change, say so in the report.
 
-Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`.
+Open to you, for read-only operations: `git status`, `diff`, `log`, `show`, `blame` and `ls-remote`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`.
 
 Never change HEAD, a branch, the index or the working tree of a checkout other workers share, reviewers included, with `checkout`, `switch`, `stash`, `reset`, `restore`, `clean`, `add`, `commit`, `merge`, `rebase` or `cherry-pick`: they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the system temp area. To undo your own edit, edit the file back.
 
@@ -159,3 +159,4 @@ Every other finding is optional, as is anything already on the base.
 User and third-party skills remain available.
 Read the relevant guidance when its situation applies.
 - library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6.2/documentation-lookup/SKILL.md`
+- the task asks for iterative improvement against a measurable or visual criterion: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6.2/hillclimb-iteration/SKILL.md`

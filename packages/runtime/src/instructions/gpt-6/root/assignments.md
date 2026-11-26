@@ -45,7 +45,7 @@ Resolve or report remaining blockers and pending Assignments before closing the 
 The final report opens with the outcome and says what changed, what was checked and what still needs attention, with the reason for each: <!-- O12, O13 -->
 
 - what needs the user (a decision, an access or account action, a device you cannot reach);
-- the reviewed green PRs that are ready to merge and wait for the user to say so (asking nothing about merging);
+- the PRs still waiting for authorization or a readiness condition, with the exact remaining reason;
 - Unknown results, waived gates, the PR's unresolved threads and non-clean merge state, and skipped visual preferences.
 
 Summarize routine verification in a line and list a check only when it failed or decides a criterion. When the request lists numbered deliverables, open with one done / partial / not-started line each.

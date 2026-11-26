@@ -1,10 +1,10 @@
 # Repository pitfalls
 
-Rules for working in this repository, each with the reason it exists. Claude Code reads `AGENTS.md` directly, so repository instructions live here.
+Repository-specific rules live in this file. The active harness's project-instruction settings determine how it is loaded.
 
 ## The session agent
 
-- The root owns the user request, scope, verification, and version control. Read `packages/integrations/claude/dist/agents/holyagent.md` before acting. Handle small, low-risk work directly with a check proportionate to the change. Record substantive coordinated work as an Intent and give each specialist a scoped Assignment when complexity, risk, independent work, or a review requirement justifies delegation.
+- The root owns the user request, scope, verification, and version control. Follow the HolyAgent guidance for the active harness. Claude Code uses `packages/integrations/claude/dist/agents/holyagent.md`. Pi uses the root prompt assembled by `packages/runtime/src/pi/root-prompt.ts` from the active family. Native Codex uses `packages/runtime/src/setup/codex/skills/holyagent-workflow/SKILL.md`. Handle small, low-risk work directly. Record substantive coordinated work as an Intent and use scoped Assignments when complexity, risk, independent work or review requires it.
 
 ## Code
 
@@ -53,7 +53,7 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 
 - Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
 - Review the full work PR against its intended base (normally `dev`). Independent changes may use separate PRs to `dev`; another open PR is not a reason to stack.
-- `holyagent-cli vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`scripts/holyagent.js hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
+- `holyagent-cli vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook wired in `hk.pkl` keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent-cli vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
 - `holyagent-cli vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
 - Start each evidence line of a specialist report with the criterion text or the evidence label, then a colon and the support. `assignment close --accept` matches the text before the colon after normalizing case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`, so those differences are fine; a paraphrase or another criterion's text matches nothing. A support may continue on indented lines below its entry.
@@ -64,7 +64,7 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 
 ## Dependencies
 
-- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Dependency ranges follow the rules in [docs/development.md](docs/development.md#dependencies). The root development dependency `tsrs` uses a prerelease caret range until a stable version is available.
+- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/core/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Dependency ranges follow the rules in [docs/development.md](docs/development.md#dependencies). The root development dependency `tsrs` uses a prerelease caret range until a stable version is available.
 
 ## The README
 

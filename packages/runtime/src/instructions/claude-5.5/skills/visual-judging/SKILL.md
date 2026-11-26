@@ -5,7 +5,7 @@ description: "Use before the first Worker.visual or Reviewer.visual dispatch, an
 
 # Judging visual work
 
-Judge rendered work from what renders, not from a passing build or a report's claims.
+Judge rendered work from what renders, not from a passing build or a report's claims. Inspect bounded visual work directly when the user, repository and risk allow it. Use independent visual review when required or useful.
 
 ## Pick the platform skill
 
@@ -15,7 +15,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 
 ## Accept
 
-- Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (read its file), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
+- Your own final pass, after any required independent visual review, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (read its file), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
 - Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, or a web page that Reviewer.visual inspected live and for which Worker.visual saved no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists; judge nothing you cannot see.
 - A material finding of your pass starts a repair like any other, whether or not the reviewer reported it; say in the final report when your pass overruled the reviewer.
 - Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence, besides the final pass; Reviewer.visual and Worker.visual hand over captures and paths so that you do not have to.
@@ -29,7 +29,7 @@ A departure from the platform skill's direction rules that has none of these eff
 ## Repair
 
 - Repair a material finding without asking when the repair keeps the user's requirements and needs no choice between fixes; otherwise ask through AskUserQuestion with a recommended default.
-- Dispatch Worker.visual with the findings as criteria and say "round N of 3" in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean; then repeat your final pass on the captures that changed. Allow at most three rounds per finding, counted across Worker.visual dispatches; after three, report the finding as a blocker.
+- Dispatch Worker.visual with the findings as criteria and include the evidence in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean; then repeat your final pass on the captures that changed. Stop when the criterion is met, when no reproducible gain remains, or when a trade-off or permission requires a decision. Keep the best result, preserve other states and report remaining material blockers.
 - Name each skipped preference in the final report, without a fix.
 
 ## Explanatory pages
@@ -38,6 +38,6 @@ When a visual explanation or chart carries what prose cannot, build one self-con
 
 ## Iteration evidence
 
-Before any task source edits, dispatch a qualified specialist to collect and preserve the immutable original revision, visual evidence and conditions. After the root creates each source commit, dispatch an appropriate existing visual or operations specialist to collect evidence without source edits on that actual commit before independent review, acceptance or push. Compare it with both the original baseline and the immediately previous commit: for the first commit the previous revision is the original; advance the previous revision after each commit and never overwrite the original. Use screenshots and real interaction, plus video when the host supports it. Record revisions, evidence paths and conditions; exploratory precommit checks do not substitute for committed evidence. Mark unavailable comparisons Unknown with a concrete reason and a blocker when the requested target requires them; never substitute the last PR for the original baseline.
+Preserve the original revision, rendered evidence and conditions before editing. Compare the final relevant revision with that baseline at the same sizes and interaction states. Include video when motion matters. Recheck intermediate revisions when they change the evidence or risk. Collect evidence yourself when appropriate, or assign a qualified specialist when independence or access requires one. Report any missing comparison and bind acceptance to the tested revision.
 
 Associate reports and artifacts with the commit SHA outside the source commit as needed, and point persisted state and handoff to them. Do not create recursive evidence-only commits. Use this evidence in review and acceptance alongside the final captures.
