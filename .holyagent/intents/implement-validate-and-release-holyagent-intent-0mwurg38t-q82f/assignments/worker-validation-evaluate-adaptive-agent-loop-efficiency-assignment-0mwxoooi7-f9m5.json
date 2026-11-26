@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mwxoooi7-f9m5",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "evaluate-adaptive-agent-loop-efficiency",
+  "objective": "Evaluate adaptive agent-loop efficiency externally without injecting throttles or claiming unmeasured usage",
+  "state": "Ready",
+  "scope": [
+    "One minimal offline evaluator and tests/docs only if needed, real native data boundaries, contrasting work-fixture evidence"
+  ],
+  "constraints": [
+    "No product telemetry new pipeline, no protected session files or live paid launches, no changes to agent instructions or thresholds."
+  ],
+  "criteria": [
+    {
+      "text": "Read authorized traces, separate end-to-end latency, visible turns, internal steps and model usage with exact coverage",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Verify cumulative delta, retries, per-session assignment aggregation and missing coverage with synthetic fixture and any actual available native evidence",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "scripts/agent-loop-evidence.ts",
+    "scripts/agent-loop-evidence.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T15:04:50.960Z"
+}
