@@ -3,7 +3,7 @@
 node = "lts"
 # Bun remains the runtime, package manager and test runner.
 bun = "1.4.5"
-hk = "2.13.0"
+hk = "2.14.0"
 # The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
 # aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
 # registry records for them where it records one; the bare names would pick a backend by mise's own

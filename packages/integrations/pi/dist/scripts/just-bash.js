@@ -65816,10 +65816,17 @@ function memoizeIdempotent(f) {
 }
 
 var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
+var ownKeys = (obj) => {
+  const names = Object.getOwnPropertyNames(obj);
+  const syms = Object.getOwnPropertySymbols(obj);
+  return syms.length > 0 ? [...names, ...syms] : names;
+};
 var getAllObjectKeys = (obj) => {
-  const keys = new Set(Reflect.ownKeys(obj));
-  if (obj.constructor === Object)
-    return keys;
+  const own = ownKeys(obj);
+  const proto = Object.getPrototypeOf(obj);
+  if (proto === Object.prototype || proto === null)
+    return own;
+  const keys = new Set(own);
   if (obj instanceof Error) {
     keys.delete("stack");
     for (const key of errorSiteKeys) {
@@ -65827,26 +65834,22 @@ var getAllObjectKeys = (obj) => {
         keys.delete(key);
     }
   }
-  const proto = Object.getPrototypeOf(obj);
   let current = proto;
   while (current !== null && current !== Object.prototype) {
-    const ownKeys = Reflect.ownKeys(current);
-    for (let i = 0;i < ownKeys.length; i++) {
-      keys.add(ownKeys[i]);
-    }
+    for (const key of ownKeys(current))
+      keys.add(key);
     current = Object.getPrototypeOf(current);
   }
-  if (keys.has("constructor") && typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
+  if (typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
     keys.delete("constructor");
   }
   return keys;
 };
 var byReferenceInstances = /* @__PURE__ */ new WeakSet;
-var viewBytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
-var isArrayBufferLike = (u) => u instanceof ArrayBuffer || typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer;
-var bufferBytes = (buffer) => {
+var objectKind = (u) => Array.isArray(u) ? 5 : ArrayBuffer.isView(u) ? u instanceof DataView ? 7 : 6 : Object.getPrototypeOf(u) === Object.prototype ? 0 : u instanceof Date ? 1 : u instanceof RegExp ? 2 : u instanceof Map ? 3 : u instanceof Set ? 4 : u instanceof ArrayBuffer ? 8 : typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer ? 9 : 0;
+var toBytes = (u, kind) => {
   try {
-    return new Uint8Array(buffer);
+    return kind === 7 ? new Uint8Array(u.buffer, u.byteOffset, u.byteLength) : new Uint8Array(u);
   } catch {
     return;
   }
@@ -65856,6 +65859,7 @@ var backEdges = 0;
 var addBackEdge = () => {
   backEdges++;
 };
+var hashCache = /* @__PURE__ */ new WeakMap;
 
 function ownEnumerableKeys(self2) {
   const keys = Object.keys(self2);
@@ -65930,12 +65934,14 @@ var hash = (self2) => {
     case "object": {
       if (self2 === null) {
         break;
-      } else if (self2 instanceof Date) {
+      }
+      const kind = objectKind(self2);
+      if (kind === 1) {
         if (Number.isNaN(self2.getTime())) {
           return string("Invalid Date");
         }
         return string(self2.toISOString());
-      } else if (self2 instanceof RegExp) {
+      } else if (kind === 2) {
         return string(self2.toString());
       } else {
         if (byReferenceInstances.has(self2)) {
@@ -65957,16 +65963,14 @@ var hash = (self2) => {
             h = self2[symbol]();
           } else if (typeof self2 === "function") {
             h = random(self2);
-          } else if (isArrayBufferLike(self2)) {
-            const bytes = bufferBytes(self2);
-            h = bytes === undefined ? random(self2) : array(bytes);
-          } else if (self2 instanceof DataView) {
-            h = array(viewBytes(self2));
-          } else if (Array.isArray(self2) || ArrayBuffer.isView(self2)) {
-            h = array(self2);
-          } else if (self2 instanceof Map) {
+          } else if (kind >= 7) {
+            const bytes = toBytes(self2, kind);
+            h = bytes === undefined ? random(self2) : hashIndexed(bytes);
+          } else if (kind >= 5) {
+            h = hashIndexed(self2);
+          } else if (kind === 3) {
             h = hashMap(self2);
-          } else if (self2 instanceof Set) {
+          } else if (kind === 4) {
             h = hashSet(self2);
           } else {
             h = structure(self2);
@@ -65984,10 +65988,11 @@ var hash = (self2) => {
   return optimize(mix(string(String(self2))));
 };
 var random = (self2) => {
-  if (!randomHashCache.has(self2)) {
-    randomHashCache.set(self2, optimize(Math.random() * 4294967296 | 0));
+  let h = randomHashCache.get(self2);
+  if (h === undefined) {
+    randomHashCache.set(self2, h = optimize(Math.random() * 4294967296 | 0));
   }
-  return randomHashCache.get(self2);
+  return h;
 };
 var mix = (h) => {
   h ^= h >>> 16;
@@ -66037,11 +66042,17 @@ var array = (arr) => {
   }
   return optimize(h);
 };
+var hashIndexed = (arr) => {
+  let h = 6151;
+  for (let i = 0;i < arr.length; i++) {
+    h = combine(h, hash(arr[i]));
+  }
+  return optimize(h);
+};
 var hashMap = /* @__PURE__ */ unordered(/* @__PURE__ */ string("Map"), ([k, v]) => combine(hash(k), hash(v)));
 var setSeed = /* @__PURE__ */ string("Set");
 var hashSet = /* @__PURE__ */ unordered(setSeed, (element) => combine(setSeed, hash(element)));
 var randomHashCache = /* @__PURE__ */ new WeakMap;
-var hashCache = /* @__PURE__ */ new WeakMap;
 var visitedObjects = /* @__PURE__ */ new WeakSet;
 
 var symbol2 = "~effect/Equal";
@@ -66052,106 +66063,122 @@ function equals() {
   return compareBoth(arguments[0], arguments[1]);
 }
 function compareBoth(self2, that) {
-  if (self2 === that)
-    return true;
   if (self2 == null || that == null)
-    return false;
+    return self2 === that;
   const selfType = typeof self2;
-  if (selfType !== typeof that) {
-    return false;
+  if (selfType !== "object" && selfType !== "function") {
+    return self2 === that || self2 !== self2 && that !== that;
   }
-  if (selfType === "number" && self2 !== self2 && that !== that) {
+  if (self2 === that) {
+    if (pathLeft.length > 0 && !hashCache.has(self2))
+      hash(self2);
     return true;
   }
-  if (selfType !== "object" && selfType !== "function") {
-    return false;
-  }
-  if (byReferenceInstances.has(self2) || byReferenceInstances.has(that)) {
+  if (selfType !== typeof that || byReferenceInstances.has(self2) || byReferenceInstances.has(that)) {
     return false;
   }
   return compareObjects(self2, that);
 }
 function compareObjects(self2, that) {
   const depth = pathLeft.length;
-  for (let i = depth;i-- > 0; ) {
-    if (pathLeft[i] === self2 && pathRight[i] === that)
-      return true;
+  const prev = seen.get(self2);
+  if (prev === that)
+    return true;
+  let known;
+  if (!depth || prev !== undefined) {
+    known = results.get(self2);
+    const cached = known?.get(that);
+    if (cached !== undefined)
+      return cached;
   }
-  if (depth)
-    return compareOnPath(self2, that);
-  let known = results.get(self2);
-  if (!known)
-    results.set(self2, known = new WeakMap);
-  let result = known.get(that);
-  if (result === undefined)
-    known.set(that, result = compareOnPath(self2, that));
-  return result;
-}
-function compareOnPath(self2, that) {
+  let revisited = false;
+  for (let i = depth;i-- > 0; ) {
+    const sameLeft = pathLeft[i] === self2;
+    if (sameLeft || pathRight[i] === that) {
+      addBackEdge();
+      if (sameLeft && pathRight[i] === that)
+        return true;
+      revisited = true;
+    }
+  }
+  if (revisited && hash(self2) !== hash(that))
+    return false;
+  const seenBack = backEdges;
   pathLeft.push(self2);
   pathRight.push(that);
+  let result;
   try {
-    return compareStructure(self2, that);
+    result = compareStructure(self2, that);
   } finally {
     pathLeft.pop();
     pathRight.pop();
+    if (!depth)
+      seen.clear();
   }
+  if (seenBack !== backEdges)
+    return result && hash(self2) === hash(that);
+  if (depth && prev === undefined) {
+    if (result)
+      seen.set(self2, that);
+  } else {
+    if (!known)
+      results.set(self2, known = new WeakMap);
+    known.set(that, result);
+  }
+  return result;
 }
 var pathLeft = [];
 var pathRight = [];
+var seen = /* @__PURE__ */ new Map;
 var results = /* @__PURE__ */ new WeakMap;
 function compareStructure(self2, that) {
-  if (hash(self2) !== hash(that)) {
+  const selfHash = hashCache.get(self2);
+  if (selfHash !== undefined && selfHash !== (hashCache.get(that) ?? selfHash))
     return false;
-  } else if (self2 instanceof Date) {
-    if (!(that instanceof Date))
+  const kind = objectKind(self2);
+  if (kind === 1 || kind === 2) {
+    if (objectKind(that) !== kind)
       return false;
-    const selfTime = self2.getTime();
-    const thatTime = that.getTime();
-    return selfTime === thatTime || Number.isNaN(selfTime) && Number.isNaN(thatTime);
-  } else if (self2 instanceof RegExp) {
-    return that instanceof RegExp && self2.toString() === that.toString();
+    if (kind === 2)
+      return self2.toString() === that.toString();
+    if (hash(self2) !== hash(that))
+      return false;
+    const a = self2.getTime();
+    const b = that.getTime();
+    return a === b || a !== a && b !== b;
   }
   const bothEquals = isEqual(self2);
   if (bothEquals !== isEqual(that) || typeof self2 === "function" && !bothEquals) {
     return false;
-  } else if (bothEquals) {
+  }
+  if ((bothEquals || isHash(self2) || isHash(that)) && hash(self2) !== hash(that)) {
+    return false;
+  }
+  if (bothEquals) {
     return self2[symbol2](that);
-  } else if (Array.isArray(self2)) {
-    if (!Array.isArray(that) || self2.length !== that.length) {
-      return false;
-    }
-    return compareArrays(self2, that);
-  } else if (isArrayBufferLike(self2)) {
-    if (!isArrayBufferLike(that) || self2 instanceof ArrayBuffer !== that instanceof ArrayBuffer) {
-      return false;
-    }
-    const selfBytes = bufferBytes(self2);
-    const thatBytes = bufferBytes(that);
+  }
+  if (kind !== objectKind(that)) {
+    return false;
+  }
+  if (kind >= 7) {
+    const selfBytes = toBytes(self2, kind);
+    const thatBytes = toBytes(that, kind);
     return selfBytes !== undefined && thatBytes !== undefined && compareTypedArrays(selfBytes, thatBytes);
-  } else if (ArrayBuffer.isView(self2)) {
-    const selfIsDataView = self2 instanceof DataView;
-    if (!ArrayBuffer.isView(that) || self2.byteLength !== that.byteLength || selfIsDataView !== that instanceof DataView) {
-      return false;
-    }
-    if (selfIsDataView) {
-      return compareTypedArrays(viewBytes(self2), viewBytes(that));
-    }
-    return compareTypedArrays(self2, that);
-  } else if (self2 instanceof Map) {
-    if (!(that instanceof Map) || self2.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self2, that, entryHash, equalEntries);
-  } else if (self2 instanceof Set) {
-    if (!(that instanceof Set) || self2.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self2, that, hash, compareBoth);
+  } else if (kind === 5) {
+    return compareArrays(self2, that);
+  } else if (kind === 6) {
+    return self2.byteLength === that.byteLength && compareTypedArrays(self2, that);
+  } else if (kind === 3) {
+    return self2.size === that.size && compareHashed(self2, that, entryHash, equalEntries);
+  } else if (kind === 4) {
+    return self2.size === that.size && compareHashed(self2, that, hash, compareBoth);
   }
   return compareRecords(self2, that);
 }
 function compareArrays(self2, that) {
+  if (self2.length !== that.length) {
+    return false;
+  }
   for (let i = 0;i < self2.length; i++) {
     if (!compareBoth(self2[i], that[i])) {
       return false;
@@ -66173,11 +66200,12 @@ function compareTypedArrays(self2, that) {
 function compareRecords(self2, that) {
   const selfKeys = getAllObjectKeys(self2);
   const thatKeys = getAllObjectKeys(that);
-  if (selfKeys.size !== thatKeys.size) {
+  const thatIsSet = thatKeys instanceof Set;
+  if ((selfKeys instanceof Set ? selfKeys.size : selfKeys.length) !== (thatIsSet ? thatKeys.size : thatKeys.length)) {
     return false;
   }
   for (const key of selfKeys) {
-    if (!thatKeys.has(key) || !compareBoth(self2[key], that[key])) {
+    if (!(thatIsSet ? thatKeys.has(key) : Object.hasOwn(that, key)) || !compareBoth(self2[key], that[key])) {
       return false;
     }
   }
@@ -68513,7 +68541,15 @@ var forkUnsafe = (parent, effect, immediate = false, daemon = false, uninterrupt
     child.evaluate(effect);
   } else {
     child._asyncContext = captureAsyncContext();
-    parentRuntime.currentDispatcher.scheduleTask(() => child.evaluate(effect), 0);
+    let resumed = false;
+    child.yieldWith(() => {
+      resumed = true;
+    });
+    parentRuntime.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      child.evaluate(effect);
+    }, 0);
   }
   return child;
 };
@@ -68716,14 +68752,39 @@ var decodeNative = (str, decodedLength, options) => {
   if (str.length < 128)
     return;
   const NativeUint8Array = Uint8Array;
-  if (typeof NativeUint8Array.fromBase64 !== "function")
-    return;
+  if (typeof NativeUint8Array.fromBase64 !== "function") {
+    const Buffer2 = getBuffer();
+    if (Buffer2 === undefined)
+      return;
+    const encoding = options?.alphabet ?? "base64";
+    const bytes = new Uint8Array(decodedLength);
+    const buffer = Buffer2.from(bytes.buffer);
+    const canonical = options !== undefined && str.endsWith("=") ? str.slice(0, str.indexOf("=")) : str;
+    return buffer.write(str, encoding) === decodedLength && buffer.toString(encoding) === canonical ? bytes : null;
+  }
   try {
     const bytes = NativeUint8Array.fromBase64(str, options);
     return bytes.length === decodedLength ? bytes : null;
   } catch {
     return null;
   }
+};
+var typedArrayPrototype = /* @__PURE__ */ Object.getPrototypeOf(Uint8Array.prototype);
+var typedArrayBuffer = Object.getOwnPropertyDescriptor(typedArrayPrototype, "buffer").get;
+var typedArrayByteOffset = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteOffset").get;
+var typedArrayByteLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteLength").get;
+var getBuffer = () => {
+  const global = globalThis;
+  return typeof global.process?.versions?.node === "string" && typeof global.Buffer === "function" ? global.Buffer : undefined;
+};
+var encodeBuffer = (bytes, encoding) => {
+  const Buffer2 = getBuffer();
+  if (Buffer2 === undefined)
+    return;
+  const byteLength = typedArrayByteLength.call(bytes);
+  if (byteLength < 32)
+    return;
+  return Buffer2.from(typedArrayBuffer.call(bytes), typedArrayByteOffset.call(bytes), byteLength).toString(encoding);
 };
 var stripCrlf = (str) => str.indexOf(`
 `) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
@@ -68786,8 +68847,13 @@ var decode = (str) => {
 var encodeBytes = (bytes) => {
   const length = bytes.length;
   const toBase64 = Uint8Array.prototype.toBase64;
-  if (length >= 32 && typeof toBase64 === "function")
-    return toBase64.call(bytes);
+  if (length >= 32) {
+    if (typeof toBase64 === "function")
+      return toBase64.call(bytes);
+    const encoded = encodeBuffer(bytes, "base64");
+    if (encoded !== undefined)
+      return encoded;
+  }
   return length < 128 ? encodeShort(bytes) : encodeLong(bytes);
 };
 var encodeShort = (bytes) => {
@@ -70464,9 +70530,6 @@ function isFinite2(annotations) {
     toJsonSchema: () => ({
       type: "number"
     }),
-    toCode: () => ({
-      runtime: "Schema.isFinite()"
-    }),
     arbitraryConstraint: {
       number: "finite"
     },
@@ -71397,9 +71460,6 @@ function isBase64(annotations) {
         flags: ""
       }]
     },
-    toCode: () => ({
-      runtime: "Schema.isBase64()"
-    }),
     ...annotations
   });
 }
@@ -71415,9 +71475,6 @@ function isInt(annotations) {
       minimum: globalThis.Number.MIN_SAFE_INTEGER,
       maximum: globalThis.Number.MAX_SAFE_INTEGER
     }),
-    toCode: () => ({
-      runtime: "Schema.isInt()"
-    }),
     arbitraryConstraint: {
       number: "integer"
     },
@@ -71430,10 +71487,6 @@ var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
     id: "effect/schema/RegExp",
     payload: null
   },
-  toCode: () => ({
-    runtime: `Schema.RegExp`,
-    Type: `globalThis.RegExp`
-  }),
   expected: "RegExp",
   toCodecJson: () => link()(Struct({
     source: String5,
@@ -71459,10 +71512,6 @@ var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
     id: "effect/schema/URL",
     payload: null
   },
-  toCode: () => ({
-    runtime: `Schema.URL`,
-    Type: `globalThis.URL`
-  }),
   expected: "URL",
   toCodecJson: () => link()(URLString, urlFromString)
 });
@@ -71477,10 +71526,6 @@ var File2 = /* @__PURE__ */ instanceOf(globalThis.File, {
     id: "effect/schema/File",
     payload: null
   },
-  toCode: () => ({
-    runtime: `Schema.File`,
-    Type: `globalThis.File`
-  }),
   expected: "File",
   toCodecJson: () => link()(Struct({
     data: String5.check(isBase64()),
@@ -71521,10 +71566,6 @@ var URLSearchParams2 = /* @__PURE__ */ instanceOf(globalThis.URLSearchParams, {
     id: "effect/schema/URLSearchParams",
     payload: null
   },
-  toCode: () => ({
-    runtime: `Schema.URLSearchParams`,
-    Type: `globalThis.URLSearchParams`
-  }),
   expected: "URLSearchParams",
   toCodecJson: () => link()(String5.annotate({
     expected: "a query string that will be decoded as URLSearchParams"
@@ -71543,10 +71584,6 @@ var Uint8Array2 = /* @__PURE__ */ instanceOf(globalThis.Uint8Array, {
     id: "effect/schema/Uint8Array",
     payload: null
   },
-  toCode: () => ({
-    runtime: `Schema.Uint8Array`,
-    Type: `globalThis.Uint8Array`
-  }),
   expected: "Uint8Array",
   toCodecJson: () => link()(Base64String, uint8ArrayFromBase64String)
 });

@@ -147,10 +147,16 @@ var init_Function = __esm(() => {
   constVoid = constUndefined;
 });
 
-var errorSiteKeys, getAllObjectKeys = (obj) => {
-  const keys = new Set(Reflect.ownKeys(obj));
-  if (obj.constructor === Object)
-    return keys;
+var errorSiteKeys, ownKeys = (obj) => {
+  const names = Object.getOwnPropertyNames(obj);
+  const syms = Object.getOwnPropertySymbols(obj);
+  return syms.length > 0 ? [...names, ...syms] : names;
+}, getAllObjectKeys = (obj) => {
+  const own = ownKeys(obj);
+  const proto = Object.getPrototypeOf(obj);
+  if (proto === Object.prototype || proto === null)
+    return own;
+  const keys = new Set(own);
   if (obj instanceof Error) {
     keys.delete("stack");
     for (const key of errorSiteKeys) {
@@ -158,22 +164,19 @@ var errorSiteKeys, getAllObjectKeys = (obj) => {
         keys.delete(key);
     }
   }
-  const proto = Object.getPrototypeOf(obj);
   let current = proto;
   while (current !== null && current !== Object.prototype) {
-    const ownKeys = Reflect.ownKeys(current);
-    for (let i = 0;i < ownKeys.length; i++) {
-      keys.add(ownKeys[i]);
-    }
+    for (const key of ownKeys(current))
+      keys.add(key);
     current = Object.getPrototypeOf(current);
   }
-  if (keys.has("constructor") && typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
+  if (typeof obj.constructor === "function" && proto === obj.constructor.prototype) {
     keys.delete("constructor");
   }
   return keys;
-}, byReferenceInstances, viewBytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength), isArrayBufferLike = (u) => u instanceof ArrayBuffer || typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer, bufferBytes = (buffer) => {
+}, byReferenceInstances, objectKind = (u) => Array.isArray(u) ? 5 : ArrayBuffer.isView(u) ? u instanceof DataView ? 7 : 6 : Object.getPrototypeOf(u) === Object.prototype ? 0 : u instanceof Date ? 1 : u instanceof RegExp ? 2 : u instanceof Map ? 3 : u instanceof Set ? 4 : u instanceof ArrayBuffer ? 8 : typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer ? 9 : 0, toBytes = (u, kind) => {
   try {
-    return new Uint8Array(buffer);
+    return kind === 7 ? new Uint8Array(u.buffer, u.byteOffset, u.byteLength) : new Uint8Array(u);
   } catch {
     return;
   }
@@ -185,7 +188,10 @@ var init_equal = __esm(() => {
 
 var backEdges = 0, addBackEdge = () => {
   backEdges++;
-};
+}, hashCache;
+var init_hash = __esm(() => {
+  hashCache = /* @__PURE__ */ new WeakMap;
+});
 
 function ownEnumerableKeys(self) {
   const keys = Object.keys(self);
@@ -276,12 +282,14 @@ var symbol = "~effect/Hash", hash = (self) => {
     case "object": {
       if (self === null) {
         break;
-      } else if (self instanceof Date) {
+      }
+      const kind = objectKind(self);
+      if (kind === 1) {
         if (Number.isNaN(self.getTime())) {
           return string("Invalid Date");
         }
         return string(self.toISOString());
-      } else if (self instanceof RegExp) {
+      } else if (kind === 2) {
         return string(self.toString());
       } else {
         if (byReferenceInstances.has(self)) {
@@ -303,16 +311,14 @@ var symbol = "~effect/Hash", hash = (self) => {
             h = self[symbol]();
           } else if (typeof self === "function") {
             h = random(self);
-          } else if (isArrayBufferLike(self)) {
-            const bytes = bufferBytes(self);
-            h = bytes === undefined ? random(self) : array(bytes);
-          } else if (self instanceof DataView) {
-            h = array(viewBytes(self));
-          } else if (Array.isArray(self) || ArrayBuffer.isView(self)) {
-            h = array(self);
-          } else if (self instanceof Map) {
+          } else if (kind >= 7) {
+            const bytes = toBytes(self, kind);
+            h = bytes === undefined ? random(self) : hashIndexed(bytes);
+          } else if (kind >= 5) {
+            h = hashIndexed(self);
+          } else if (kind === 3) {
             h = hashMap(self);
-          } else if (self instanceof Set) {
+          } else if (kind === 4) {
             h = hashSet(self);
           } else {
             h = structure(self);
@@ -329,10 +335,11 @@ var symbol = "~effect/Hash", hash = (self) => {
   }
   return optimize(mix(string(String(self))));
 }, random = (self) => {
-  if (!randomHashCache.has(self)) {
-    randomHashCache.set(self, optimize(Math.random() * 4294967296 | 0));
+  let h = randomHashCache.get(self);
+  if (h === undefined) {
+    randomHashCache.set(self, h = optimize(Math.random() * 4294967296 | 0));
   }
-  return randomHashCache.get(self);
+  return h;
 }, mix = (h) => {
   h ^= h >>> 16;
   h = Math.imul(h, 2246822507);
@@ -370,10 +377,17 @@ var symbol = "~effect/Hash", hash = (self) => {
     h = combine(h, hash(element));
   }
   return optimize(h);
-}, hashMap, setSeed, hashSet, randomHashCache, hashCache, visitedObjects;
+}, hashIndexed = (arr) => {
+  let h = 6151;
+  for (let i = 0;i < arr.length; i++) {
+    h = combine(h, hash(arr[i]));
+  }
+  return optimize(h);
+}, hashMap, setSeed, hashSet, randomHashCache, visitedObjects;
 var init_Hash = __esm(() => {
   init_Function();
   init_equal();
+  init_hash();
   init_Predicate();
   combine = /* @__PURE__ */ dual(2, (self, b) => mix(Math.imul(self, 2654435761) + Math.imul(b, 2246822507)));
   float64 = /* @__PURE__ */ new DataView(/* @__PURE__ */ new ArrayBuffer(8));
@@ -381,7 +395,6 @@ var init_Hash = __esm(() => {
   setSeed = /* @__PURE__ */ string("Set");
   hashSet = /* @__PURE__ */ unordered(setSeed, (element) => combine(setSeed, hash(element)));
   randomHashCache = /* @__PURE__ */ new WeakMap;
-  hashCache = /* @__PURE__ */ new WeakMap;
   visitedObjects = /* @__PURE__ */ new WeakSet;
 });
 
@@ -392,103 +405,118 @@ function equals() {
   return compareBoth(arguments[0], arguments[1]);
 }
 function compareBoth(self, that) {
-  if (self === that)
-    return true;
   if (self == null || that == null)
-    return false;
+    return self === that;
   const selfType = typeof self;
-  if (selfType !== typeof that) {
-    return false;
+  if (selfType !== "object" && selfType !== "function") {
+    return self === that || self !== self && that !== that;
   }
-  if (selfType === "number" && self !== self && that !== that) {
+  if (self === that) {
+    if (pathLeft.length > 0 && !hashCache.has(self))
+      hash(self);
     return true;
   }
-  if (selfType !== "object" && selfType !== "function") {
-    return false;
-  }
-  if (byReferenceInstances.has(self) || byReferenceInstances.has(that)) {
+  if (selfType !== typeof that || byReferenceInstances.has(self) || byReferenceInstances.has(that)) {
     return false;
   }
   return compareObjects(self, that);
 }
 function compareObjects(self, that) {
   const depth = pathLeft.length;
-  for (let i = depth;i-- > 0; ) {
-    if (pathLeft[i] === self && pathRight[i] === that)
-      return true;
+  const prev = seen.get(self);
+  if (prev === that)
+    return true;
+  let known;
+  if (!depth || prev !== undefined) {
+    known = results.get(self);
+    const cached = known?.get(that);
+    if (cached !== undefined)
+      return cached;
   }
-  if (depth)
-    return compareOnPath(self, that);
-  let known = results.get(self);
-  if (!known)
-    results.set(self, known = new WeakMap);
-  let result = known.get(that);
-  if (result === undefined)
-    known.set(that, result = compareOnPath(self, that));
-  return result;
-}
-function compareOnPath(self, that) {
+  let revisited = false;
+  for (let i = depth;i-- > 0; ) {
+    const sameLeft = pathLeft[i] === self;
+    if (sameLeft || pathRight[i] === that) {
+      addBackEdge();
+      if (sameLeft && pathRight[i] === that)
+        return true;
+      revisited = true;
+    }
+  }
+  if (revisited && hash(self) !== hash(that))
+    return false;
+  const seenBack = backEdges;
   pathLeft.push(self);
   pathRight.push(that);
+  let result;
   try {
-    return compareStructure(self, that);
+    result = compareStructure(self, that);
   } finally {
     pathLeft.pop();
     pathRight.pop();
+    if (!depth)
+      seen.clear();
   }
+  if (seenBack !== backEdges)
+    return result && hash(self) === hash(that);
+  if (depth && prev === undefined) {
+    if (result)
+      seen.set(self, that);
+  } else {
+    if (!known)
+      results.set(self, known = new WeakMap);
+    known.set(that, result);
+  }
+  return result;
 }
 function compareStructure(self, that) {
-  if (hash(self) !== hash(that)) {
+  const selfHash = hashCache.get(self);
+  if (selfHash !== undefined && selfHash !== (hashCache.get(that) ?? selfHash))
     return false;
-  } else if (self instanceof Date) {
-    if (!(that instanceof Date))
+  const kind = objectKind(self);
+  if (kind === 1 || kind === 2) {
+    if (objectKind(that) !== kind)
       return false;
-    const selfTime = self.getTime();
-    const thatTime = that.getTime();
-    return selfTime === thatTime || Number.isNaN(selfTime) && Number.isNaN(thatTime);
-  } else if (self instanceof RegExp) {
-    return that instanceof RegExp && self.toString() === that.toString();
+    if (kind === 2)
+      return self.toString() === that.toString();
+    if (hash(self) !== hash(that))
+      return false;
+    const a = self.getTime();
+    const b = that.getTime();
+    return a === b || a !== a && b !== b;
   }
   const bothEquals = isEqual(self);
   if (bothEquals !== isEqual(that) || typeof self === "function" && !bothEquals) {
     return false;
-  } else if (bothEquals) {
+  }
+  if ((bothEquals || isHash(self) || isHash(that)) && hash(self) !== hash(that)) {
+    return false;
+  }
+  if (bothEquals) {
     return self[symbol2](that);
-  } else if (Array.isArray(self)) {
-    if (!Array.isArray(that) || self.length !== that.length) {
-      return false;
-    }
-    return compareArrays(self, that);
-  } else if (isArrayBufferLike(self)) {
-    if (!isArrayBufferLike(that) || self instanceof ArrayBuffer !== that instanceof ArrayBuffer) {
-      return false;
-    }
-    const selfBytes = bufferBytes(self);
-    const thatBytes = bufferBytes(that);
+  }
+  if (kind !== objectKind(that)) {
+    return false;
+  }
+  if (kind >= 7) {
+    const selfBytes = toBytes(self, kind);
+    const thatBytes = toBytes(that, kind);
     return selfBytes !== undefined && thatBytes !== undefined && compareTypedArrays(selfBytes, thatBytes);
-  } else if (ArrayBuffer.isView(self)) {
-    const selfIsDataView = self instanceof DataView;
-    if (!ArrayBuffer.isView(that) || self.byteLength !== that.byteLength || selfIsDataView !== that instanceof DataView) {
-      return false;
-    }
-    if (selfIsDataView) {
-      return compareTypedArrays(viewBytes(self), viewBytes(that));
-    }
-    return compareTypedArrays(self, that);
-  } else if (self instanceof Map) {
-    if (!(that instanceof Map) || self.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self, that, entryHash, equalEntries);
-  } else if (self instanceof Set) {
-    if (!(that instanceof Set) || self.size !== that.size) {
-      return false;
-    }
-    return compareHashed(self, that, hash, compareBoth);
+  } else if (kind === 5) {
+    return compareArrays(self, that);
+  } else if (kind === 6) {
+    return self.byteLength === that.byteLength && compareTypedArrays(self, that);
+  } else if (kind === 3) {
+    return self.size === that.size && compareHashed(self, that, entryHash, equalEntries);
+  } else if (kind === 4) {
+    return self.size === that.size && compareHashed(self, that, hash, compareBoth);
   }
   return compareRecords(self, that);
 }
 function compareArrays(self, that) {
+  if (self.length !== that.length) {
+    return false;
+  }
   for (let i = 0;i < self.length; i++) {
     if (!compareBoth(self[i], that[i])) {
       return false;
@@ -510,11 +538,12 @@ function compareTypedArrays(self, that) {
 function compareRecords(self, that) {
   const selfKeys = getAllObjectKeys(self);
   const thatKeys = getAllObjectKeys(that);
-  if (selfKeys.size !== thatKeys.size) {
+  const thatIsSet = thatKeys instanceof Set;
+  if ((selfKeys instanceof Set ? selfKeys.size : selfKeys.length) !== (thatIsSet ? thatKeys.size : thatKeys.length)) {
     return false;
   }
   for (const key of selfKeys) {
-    if (!thatKeys.has(key) || !compareBoth(self[key], that[key])) {
+    if (!(thatIsSet ? thatKeys.has(key) : Object.hasOwn(that, key)) || !compareBoth(self[key], that[key])) {
       return false;
     }
   }
@@ -549,16 +578,18 @@ function compareHashed(self, that, hashOf, equivalent) {
     }
   return remaining === 0;
 }
-var symbol2 = "~effect/Equal", pathLeft, pathRight, results, entryHash = (entry) => hash(entry[0]), equalEntries = (self, that) => compareBoth(self[0], that[0]) && compareBoth(self[1], that[1]), isEqual = (u) => hasProperty(u, symbol2) && typeof u[symbol2] === "function", byReferenceUnsafe = (obj) => {
+var symbol2 = "~effect/Equal", pathLeft, pathRight, seen, results, entryHash = (entry) => hash(entry[0]), equalEntries = (self, that) => compareBoth(self[0], that[0]) && compareBoth(self[1], that[1]), isEqual = (u) => hasProperty(u, symbol2) && typeof u[symbol2] === "function", byReferenceUnsafe = (obj) => {
   byReferenceInstances.add(obj);
   return obj;
 };
 var init_Equal = __esm(() => {
   init_Hash();
   init_equal();
+  init_hash();
   init_Predicate();
   pathLeft = [];
   pathRight = [];
+  seen = /* @__PURE__ */ new Map;
   results = /* @__PURE__ */ new WeakMap;
 });
 
@@ -3165,7 +3196,15 @@ ${prefix}}`;
     child.evaluate(effect);
   } else {
     child._asyncContext = captureAsyncContext();
-    parentRuntime.currentDispatcher.scheduleTask(() => child.evaluate(effect), 0);
+    let resumed = false;
+    child.yieldWith(() => {
+      resumed = true;
+    });
+    parentRuntime.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      child.evaluate(effect);
+    }, 0);
   }
   return child;
 }, runForkWith = (context) => (effect, options) => {
@@ -5291,16 +5330,41 @@ var decodeNative = (str, decodedLength, options) => {
   if (str.length < 128)
     return;
   const NativeUint8Array = Uint8Array;
-  if (typeof NativeUint8Array.fromBase64 !== "function")
-    return;
+  if (typeof NativeUint8Array.fromBase64 !== "function") {
+    const Buffer2 = getBuffer();
+    if (Buffer2 === undefined)
+      return;
+    const encoding = options?.alphabet ?? "base64";
+    const bytes = new Uint8Array(decodedLength);
+    const buffer = Buffer2.from(bytes.buffer);
+    const canonical = options !== undefined && str.endsWith("=") ? str.slice(0, str.indexOf("=")) : str;
+    return buffer.write(str, encoding) === decodedLength && buffer.toString(encoding) === canonical ? bytes : null;
+  }
   try {
     const bytes = NativeUint8Array.fromBase64(str, options);
     return bytes.length === decodedLength ? bytes : null;
   } catch {
     return null;
   }
+}, typedArrayPrototype, typedArrayBuffer, typedArrayByteOffset, typedArrayByteLength, getBuffer = () => {
+  const global = globalThis;
+  return typeof global.process?.versions?.node === "string" && typeof global.Buffer === "function" ? global.Buffer : undefined;
+}, encodeBuffer = (bytes, encoding) => {
+  const Buffer2 = getBuffer();
+  if (Buffer2 === undefined)
+    return;
+  const byteLength = typedArrayByteLength.call(bytes);
+  if (byteLength < 32)
+    return;
+  return Buffer2.from(typedArrayBuffer.call(bytes), typedArrayByteOffset.call(bytes), byteLength).toString(encoding);
 }, stripCrlf = (str) => str.indexOf(`
 `) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
+var init_base64 = __esm(() => {
+  typedArrayPrototype = /* @__PURE__ */ Object.getPrototypeOf(Uint8Array.prototype);
+  typedArrayBuffer = Object.getOwnPropertyDescriptor(typedArrayPrototype, "buffer").get;
+  typedArrayByteOffset = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteOffset").get;
+  typedArrayByteLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteLength").get;
+});
 
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input), decode = (str) => {
   const stripped = stripCrlf(str);
@@ -5358,8 +5422,13 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
 }, encodeBytes = (bytes) => {
   const length = bytes.length;
   const toBase64 = Uint8Array.prototype.toBase64;
-  if (length >= 32 && typeof toBase64 === "function")
-    return toBase64.call(bytes);
+  if (length >= 32) {
+    if (typeof toBase64 === "function")
+      return toBase64.call(bytes);
+    const encoded = encodeBuffer(bytes, "base64");
+    if (encoded !== undefined)
+      return encoded;
+  }
   return length < 128 ? encodeShort(bytes) : encodeLong(bytes);
 }, encodeShort = (bytes) => {
   const length = bytes.length;
@@ -5414,6 +5483,7 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
   return codes[charCode];
 };
 var init_Base64 = __esm(() => {
+  init_base64();
   init_Result();
   init_EncodingError();
   encoder = /* @__PURE__ */ new TextEncoder;
@@ -6381,9 +6451,6 @@ function isFinite(annotations) {
     },
     toJsonSchema: () => ({
       type: "number"
-    }),
-    toCode: () => ({
-      runtime: "Schema.isFinite()"
     }),
     arbitraryConstraint: {
       number: "finite"
@@ -8643,14 +8710,10 @@ function isPattern2(regExp, annotations) {
   const source = regExp.source;
   const flags = regExp.flags;
   const canExport = /^[dg]*uy?$/.test(flags);
-  const runtimeRegExp = flags === "" ? `new globalThis.RegExp(${format(source)})` : `new globalThis.RegExp(${format(source)}, ${format(flags)})`;
   return isPattern(regExp, {
     toJsonSchema: () => canExport ? {
       pattern: flags.endsWith("y") ? `^(?:${source})` : source
     } : [{}, true],
-    toCode: () => ({
-      runtime: `Schema.isPattern(${runtimeRegExp})`
-    }),
     ...annotations
   });
 }
@@ -8672,9 +8735,6 @@ function isBase64(annotations) {
         flags: ""
       }]
     },
-    toCode: () => ({
-      runtime: "Schema.isBase64()"
-    }),
     ...annotations
   });
 }
@@ -8738,9 +8798,6 @@ function isInt(annotations) {
       minimum: globalThis.Number.MIN_SAFE_INTEGER,
       maximum: globalThis.Number.MAX_SAFE_INTEGER
     }),
-    toCode: () => ({
-      runtime: "Schema.isInt()"
-    }),
     arbitraryConstraint: {
       number: "integer"
     },
@@ -8768,9 +8825,6 @@ function makeIsMinLength(minLength, minCodePoints, annotations) {
       minLength: minCodePoints,
       minItems: minLength
     }, true] : [{}, true],
-    toCode: () => ({
-      runtime: `Schema.isMinLength(${minLength})`
-    }),
     [STRUCTURAL_ANNOTATION_KEY]: true,
     arbitraryConstraint: {
       minLength
@@ -8885,9 +8939,6 @@ var init_Schema = __esm(() => {
       },
       toJsonSchema: () => ({
         minimum
-      }),
-      toCode: () => ({
-        runtime: `Schema.isGreaterThanOrEqualTo(${format(minimum)})`
       })
     })
   });
@@ -8914,9 +8965,6 @@ var init_Schema = __esm(() => {
         toJsonSchema: () => ({
           [exclusiveMinimum ? "exclusiveMinimum" : "minimum"]: options.minimum,
           [exclusiveMaximum ? "exclusiveMaximum" : "maximum"]: options.maximum
-        }),
-        toCode: () => ({
-          runtime: `Schema.isBetween({ minimum: ${format(options.minimum)}, maximum: ${format(options.maximum)}, exclusiveMinimum: ${format(exclusiveMinimum)}, exclusiveMaximum: ${format(exclusiveMaximum)} })`
         })
       };
     }
@@ -8928,10 +8976,6 @@ var init_Schema = __esm(() => {
       id: "effect/schema/RegExp",
       payload: null
     },
-    toCode: () => ({
-      runtime: `Schema.RegExp`,
-      Type: `globalThis.RegExp`
-    }),
     expected: "RegExp",
     toCodecJson: () => link()(Struct({
       source: String6,
@@ -8957,10 +9001,6 @@ var init_Schema = __esm(() => {
       id: "effect/schema/URL",
       payload: null
     },
-    toCode: () => ({
-      runtime: `Schema.URL`,
-      Type: `globalThis.URL`
-    }),
     expected: "URL",
     toCodecJson: () => link()(URLString, urlFromString)
   });
@@ -8972,10 +9012,6 @@ var init_Schema = __esm(() => {
       id: "effect/schema/File",
       payload: null
     },
-    toCode: () => ({
-      runtime: `Schema.File`,
-      Type: `globalThis.File`
-    }),
     expected: "File",
     toCodecJson: () => link()(Struct({
       data: String6.check(isBase64()),
@@ -9016,10 +9052,6 @@ var init_Schema = __esm(() => {
       id: "effect/schema/URLSearchParams",
       payload: null
     },
-    toCode: () => ({
-      runtime: `Schema.URLSearchParams`,
-      Type: `globalThis.URLSearchParams`
-    }),
     expected: "URLSearchParams",
     toCodecJson: () => link()(String6.annotate({
       expected: "a query string that will be decoded as URLSearchParams"
@@ -9041,10 +9073,6 @@ var init_Schema = __esm(() => {
       id: "effect/schema/Uint8Array",
       payload: null
     },
-    toCode: () => ({
-      runtime: `Schema.Uint8Array`,
-      Type: `globalThis.Uint8Array`
-    }),
     expected: "Uint8Array",
     toCodecJson: () => link()(Base64String, uint8ArrayFromBase64String)
   });
@@ -9052,12 +9080,7 @@ var init_Schema = __esm(() => {
   arbitraryMaximumZonedDateTimeTimestamp = arbitraryMaximumDateTimestamp - 14 * 60 * 60 * 1000;
   arbitraryMinimumTimeZoneOffset = -12 * 60 * 60 * 1000;
   arbitraryMaximumTimeZoneOffset = 14 * 60 * 60 * 1000;
-  Json2 = /* @__PURE__ */ make9(/* @__PURE__ */ annotate(Json, {
-    toCode: () => ({
-      runtime: "Schema.Json",
-      Type: "Schema.Json"
-    })
-  }));
+  Json2 = /* @__PURE__ */ make9(Json);
   JsonObject = /* @__PURE__ */ Record(String6, Json2);
 });
 
@@ -11173,11 +11196,11 @@ var pi_packages_default;
 var init_pi_packages = __esm(() => {
   pi_packages_default = {
     "pi-provider-kimi-code": "0.6.14",
-    "@tintinweb/pi-subagents": "0.26.2",
+    "@tintinweb/pi-subagents": "0.26.3",
     "billion-context": "0.1.216",
-    "@juicesharp/rpiv-todo": "2.15.0",
-    "@juicesharp/rpiv-ask-user-question": "2.15.0",
-    "@aliou/pi-processes": "0.13.8",
+    "@juicesharp/rpiv-todo": "2.16.0",
+    "@juicesharp/rpiv-ask-user-question": "2.16.0",
+    "@aliou/pi-processes": "0.13.9",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
     "@opencode/browse": "0.1.5"
@@ -11802,7 +11825,7 @@ var init_package = __esm(() => {
       "@types/bun": "^1.0.0",
       effect: "^4.0.0",
       "eslint-plugin-jsdoc": "^65.0.0",
-      oxfmt: "^0.79.0",
+      oxfmt: "^0.80.0",
       oxlint: "^1.0.0",
       "solid-js": "^1.0.0",
       tsrs: "^7.1.0-beta.tsrs3"
@@ -18277,7 +18300,7 @@ var BROWSE_VERSION, BROWSE_COMMAND, browseRunnerCommand = (runner, operation) =>
     ];
   });
   return browsers.length === 0 ? { state: "unpaired" } : { state: "paired", browsers };
-}), seen = (browser) => browser.lastSeen === undefined ? "not connected yet" : `last seen ${new Date(browser.lastSeen).toISOString()}`, describePairing = (pairing) => pairing.state === "unpaired" ? "no browser is paired with browse (the extension is not installed or not paired; browse cannot tell which)" : `${pairing.browsers.length === 1 ? "1 browser" : `${pairing.browsers.length} browsers`} paired with browse (the extension is installed): ${pairing.browsers.map((browser) => `${browser.name ?? browser.id ?? browser.key}, ${seen(browser)}`).join("; ")}`, BROWSE_EXTENSION_IDS, browserDirectories = (env, platform = process.platform) => {
+}), seen2 = (browser) => browser.lastSeen === undefined ? "not connected yet" : `last seen ${new Date(browser.lastSeen).toISOString()}`, describePairing = (pairing) => pairing.state === "unpaired" ? "no browser is paired with browse (the extension is not installed or not paired; browse cannot tell which)" : `${pairing.browsers.length === 1 ? "1 browser" : `${pairing.browsers.length} browsers`} paired with browse (the extension is installed): ${pairing.browsers.map((browser) => `${browser.name ?? browser.id ?? browser.key}, ${seen2(browser)}`).join("; ")}`, BROWSE_EXTENSION_IDS, browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
     const support = join15(home, "Library", "Application Support");
@@ -31872,8 +31895,8 @@ var init_lock3 = __esm(() => {
 });
 
 var TUI_PACKAGES = {
-  "@opentui/core": "0.9.7",
-  "@opentui/solid": "0.9.7",
+  "@opentui/core": "0.9.9",
+  "@opentui/solid": "0.9.9",
   "solid-js": "1.9.20"
 }, TUI_LOCK = `{
   "lockfileVersion": 2,
@@ -31882,8 +31905,8 @@ var TUI_PACKAGES = {
     "": {
       "name": "holyagent-setup-tui",
       "dependencies": {
-        "@opentui/core": "0.9.7",
-        "@opentui/solid": "0.9.7",
+        "@opentui/core": "0.9.9",
+        "@opentui/solid": "0.9.9",
         "solid-js": "1.9.20"
       }
     }
@@ -32273,7 +32296,7 @@ var TUI_PACKAGES = {
       "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
     ],
     "@opentui/core": [
-      "@opentui/core@0.9.7",
+      "@opentui/core@0.9.9",
       "",
       {
         "dependencies": {
@@ -32282,104 +32305,103 @@ var TUI_PACKAGES = {
           "string-width": "7.2.0"
         },
         "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.7",
-          "@opentui/core-darwin-x64": "0.9.7",
-          "@opentui/core-linux-arm64": "0.9.7",
-          "@opentui/core-linux-arm64-musl": "0.9.7",
-          "@opentui/core-linux-x64": "0.9.7",
-          "@opentui/core-linux-x64-musl": "0.9.7",
-          "@opentui/core-win32-arm64": "0.9.7",
-          "@opentui/core-win32-x64": "0.9.7"
+          "@opentui/core-darwin-arm64": "0.9.9",
+          "@opentui/core-darwin-x64": "0.9.9",
+          "@opentui/core-linux-arm64": "0.9.9",
+          "@opentui/core-linux-arm64-musl": "0.9.9",
+          "@opentui/core-linux-x64": "0.9.9",
+          "@opentui/core-linux-x64-musl": "0.9.9",
+          "@opentui/core-win32-arm64": "0.9.9",
+          "@opentui/core-win32-x64": "0.9.9"
         },
         "peerDependencies": {
           "web-tree-sitter": "0.25.10"
         }
       },
-      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
+      "sha512-Dq4pFkTvM6QkQw8lcplnRF1JFbW5vSSYmymUA/nIVKOoqSUV/cxV3ns3KkOGwzR/JpeGxGrzc4wXEuY5RYrTzQ=="
     ],
     "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.7",
+      "@opentui/core-darwin-arm64@0.9.9",
       "",
       {
         "os": "darwin",
         "cpu": "arm64"
       },
-      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
+      "sha512-KmDAKo9GnvJ8HNw8C9YSUdeA8jO1xjp7YxObPhhfdxfpWCwHOrM2W91pmgW14p52vOdvhCBMZvgX/1mHFAXYbQ=="
     ],
     "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.7",
+      "@opentui/core-darwin-x64@0.9.9",
       "",
       {
         "os": "darwin",
         "cpu": "x64"
       },
-      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
+      "sha512-3fz8z5kZwawz/PvewzDVDkyVYMrLqIDA/Eat1jwVkzFrqCVqh903P7Qr6Wpf/Ahg5La/qqqZMxRRYjc40qEW+A=="
     ],
     "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.7",
+      "@opentui/core-linux-arm64@0.9.9",
       "",
       {
         "os": "linux",
         "cpu": "arm64"
       },
-      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
+      "sha512-nHLjJH04gqsE2WW6P0yNuzlxddeBYTwDpyDfscico9YBtOj21stfpEf7G5PIGhfeMCSmsY3D1B52ebrISq0YgA=="
     ],
     "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.7",
+      "@opentui/core-linux-arm64-musl@0.9.9",
       "",
       {
         "os": "linux",
         "cpu": "arm64",
         "libc": "musl"
       },
-      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
+      "sha512-FdbKKXfXk6Y5z46wojVNnHyPuEns8Dn7/ONhYTgBi0Z/dBVc/aRWRYzXHIn7x3ZBLpA0fNU01wTAW3SxgOmBmQ=="
     ],
     "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.7",
+      "@opentui/core-linux-x64@0.9.9",
       "",
       {
         "os": "linux",
         "cpu": "x64"
       },
-      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
+      "sha512-7W0ffV5ci202+6IkY3oh5Y67QWj/CjVJY0LkSaGu56/rLtRWL6RIl0/V9S5NSu2EcwqAyTp8C+EIhBdOoDwhCA=="
     ],
     "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.7",
+      "@opentui/core-linux-x64-musl@0.9.9",
       "",
       {
         "os": "linux",
         "cpu": "x64",
         "libc": "musl"
       },
-      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
+      "sha512-LvFHYVK/oWTsjaMj7UknAWMmRlhfpo85vW+RALHd2Y/t0PnRCHlEr2uRWPAlrymqIxU4tqei6BIodQLozc0HLg=="
     ],
     "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.7",
+      "@opentui/core-win32-arm64@0.9.9",
       "",
       {
         "os": "win32",
         "cpu": "arm64"
       },
-      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
+      "sha512-EiLfLFuNV4z1iXzx0fCDKGuweME4qkQOZgtLQmKak7IXicng02w3hbgkeWZrtPvuuZWB3WkqnNa0j6OD7UbpJQ=="
     ],
     "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.7",
+      "@opentui/core-win32-x64@0.9.9",
       "",
       {
         "os": "win32",
         "cpu": "x64"
       },
-      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
+      "sha512-WhLVmvPr5V+K0LN7ss0Ss0LxgYHyM0SKAaOtWP9oJSt4LnyFnRd3Hy6OQh67dANlCmr/sSkRN8OqQ0thmWuFyA=="
     ],
     "@opentui/solid": [
-      "@opentui/solid@0.9.7",
+      "@opentui/solid@0.9.9",
       "",
       {
         "dependencies": {
           "@babel/core": "7.29.7",
           "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.7",
-          "babel-plugin-module-resolver": "5.0.2",
+          "@opentui/core": "0.9.9",
           "babel-preset-solid": "1.9.16",
           "entities": "7.0.1",
           "s-js": "^0.4.9"
@@ -32388,7 +32410,7 @@ var TUI_PACKAGES = {
           "solid-js": "^1.9.12"
         }
       },
-      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
+      "sha512-8bDc7vZThFMK4QX2LtHz+sHiZAdwwIn6c/0Pm4iFKoUSkCtuHg6YcXK5c7ZZdReXXMPbfh5Km9MI8iL0LW2ddg=="
     ],
     "ansi-regex": [
       "ansi-regex@6.6.0",
@@ -32412,20 +32434,6 @@ var TUI_PACKAGES = {
         }
       },
       "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
-    ],
-    "babel-plugin-module-resolver": [
-      "babel-plugin-module-resolver@5.0.2",
-      "",
-      {
-        "dependencies": {
-          "find-babel-config": "^2.1.1",
-          "glob": "^9.3.3",
-          "pkg-up": "^3.1.0",
-          "reselect": "^4.1.7",
-          "resolve": "^1.22.8"
-        }
-      },
-      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
     ],
     "babel-preset-solid": [
       "babel-preset-solid@1.9.16",
@@ -32482,10 +32490,10 @@ var TUI_PACKAGES = {
       "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
     ],
     "caniuse-lite": [
-      "caniuse-lite@1.0.30001827",
+      "caniuse-lite@1.0.30001828",
       "",
       {},
-      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
+      "sha512-7MWeT+3DlrpuDybTWHl4Zb1Z80Z1fLLnOXuBjDXebzDVcqnEWUlV8JcbASg8B8BhcW8QT2UiR1KAtzYFIZHZYA=="
     ],
     "convert-source-map": [
       "convert-source-map@2.0.0",
@@ -32522,10 +32530,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.492",
+      "electron-to-chromium@1.5.494",
       "",
       {},
-      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
+      "sha512-Tph7ohL4Xc0ft3DXElYEIVTmPI3H0MtPCTdgtz5AwWGZG6q+vMiT3IzJ3RJX/HJQ8pYzeimQyvi6SsBTOS0nyQ=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -32539,39 +32547,11 @@ var TUI_PACKAGES = {
       {},
       "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
     ],
-    "es-errors": [
-      "es-errors@1.3.0",
-      "",
-      {},
-      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
-    ],
     "escalade": [
       "escalade@3.2.0",
       "",
       {},
       "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
-    ],
-    "find-babel-config": [
-      "find-babel-config@2.1.2",
-      "",
-      {
-        "dependencies": {
-          "json5": "^2.2.3"
-        }
-      },
-      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
-    ],
-    "fs.realpath": [
-      "fs.realpath@1.0.0",
-      "",
-      {},
-      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
-    ],
-    "function-bind": [
-      "function-bind@1.1.2",
-      "",
-      {},
-      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
     ],
     "gensync": [
       "gensync@1.0.0-beta.2",
@@ -32584,39 +32564,6 @@ var TUI_PACKAGES = {
       "",
       {},
       "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
-    ],
-    "glob": [
-      "glob@9.3.5",
-      "",
-      {
-        "dependencies": {
-          "fs.realpath": "^1.0.0",
-          "minimatch": "^8.0.2",
-          "minipass": "^4.2.4",
-          "path-scurry": "^1.6.1"
-        }
-      },
-      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
-    ],
-    "hasown": [
-      "hasown@2.0.4",
-      "",
-      {
-        "dependencies": {
-          "function-bind": "^1.1.2"
-        }
-      },
-      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
-    ],
-    "is-core-module": [
-      "is-core-module@2.18.0",
-      "",
-      {
-        "dependencies": {
-          "hasown": "^2.0.4"
-        }
-      },
-      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
     ],
     "js-tokens": [
       "js-tokens@4.0.0",
@@ -32644,12 +32591,6 @@ var TUI_PACKAGES = {
       },
       "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
     ],
-    "minipass": [
-      "minipass@4.2.8",
-      "",
-      {},
-      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
-    ],
     "ms": [
       "ms@2.1.3",
       "",
@@ -32657,16 +32598,10 @@ var TUI_PACKAGES = {
       "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
     ],
     "node-releases": [
-      "node-releases@2.0.65",
+      "node-releases@2.0.66",
       "",
       {},
-      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
-    ],
-    "p-try": [
-      "p-try@2.2.0",
-      "",
-      {},
-      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+      "sha512-uSMWN9/XtWzxaE0d9ZNHe00Hda6028AXH3WRjTsK71neiPCSeL5nGSD9MXTQX/6Qx0k7Op1AyyinmIUw9fBzrg=="
     ],
     "parse5": [
       "parse5@7.3.0",
@@ -32678,60 +32613,11 @@ var TUI_PACKAGES = {
       },
       "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
     ],
-    "path-parse": [
-      "path-parse@1.0.7",
-      "",
-      {},
-      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
-    ],
-    "path-scurry": [
-      "path-scurry@1.11.1",
-      "",
-      {
-        "dependencies": {
-          "lru-cache": "^10.2.0",
-          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
-        }
-      },
-      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
-    ],
     "picocolors": [
       "picocolors@1.1.1",
       "",
       {},
       "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
-    ],
-    "pkg-up": [
-      "pkg-up@3.1.0",
-      "",
-      {
-        "dependencies": {
-          "find-up": "^3.0.0"
-        }
-      },
-      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
-    ],
-    "reselect": [
-      "reselect@4.1.8",
-      "",
-      {},
-      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
-    ],
-    "resolve": [
-      "resolve@1.22.14",
-      "",
-      {
-        "dependencies": {
-          "es-errors": "^1.3.0",
-          "is-core-module": "^2.18.0",
-          "path-parse": "^1.0.7",
-          "supports-preserve-symlinks-flag": "^1.0.0"
-        },
-        "bin": {
-          "resolve": "bin/resolve"
-        }
-      },
-      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
     ],
     "s-js": [
       "s-js@0.4.9",
@@ -32788,12 +32674,6 @@ var TUI_PACKAGES = {
         }
       },
       "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
-    ],
-    "supports-preserve-symlinks-flag": [
-      "supports-preserve-symlinks-flag@1.0.0",
-      "",
-      {},
-      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
     ],
     "typescript": [
       "typescript@5.9.3",
@@ -32898,96 +32778,11 @@ var TUI_PACKAGES = {
       {},
       "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
     ],
-    "glob/minimatch": [
-      "minimatch@8.0.7",
-      "",
-      {
-        "dependencies": {
-          "brace-expansion": "^2.0.1"
-        }
-      },
-      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
-    ],
     "parse5/entities": [
       "entities@6.0.1",
       "",
       {},
       "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
-    ],
-    "path-scurry/lru-cache": [
-      "lru-cache@10.4.3",
-      "",
-      {},
-      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
-    ],
-    "path-scurry/minipass": [
-      "minipass@7.1.3",
-      "",
-      {},
-      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
-    ],
-    "pkg-up/find-up": [
-      "find-up@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "locate-path": "^3.0.0"
-        }
-      },
-      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
-    ],
-    "glob/minimatch/brace-expansion": [
-      "brace-expansion@2.1.8",
-      "",
-      {
-        "dependencies": {
-          "balanced-match": "^1.0.0"
-        }
-      },
-      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
-    ],
-    "pkg-up/find-up/locate-path": [
-      "locate-path@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-locate": "^3.0.0",
-          "path-exists": "^3.0.0"
-        }
-      },
-      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
-    ],
-    "glob/minimatch/brace-expansion/balanced-match": [
-      "balanced-match@1.0.2",
-      "",
-      {},
-      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate": [
-      "p-locate@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-limit": "^2.0.0"
-        }
-      },
-      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
-    ],
-    "pkg-up/find-up/locate-path/path-exists": [
-      "path-exists@3.0.0",
-      "",
-      {},
-      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate/p-limit": [
-      "p-limit@2.3.0",
-      "",
-      {
-        "dependencies": {
-          "p-try": "^2.0.0"
-        }
-      },
-      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
     ]
   }
 }
