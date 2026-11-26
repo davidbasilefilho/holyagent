@@ -173,8 +173,8 @@ export const checkT3Prerequisites = (env: Env, piUsed: boolean) =>
     return [
       ...((yield* isDirectory(home))
         ? []
-        : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`]),
-      ...(piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]),
+        : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup pi`]),
+      ...(piUsed ? [] : ["pi: install the Pi backend from https://pi.dev and put pi on PATH"]),
     ]
   })
 

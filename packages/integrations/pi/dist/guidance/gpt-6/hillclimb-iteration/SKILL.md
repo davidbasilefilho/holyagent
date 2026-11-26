@@ -22,6 +22,8 @@ Use `visual-judging` for acceptance and the relevant platform design skill for i
 
 Scale the checks to the change. Use representative scenarios at the real entry point for both revisions, record versions and conditions, and separate installation from use. For defensive and operational improvements, use isolated, harmless fixtures and verify normal behavior, safe failure and recovery without weakening authorization or losing state. Exercise the actual user or developer flow for UI, UX or DX as well as the relevant visual and accessibility checks.
 
+For material changes, keep a short record with both revisions, commands, samples and the reason to keep or revert each trial. Check that the treatment ran. Use a negative control to show that a failing case is detected or that activation can be distinguished from install. Alternate run order if it could bias measurements. Report sample size and ordinary variation. Separate correctness from a measured gain.
+
 ## Examples
 
 - **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.

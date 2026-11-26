@@ -16470,8 +16470,8 @@ var writeSettings = (path, value, unchangedSince) => writeJsonObjectIfUnchanged(
 var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
   const home = t3Home(env);
   return [
-    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
-    ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
+    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup pi`],
+    ...piUsed ? [] : ["pi: install the Pi backend from https://pi.dev and put pi on PATH"]
   ];
 });
 var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join23(homeDirectory2(env), ".t3");
@@ -16896,7 +16896,13 @@ var setup = fn2("setup")(function* (env, options) {
   if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed);
     if (blockers.length > 0)
-      return { lines: blockers.map((line) => `! ${line}`), ok: false };
+      return {
+        lines: [
+          ...blockers.map((line) => `! ${line}`),
+          hint("If you meant native Codex, see holyagent setup codex --help to prepare its profile before launch. Neither a package install nor a dry run activates the current session.")
+        ],
+        ok: false
+      };
   }
   let piSteps = true;
   const whenPiSaved = () => piSteps;

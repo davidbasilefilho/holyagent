@@ -82,6 +82,10 @@ const EXISTING_COVERAGE = {
       section: "skills/hillclimb-iteration/SKILL.md",
       phrase: "separate installation from use",
     },
+    "R-HILLCLIMB-EVIDENCE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "Check that the treatment ran",
+    },
     "R-HILLCLIMB-REUSE": {
       section: "skills/hillclimb-iteration/SKILL.md",
       phrase: "`performance-iteration` for controlled measurement",
@@ -475,6 +479,10 @@ const EXISTING_COVERAGE = {
     "R-HILLCLIMB-SCENARIOS": {
       section: "skills/hillclimb-iteration/SKILL.md",
       phrase: "separate installation from use",
+    },
+    "R-HILLCLIMB-EVIDENCE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "Check that the treatment ran",
     },
     "R-HILLCLIMB-REUSE": {
       section: "skills/hillclimb-iteration/SKILL.md",
@@ -890,6 +898,10 @@ const EXISTING_COVERAGE = {
     "R-HILLCLIMB-SCENARIOS": {
       section: "skills/hillclimb-iteration/SKILL.md",
       phrase: "separate installation from use",
+    },
+    "R-HILLCLIMB-EVIDENCE": {
+      section: "skills/hillclimb-iteration/SKILL.md",
+      phrase: "Check that the treatment ran",
     },
     "R-HILLCLIMB-REUSE": {
       section: "skills/hillclimb-iteration/SKILL.md",

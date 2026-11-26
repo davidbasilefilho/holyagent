@@ -19,6 +19,8 @@ Use the existing guidance where available. Use `visual-judging` for visual accep
 
 Use representative before/after scenarios at the real entry point. Record both versions and conditions, and separate installation from use. Scale the checks to the impact. Use isolated, harmless fixtures for defensive changes, expected failures and recovery. Check that authorization, prior state and data stay protected. For UI, UX and DX, exercise the flow a person uses. Keep relevant accessibility and qualitative checks even when a metric improves.
 
+For a material change, keep a short record of the exact revisions, commands, samples and reasons to keep or revert each trial. Check that the treatment ran. Use a negative control when a check could pass without exercising the change. Alternate run order when it could bias the result, and report sample count and variation. A fix can pass its checks without showing a speedup.
+
 ## Examples
 
 - **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.

@@ -11849,7 +11849,7 @@ var subjects = (lines, mark) => {
   const detail = line.slice(2);
   if (/^(?:scope|form|setup harness|Codex home|Startup): /i.test(detail))
     return "status";
-  if (/^(?:Start Codex with this CODEX_HOME\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(detail))
+  if (/^(?:Start Codex with this CODEX_HOME\b|If you meant native Codex\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(detail))
     return "next";
   return "warning";
 }, summarizeResult = (result, dryRun) => {
@@ -19929,8 +19929,8 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
 })))), checkT3Prerequisites = (env, piUsed) => gen2(function* () {
   const home = t3Home(env);
   return [
-    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
-    ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
+    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup pi`],
+    ...piUsed ? [] : ["pi: install the Pi backend from https://pi.dev and put pi on PATH"]
   ];
 }), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, startupModelRefusal = (existing, recorded) => {
   const instances = existing["providerInstances"];
@@ -20379,7 +20379,13 @@ var init_steps = __esm(() => {
     if (piOnly) {
       const blockers = yield* checkT3Prerequisites(env, piUsed);
       if (blockers.length > 0)
-        return { lines: blockers.map((line) => `! ${line}`), ok: false };
+        return {
+          lines: [
+            ...blockers.map((line) => `! ${line}`),
+            hint("If you meant native Codex, see holyagent setup codex --help to prepare its profile before launch. Neither a package install nor a dry run activates the current session.")
+          ],
+          ok: false
+        };
     }
     let piSteps = true;
     const whenPiSaved = () => piSteps;
@@ -30925,6 +30931,8 @@ For visual work, capture the same viewport, state and interaction input before a
 Use the existing guidance where available. Use \`visual-judging\` for visual acceptance, the relevant platform design skill for its checklist, \`dev-server\` for a shared render target, \`performance-iteration\` for controlled measurement, and \`evidence-judging\` for reviewing findings.
 
 Use representative before/after scenarios at the real entry point. Record both versions and conditions, and separate installation from use. Scale the checks to the impact. Use isolated, harmless fixtures for defensive changes, expected failures and recovery. Check that authorization, prior state and data stay protected. For UI, UX and DX, exercise the flow a person uses. Keep relevant accessibility and qualitative checks even when a metric improves.
+
+For a material change, keep a short record of the exact revisions, commands, samples and reasons to keep or revert each trial. Check that the treatment ran. Use a negative control when a check could pass without exercising the change. Alternate run order when it could bias the result, and report sample count and variation. A fix can pass its checks without showing a speedup.
 
 ## Examples
 

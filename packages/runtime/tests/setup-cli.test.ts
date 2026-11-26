@@ -64,6 +64,19 @@ const publicCli = (argv: ReadonlyArray<string>) =>
   )
 
 describe("public setup harnesses", () => {
+  test("a Pi preview with no backend or initialized T3 names each next step without activating another host", async () => {
+    const result = await publicCli(["setup", "pi", "--dry-run", "--non-interactive"])
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain("open T3 Code once")
+    expect(result.stdout).toContain("then run holyagent setup pi")
+    expect(result.stdout).toContain("install the Pi backend from https://pi.dev")
+    expect(result.stdout).toContain("see holyagent setup codex --help")
+    expect(result.stdout).toContain("activates the current session")
+    expect(await Bun.file(join(home, "t3", "userdata", "settings.json")).exists()).toBe(false)
+    expect(await Bun.file(join(home, ".holyagent", "codex", "config.toml")).exists()).toBe(false)
+    expect(await Bun.file(settings()).exists()).toBe(false)
+  })
+
   test("install is shown inline once and uses setup's exact help and validation", async () => {
     const help = await publicCli(["--help"])
     const setup = help.stdout.split("\n").filter((line) => line.startsWith("setup "))

@@ -20,6 +20,8 @@ Use the related guidance when available. `visual-judging` handles acceptance, th
 
 Choose scenarios proportionate to the risk and exercise the real entry point on the baseline and candidate. Record versions and conditions. Record the result and separate installation from use. For defensive and reliability changes, use isolated, harmless fixtures with expected success, failure and recovery. Check authorization, prior state and data. For UI, UX and DX, validate the task people actually perform, including appropriate accessibility.
 
+Record baseline and candidate revisions, commands, samples and why you kept or rejected each material trial. Check that the treatment ran. Use a negative control if a passing check might hide the missing effect. For order-sensitive comparisons, alternate baseline-first and candidate-first. Show sample counts and variation. A correct fix need not be faster.
+
 ## Examples
 
 - **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.

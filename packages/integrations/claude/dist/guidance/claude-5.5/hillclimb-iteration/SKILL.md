@@ -19,6 +19,8 @@ Use related guidance where available. `visual-judging` and the relevant platform
 
 Size the evaluation to the risk. Test representative behavior through the real entry point before and after, and record the versions and conditions. Record the result and separate installation from use. For defensive or operational changes, use isolated, harmless fixtures to exercise failure and recovery. Verify that permissions, data and prior state stay protected. For UI, UX or DX, test the key user or developer flow, not just the appearance or one numeric score.
 
+For a material change, record revisions, commands, samples and keep or revert decisions, including failed trials. Check that the treatment ran. Use a negative control when a successful install or a passing check could hide a missing effect. Alternate the order of repeated runs when it can bias the result. Report noise and sample count. A correct fix is not a measured speedup.
+
 ## Examples
 
 - **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.
