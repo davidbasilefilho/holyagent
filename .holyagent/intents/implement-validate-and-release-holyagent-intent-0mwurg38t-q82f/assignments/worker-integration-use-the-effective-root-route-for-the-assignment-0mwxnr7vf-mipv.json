@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwxnr7vf-mipv",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.integration",
+  "slug": "use-the-effective-root-route-for-the",
+  "objective": "Use the effective root route for the native Pi and T3 startup model without changing specialist routing",
+  "state": "Ready",
+  "scope": [
+    "Root startup model resolution and native default persistence, isolated tests and accurate docs"
+  ],
+  "constraints": [
+    "Only initial new-session preferences; keep later manual choices, scope and mixed specialist routing. No version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Use native supported preferences for the real Pi and T3 startup model",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Do not overwrite any later changes or impose a primary provider on specialists",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Isolated Pi and T3 including both providers plus manual override and rerun",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/setup/pi-settings.ts",
+    "packages/core/src/setup/t3-settings.ts",
+    "packages/core/src/pi/provider.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:38:49.756Z"
+}
