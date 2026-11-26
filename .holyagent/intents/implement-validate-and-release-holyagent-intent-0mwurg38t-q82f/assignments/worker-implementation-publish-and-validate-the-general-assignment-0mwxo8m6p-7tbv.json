@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwxo8m6p-7tbv",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "publish-and-validate-the-general",
+  "objective": "Publish and validate the general hillclimb-iteration HolyAgent skill without duplicating specialist skills",
+  "state": "Ready",
+  "scope": [
+    "Repository instruction requirements and family variants, skill discovery tests, isolated examples"
+  ],
+  "constraints": [
+    "Root owns Git. No personal ChatGPT skill installation, no paid/hosted test sessions, no token limits in skill prose."
+  ],
+  "criteria": [
+    {
+      "text": "Guide autonomous metric-driven iteration with guardrails and noise-aware stopping",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Use existing specialized tools and preserve the project publication and discovery pattern",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Verify discovery and a visual and nonvisual application without claiming model evaluations from fixtures",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:52:21.457Z"
+}
