@@ -38,6 +38,8 @@ export interface Result {
   readonly stdout: string
   readonly stderr: string
   readonly code: number
+  /** Public setup presentation data, separate from its plain stdout. */
+  readonly setupResult?: SetupResult
 }
 
 export { encodeRecord } from "../toon.ts"
@@ -447,9 +449,10 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
     const output = yield* command.run(call).pipe(Effect.provideService(WorkTree, call.root))
     if (surface === "public" && output instanceof SetupResult)
       return {
-        stdout: renderSetupResult(output, host.env, host.terminal?.stdout === true),
+        stdout: renderSetupResult(output),
         stderr: "",
         code: output.code,
+        setupResult: output,
       }
     if (surface === "agent") {
       const stdout = emitted.join("")

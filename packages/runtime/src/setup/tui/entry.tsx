@@ -6,6 +6,8 @@ import { SetupApp } from "./app.tsx"
 import { detectBackground } from "./background.ts"
 import type { TuiInput, TuiOutcome } from "./types.ts"
 
+export { renderTerminalOutput } from "./terminal-output.ts"
+
 /**
  * Shows the setup interface on the renderer `acquire` creates and resolves with how it ended. The
  * renderer is closed before this resolves, so the shell is back to normal when the command prints

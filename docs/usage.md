@@ -47,6 +47,8 @@ In an interactive terminal, run bare `holyagent setup` to review Pi, Claude and 
 
 For the native Codex preview, run `holyagent setup codex --dry-run` to review the separate profile and plugin install, then omit `--dry-run` to apply. This does not change a running session or your usual Codex profile. Set `CODEX_HOME` before starting the native Codex process. See the [Codex startup guide](../packages/integrations/codex/README.md) for the verified runtime line, the root-only option and the hosted validation limits.
 
+See [Browser and desktop controls by setup target](setup-surfaces.md) for how OpenCode Browse, native desktop browsers, extensions and device simulators differ.
+
 Use `--non-interactive` for scripts. It skips the setup screen and uses the defaults shown by `holyagent setup --help` or the flags you supplied. Use `--dry-run` to see changes before applying them.
 
 Interactive Pi setup shows controls for the detected environment. General Pi capabilities use their configured values or the documented defaults. Change those in [Pi configuration](pi/configuration.md#capabilities) or pass the corresponding flag.

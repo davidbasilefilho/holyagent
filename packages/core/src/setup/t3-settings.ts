@@ -2,7 +2,8 @@ import { join } from "node:path"
 
 import { Effect, Equal } from "effect"
 
-import type { Config } from "../config/schema.ts"
+import type { Config, PiProviderSelection } from "../config/schema.ts"
+import { rootModelSettings } from "../pi/provider.ts"
 import { fileSystem } from "../ports/filesystem.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
@@ -17,7 +18,6 @@ import {
   readJsonObjectSnapshot,
   readJsonText,
   removeFileIfUnchanged,
-  writeJsonObject,
   writeJsonObjectIfUnchanged,
 } from "./json-file.ts"
 import { loadPiConfig, piInUse } from "./pi-check.ts"
@@ -78,7 +78,7 @@ interface Unit {
   readonly keys: ReadonlyArray<Wanted>
   readonly whole?: string
   /** Why the unit must not be written into this file, or `undefined`. */
-  readonly refuse?: (existing: JsonObject) => string | undefined
+  readonly refuse?: (existing: JsonObject, recorded: ReadonlyArray<Recorded>) => string | undefined
 }
 
 /** The T3 setup choices a person decides on; every other unit is always applied. */
@@ -99,6 +99,8 @@ export interface T3SettingsOptions {
    * scope `user`), so the step does not load it again; loaded here when absent.
    */
   readonly config?: Config
+  /** Provider choices in the setup review that have not necessarily been saved yet. */
+  readonly providers?: PiProviderSelection
   /**
    * Writes the file; {@link writeSettings} when absent. `unchangedSince` is the text the file must
    * still have (`undefined` for a file that did not exist), and a write that finds another text
@@ -149,22 +151,20 @@ export const restoreSettings = (
 /**
  * Writes T3's settings file. With `unchangedSince` (the text the step read), it writes only while
  * the file still has that text, so a save by T3 Code in between is never overwritten; otherwise it
- * fails naming the file and writes nothing. Without it (the file did not exist) it writes plainly.
+ * fails naming the file and writes nothing. Without it the file must still be absent.
  */
 export const writeSettings = (path: string, value: JsonObject, unchangedSince?: string) =>
-  unchangedSince === undefined
-    ? writeJsonObject(path, value)
-    : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(
-        Effect.flatMap((wrote) =>
-          wrote
-            ? Effect.void
-            : Effect.fail(
-                new SetupFailure({
-                  message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`,
-                }),
-              ),
-        ),
-      )
+  writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(
+    Effect.flatMap((wrote) =>
+      wrote
+        ? Effect.void
+        : Effect.fail(
+            new SetupFailure({
+              message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`,
+            }),
+          ),
+    ),
+  )
 
 /** Lists the missing prerequisites for the public T3 Code workflow without writing settings. */
 export const checkT3Prerequisites = (env: Env, piUsed: boolean) =>
@@ -233,6 +233,28 @@ const BALANCED = {
   pauseWhenOnBattery: false,
 } as const
 
+/** Leave T3's default alone when its `pi` instance cannot take the selection. */
+const startupModelRefusal: NonNullable<Unit["refuse"]> = (existing, recorded) => {
+  const instances = existing["providerInstances"]
+  if (instances !== undefined && !isJsonObject(instances))
+    return "providerInstances is not an object"
+  const instance = instances?.["pi"]
+  if (instance !== undefined) {
+    if (!isJsonObject(instance)) return "providerInstances.pi is not an object"
+    if (instance["driver"] !== undefined && instance["driver"] !== "pi")
+      return "providerInstances.pi is another driver's instance"
+    const config = instance["config"]
+    if (instance["enabled"] === false || (isJsonObject(config) && config["enabled"] === false))
+      return "the Pi provider instance is disabled"
+  }
+  if (
+    existing["defaultModelSelection"] === undefined &&
+    recorded.some(({ path }) => path[0] === "defaultModelSelection")
+  )
+    return "kept the startup model reset"
+  return undefined
+}
+
 /**
  * The units setup writes, from the config switches and the device answer. Each key carries T3's
  * default, and {@link wantedKeys} leaves one out when its value equals it. Source: T3 Code's
@@ -249,7 +271,11 @@ const BALANCED = {
  * - `branchNamingMode` and `branchNameInstructions`: the environment-wide rule, each key on its own
  *   (T3's `pullRequestMergeMethod` is left at its default, the method last chosen on the device).
  */
-const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
+const units = (
+  devices: boolean,
+  worktrees: boolean,
+  root: ReturnType<typeof rootModelSettings>,
+): ReadonlyArray<Unit> => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -270,6 +296,27 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
         : undefined
     },
   },
+  // T3 v0.1.12's ModelSelection uses a provider instance, Pi's provider/model slug and
+  // an option array. The Pi adapter reads the `thinking` option and applies it via Pi RPC.
+  ...(root === undefined
+    ? []
+    : [
+        {
+          name: "default model for new threads",
+          keys: [
+            {
+              path: ["defaultModelSelection"] as const,
+              value: {
+                instanceId: "pi",
+                model: `${root.defaultProvider}/${root.defaultModel}`,
+                options: [{ id: "thinking", value: root.defaultThinkingLevel }],
+              },
+              default: null,
+            },
+          ],
+          refuse: startupModelRefusal,
+        },
+      ]),
   ...(devices
     ? [
         {
@@ -382,7 +429,7 @@ const unitOutcome = (
   const reason =
     unit.whole !== undefined && existing[unit.whole] !== undefined
       ? `${unit.whole} is set`
-      : unit.refuse?.(existing)
+      : unit.refuse?.(existing, recorded)
   return reason !== undefined
     ? { status: "left", reason }
     : { status: "keys", keys: unit.keys.filter((key) => !Equal.equals(key.value, key.default)) }
@@ -440,11 +487,16 @@ type Outcome = { readonly line: string } | { readonly target: Target }
 const decide = Effect.fn("t3SettingsDecide")(function* (
   env: Env,
   cwd: string,
-  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform" | "config">,
+  options: Pick<
+    T3SettingsOptions,
+    "worktrees" | "deviceAccess" | "platform" | "config" | "providers"
+  >,
 ) {
   const config =
     options.config ??
-    (yield* loadPiConfig(env, cwd, "user").pipe(Effect.orElseSucceed(() => undefined)))
+    (yield* loadPiConfig(env, cwd, "user", undefined, options.providers).pipe(
+      Effect.orElseSucceed(() => undefined),
+    ))
   if (config === undefined || !config.pi.enable) return undefined
   const home = t3Home(env)
   if (!(yield* isDirectory(home)))
@@ -471,6 +523,7 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
       units: units(
         wantsDevices && host !== undefined,
         (options.worktrees ?? true) && config.pi.t3.worktrees,
+        rootModelSettings(config),
       ),
       deviceNote,
       device: host,
@@ -532,9 +585,10 @@ const names = (paths: ReadonlyArray<{ readonly path: string }>) =>
  * whatever it is. Written: the Pi provider instance, device access, new threads in worktrees,
  * background activity, the commit and pull request writing style, the branch naming rule
  * ({@link T3_BRANCH_INSTRUCTIONS}), thread resume and snooze, auto pull and storage cleanup
- * ({@link T3_STORAGE_CLEANUP}); the context meter, model choices, Pi launch settings and per-device
- * client settings are never written. Device access only where {@link deviceHost} finds Xcode or an
- * Android SDK, and only while the options and the config's `pi.t3` allow it; worktrees likewise.
+ * ({@link T3_STORAGE_CLEANUP}) and the initial Pi model for new threads. The context meter, other
+ * model choices, Pi launch settings and per-device client settings are never written. Device access
+ * only where {@link deviceHost} finds Xcode or an Android SDK, and only while the options and the
+ * config's `pi.t3` allow it; worktrees likewise.
  *
  * Nothing is written without T3's home folder (T3 Code is not installed), with `pi.enable` off, or
  * with `pi.t3.scope` `project`. A file that does not decode as a JSON object fails with a
@@ -642,7 +696,10 @@ export interface T3Preview {
 export const previewT3Settings = Effect.fn("previewT3Settings")(function* (
   env: Env,
   cwd: string,
-  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform" | "config">,
+  options: Pick<
+    T3SettingsOptions,
+    "worktrees" | "deviceAccess" | "platform" | "config" | "providers"
+  >,
 ): Effect.fn.Return<T3Preview | { readonly line: string } | undefined, SetupFailure> {
   const decided = yield* decide(env, cwd, options)
   if (decided === undefined) return undefined
@@ -759,7 +816,8 @@ export const checkT3Settings = (
             ),
           ]
       }
-      const { keys } = wantedKeys(value, wanted)
+      const recorded = yield* readRecorded(env, file).pipe(Effect.orElseSucceed(() => []))
+      const { keys } = wantedKeys(value, wanted, recorded)
       const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added")
       return [
         missing.length === 0

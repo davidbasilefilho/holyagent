@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import type { SetupProgressUpdate } from "../../../../core/src/setup/progress.ts"
 import type { PiProvider, PiProviderSelection } from "../../config/schema.ts"
 import type { BrowsePlan } from "../browse-setup.ts"
+import type { Tone } from "./theme.ts"
 
 /** The setup choices: harnesses, Pi model providers, T3 settings and capability switches. */
 export interface Choices {
@@ -11,12 +12,23 @@ export interface Choices {
   readonly deviceAccess: boolean
   /** Each offered capability's switch, by `pi.features` key. */
   readonly capabilities: Readonly<Record<string, boolean>>
-  /** True only after the person chooses Configure or Update for this run. */
+  /** Interactive Browse choice. Configure or Update starts selected when available and enabled. */
   readonly browseSetup?: boolean
   /** The detected browser profile picked for a new Browse pairing. */
   readonly browseProfile?: number
+  /** Browser installation ids selected in the Browser Use settings page. */
+  readonly browseBrowserIds?: ReadonlyArray<string>
+  /** Explicitly chosen desktop browser for opening the official ChatGPT extension guide. */
+  readonly codexBrowserHandoff?: string
   /** Selected public harnesses in the combined setup. */
   readonly harnesses?: { readonly pi: boolean; readonly claude: boolean; readonly codex?: boolean }
+}
+
+/** A local browser candidate; discovering it does not prove Browse is installed or paired. */
+export interface BrowserOption {
+  readonly id: string
+  readonly name: string
+  readonly browseCompatibility: "supported" | "unverified" | "unsupported"
 }
 
 /** One capability row of the choose screen. */
@@ -47,7 +59,9 @@ export interface Offer {
   /** The capability rows, in registry order; none when the config cannot be read or Pi is off. */
   readonly capabilities: ReadonlyArray<CapabilityOffer>
   /** The public graphical Pi setup's read-only OpenCode Browse plan. */
-  readonly browse?: Pick<BrowsePlan, "state" | "action" | "profiles">
+  readonly browse?: Pick<BrowsePlan, "state" | "action" | "profiles"> & {
+    readonly browsers?: ReadonlyArray<BrowserOption>
+  }
   /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
   readonly form: string
   /** Present only in bare public setup when the harness chooser is available. */
@@ -55,6 +69,14 @@ export interface Offer {
     readonly piAvailable: boolean
     readonly scope: string
     readonly codexHome?: string
+    /** Named Codex setup shows only its own settings, without switching harness tabs. */
+    readonly onlyCodex?: boolean
+    /** Independent desktop capabilities. Not inferred from CLI feature flags. */
+    readonly codexDesktop?: {
+      readonly name: string
+      readonly version?: string
+      readonly extensionBrowsers?: ReadonlyArray<{ readonly id: string; readonly name: string }>
+    }
   }
 }
 
@@ -126,6 +148,23 @@ export type TuiOutcome =
   | { readonly _tag: "Applied"; readonly applied: Applied }
   | { readonly _tag: "Cancelled" }
   | { readonly _tag: "Interrupted" }
+
+/** A public output line and its shared visual tone. */
+export interface TerminalOutputLine {
+  readonly text: string
+  readonly tone: Tone
+  /** A report path produced by setup, never a hyperlink from child output. */
+  readonly reportFile?: string
+}
+
+/** The append-only presentation passed across the public setup bundle boundary. */
+export interface TerminalOutput {
+  readonly env: TuiInput["env"]
+  readonly lines: ReadonlyArray<TerminalOutputLine>
+}
+
+/** The inline formatter exported by the packaged renderer. */
+export type TerminalOutputRenderer = (input: TerminalOutput) => string
 
 /** What the TUI bundle exports: the one function the command calls. */
 export interface SetupTuiModule {

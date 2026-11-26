@@ -24,9 +24,23 @@ export const resultHeadline = (ok: boolean, dryRun: boolean): string => {
   return ok ? "Setup finished." : "Setup finished with failures."
 }
 
+/** Routine report lines that predate separate information and next-step markers. */
+export const setupNotice = (line: string): "status" | "next" | "warning" | undefined => {
+  if (/^= (?:pi package|Pi model providers|Codex plugin): /i.test(line)) return "status"
+  if (!line.startsWith("~ ")) return undefined
+  const detail = line.slice(2)
+  if (/^(?:scope|form|setup harness|Codex home|Startup): /i.test(detail)) return "status"
+  if (
+    /^(?:Start Codex with this CODEX_HOME\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(
+      detail,
+    )
+  )
+    return "next"
+  return "warning"
+}
+
 /** Condenses a report for display. The underlying lines remain available as run details. */
 export const summarizeResult = (result: Applied, dryRun: boolean): ReadonlyArray<ResultSection> => {
-  const informational = /^~ (?:scope|form|setup harness): /
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(
@@ -36,30 +50,22 @@ export const summarizeResult = (result: Applied, dryRun: boolean): ReadonlyArray
       "- ",
     ),
   ]
-  const warnings = [
-    ...subjects(result.lines, "! "),
-    ...subjects(
-      result.lines.filter((line) => !informational.test(line)),
-      "~ ",
-    ),
-  ]
+  const linesOf = (kind: ReturnType<typeof setupNotice>) =>
+    result.lines.filter((line) => setupNotice(line) === kind)
+  const status = linesOf("status").map((line) => line.slice(2))
+  const failures = subjects(result.lines, "! ")
+  const warnings = subjects(linesOf("warning"), "~ ")
+  const next = linesOf("next").map((line) => line.slice(2))
+  if (!result.ok) next.push("Check the failures in the full report before running setup again.")
+  else if (warnings.length > 0) next.push("Check the warnings in the full report.")
   return [
     {
       title: dryRun ? "Planned changes" : "Changes",
       lines: changes.length === 0 ? ["No changes."] : changes,
     },
+    ...(status.length > 0 ? [{ title: "Status", lines: status }] : []),
+    ...(failures.length > 0 ? [{ title: "Failures", lines: failures }] : []),
     ...(warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : []),
-    ...(warnings.length > 0 || !result.ok
-      ? [
-          {
-            title: "Next steps",
-            lines: [
-              result.ok
-                ? "Check the warnings in the full report."
-                : "Check the failures in the full report before running setup again.",
-            ],
-          },
-        ]
-      : []),
+    ...(next.length > 0 ? [{ title: "Next steps", lines: next }] : []),
   ]
 }

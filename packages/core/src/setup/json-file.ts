@@ -131,21 +131,22 @@ export const writeJsonObject = (
 
 /**
  * Like {@link writeJsonObject}, but writes only when the file still has the text `unchangedSince`
- * (from {@link readJsonObjectSnapshot}); the check runs just before the rename, so the window in
- * which another program's update could be lost is the rename itself. Returns whether it wrote.
+ * (from {@link readJsonObjectSnapshot}, `undefined` for a missing file); the check runs just before
+ * the rename, so the window in which another program's update could be lost is the rename itself.
+ * Returns whether it wrote.
  */
 export const writeJsonObjectIfUnchanged = (
   path: string,
   value: JsonObject,
-  unchangedSince: string,
+  unchangedSince: string | undefined,
   options?: { readonly mode?: number },
-) => replaceJsonObject(path, value, options, unchangedSince)
+) => replaceJsonObject(path, value, options, { text: unchangedSince })
 
 const replaceJsonObject = (
   path: string,
   value: JsonObject,
   options?: { readonly mode?: number },
-  unchangedSince?: string,
+  snapshot?: { readonly text: string | undefined },
 ) =>
   Effect.gen(function* () {
     const fs = yield* fileSystem
@@ -203,10 +204,7 @@ const replaceJsonObject = (
       // Creation applies the umask; chmod sets the exact mode.
       if (mode !== undefined)
         yield* fileOperation(temporary, "write", () => fs.chmod(temporary, mode))
-      if (
-        unchangedSince !== undefined &&
-        (yield* fileOperation(target, "read", () => fs.readFile(target, "utf8"))) !== unchangedSince
-      ) {
+      if (snapshot !== undefined && (yield* readJsonText(target)) !== snapshot.text) {
         yield* fileOperation(temporary, "remove", () => fs.rm(temporary, { force: true }))
         return false
       }

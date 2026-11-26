@@ -85,7 +85,7 @@ const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replac
 )
 
 const CODEX_USAGE =
-  "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]"
+  "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]"
 const PublicManifest = Schema.Struct({ name: Schema.Literal("holyagent"), version: Schema.String })
 const codexPlan = (
   args: Parameters<typeof stringFlag>[0],
@@ -124,6 +124,28 @@ const codexPlan = (
     ),
   )
 
+const reviewedCodexPlan = (
+  args: Parameters<typeof stringFlag>[0],
+  env: Env,
+  installedPackageRoot: string | undefined,
+) => {
+  let fingerprint: string | undefined
+  return (dryRun: boolean) =>
+    Effect.gen(function* () {
+      if (!dryRun && fingerprint === undefined)
+        return { ok: false, lines: ["! Review the Codex setup plan before applying."] }
+      const plan = yield* codexPlan(
+        args,
+        env,
+        installedPackageRoot,
+        dryRun,
+        dryRun ? undefined : fingerprint,
+      )
+      if (dryRun) fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined
+      return plan
+    })
+}
+
 const codexCommand: Command = {
   path: ["setup", "codex"],
   usage: CODEX_USAGE,
@@ -133,21 +155,58 @@ const codexCommand: Command = {
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
     "The verified Codex 0.172.0 runtime must already be on PATH. Setup never changes a running session.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
-    "--dry-run never installs or writes. Explicit Codex setup is always non-interactive.",
+    "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
+    "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide.",
   ],
   flags: {
     "codex-home": "string",
     "root-only-catalog": "string",
+    form: "string",
     "dry-run": "boolean",
     "non-interactive": "boolean",
     "no-tui": "boolean",
   },
   stateless: true,
   positionals: 0,
-  run: ({ args, env, installedPackageRoot }) =>
-    codexPlan(args, env, installedPackageRoot, booleanFlag(args, "dry-run")).pipe(
-      Effect.map(printed),
-    ),
+  run: ({ args, env, cwd, installedPackageRoot, terminal, setupTui, emit }) =>
+    Effect.gen(function* () {
+      const dryRun = booleanFlag(args, "dry-run")
+      const form = yield* formOf(args, env, CODEX_USAGE)
+      const direct = () =>
+        codexPlan(args, env, installedPackageRoot, dryRun).pipe(Effect.map(printed))
+      if (
+        dryRun ||
+        booleanFlag(args, "no-tui") ||
+        booleanFlag(args, "non-interactive") ||
+        form.form === "headless"
+      )
+        return yield* direct()
+      const plan = reviewedCodexPlan(args, env, installedPackageRoot)
+      const interactive = yield* runInteractive({
+        env,
+        cwd,
+        scope: "user",
+        terminal,
+        undo: false,
+        dryRun: false,
+        t3Workflow: true,
+        noTui: false,
+        choiceFlag: false,
+        form,
+        ...(setupTui === undefined ? {} : { load: setupTui }),
+        notify: emit,
+        apply: () => plan(false),
+        combined: {
+          codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
+          onlyCodex: true,
+          run: (_target, _choices, _capabilities, preview) => plan(preview),
+        },
+      })
+      if (interactive.kind === "done") return printed(interactive.report)
+      if (interactive.kind === "applied")
+        return yield* saveSetupResult(interactive.report, false, env)
+      return yield* direct()
+    }).pipe(Effect.provide(shellLive(env))),
 }
 
 const CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ")
@@ -218,7 +277,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup with Browser Use enabled can configure or update OpenCode Browse after review; Skip is the default. Setup runs only the pinned Browse CLI with the HolyAgent package runner after closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -331,7 +390,8 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             ),
           )
         if (target === "claude") return printed(yield* apply(flagged, capabilities))
-        let reviewedCodex: string | undefined
+        const reviewedCodex = reviewedCodexPlan(args, env, installedPackageRoot)
+        const browserExecutable = stringFlag(args, "browser-executable")
         const interactive = yield* runInteractive({
           env,
           cwd,
@@ -346,7 +406,14 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             flagged.deviceAccess !== undefined ||
             Object.keys(capabilities).length > 0,
           form,
-          ...(surface === "public" ? { browse: { packageRoot: installedPackageRoot } } : {}),
+          ...(surface === "public"
+            ? {
+                browse: {
+                  packageRoot: installedPackageRoot,
+                  ...(browserExecutable === undefined ? {} : { executable: browserExecutable }),
+                },
+              }
+            : {}),
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
           apply: (choices, chosen, replacePiRegistration) =>
@@ -382,23 +449,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                     replacePiRegistration,
                   ) =>
                     harness === "codex"
-                      ? Effect.gen(function* () {
-                          if (!dryRun && reviewedCodex === undefined)
-                            return {
-                              ok: false,
-                              lines: ["! Review the Codex setup plan before applying."],
-                            }
-                          const plan = yield* codexPlan(
-                            args,
-                            env,
-                            installedPackageRoot,
-                            dryRun,
-                            dryRun ? undefined : reviewedCodex,
-                          )
-                          if (dryRun)
-                            reviewedCodex = "fingerprint" in plan ? plan.fingerprint : undefined
-                          return plan
-                        })
+                      ? reviewedCodex(dryRun)
                       : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
                           target: harness,
                           dryRun,
@@ -530,6 +581,7 @@ const publicPiSetup = (target?: "pi"): Command => {
     flags: {
       ...flags,
       "non-interactive": "boolean",
+      "browser-executable": "string",
       ...(target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}),
     },
     notes: [
@@ -539,6 +591,7 @@ const publicPiSetup = (target?: "pi"): Command => {
           ]
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),
+      "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
       "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal.",
     ],
   }
@@ -565,6 +618,7 @@ export const PUBLIC_SETUP_COMMANDS: ReadonlyArray<Command> = [
       "--scope defaults to local when untracked local settings enable the plugin, and user otherwise. --subagent-cache-ttl defaults to 1h. Context7 is installed if needed unless you pass --skip-ctx7 or setup runs on claude.ai.",
       "--undo removes only values recorded by setup that are still unchanged. --dry-run previews without writing. Both are off by default.",
       "Claude Code setup runs without a TUI or stdin prompts. --non-interactive and --no-tui are accepted for scripts.",
+      "Manage native browser access with Claude Code's /chrome and macOS computer-use with /mcp. Setup never selects a browser, grants OS permissions, or registers OpenCode Browse for Claude Code.",
     ],
   },
   publicPiSetup(),

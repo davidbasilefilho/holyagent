@@ -90,6 +90,9 @@ export interface Mount {
   /** Whether the T3 rows are offered; true when absent. */
   readonly t3?: boolean
   readonly combined?: boolean
+  readonly codexHome?: string
+  readonly onlyCodex?: boolean
+  readonly codexDesktop?: NonNullable<TuiInput["offer"]["harnesses"]>["codexDesktop"]
   /** The capability rows, all switched on at the start; none when absent. */
   readonly capabilities?: ReadonlyArray<CapabilityOffer>
   readonly browse?: TuiInput["offer"]["browse"]
@@ -120,7 +123,13 @@ export const mount = async (options: Mount) => {
       form: "normal (detected: a graphical session is available)",
       ...(options.combined === true
         ? {
-            harnesses: { piAvailable: true, scope: "user" },
+            harnesses: {
+              piAvailable: true,
+              scope: "user",
+              ...(options.codexHome === undefined ? {} : { codexHome: options.codexHome }),
+              ...(options.onlyCodex === true ? { onlyCodex: true } : {}),
+              ...(options.codexDesktop === undefined ? {} : { codexDesktop: options.codexDesktop }),
+            },
             providers: ["kimi-coding-global", "openai-codex"],
           }
         : {}),
@@ -130,13 +139,18 @@ export const mount = async (options: Mount) => {
       deviceAccess: true,
       ...(options.combined === true
         ? {
-            harnesses: { pi: true, claude: false },
+            harnesses: {
+              pi: true,
+              claude: false,
+              ...(options.codexHome === undefined ? {} : { codex: options.onlyCodex === true }),
+            },
             piProviders: { providers: ["kimi-coding-global"] },
           }
         : {}),
       capabilities: Object.fromEntries(
         (options.capabilities ?? []).map((capability) => [capability.feature, true]),
       ),
+      ...(options.browse?.action === undefined ? {} : { browseSetup: true }),
     },
     dryRun: options.dryRun ?? false,
     review: (choices) => {

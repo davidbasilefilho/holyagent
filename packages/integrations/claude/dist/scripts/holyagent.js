@@ -3625,6 +3625,24 @@ var all = (arg, options) => {
     concurrency: options?.concurrency
   }), Object.fromEntries));
 };
+var findFirst = /* @__PURE__ */ dual((args) => isIterable(args[0]) && !isEffect(args[0]), (elements, predicate) => suspend(() => {
+  const iterator = elements[Symbol.iterator]();
+  const next = iterator.next();
+  if (!next.done) {
+    return findFirstLoop(iterator, 0, predicate, next.value);
+  }
+  return succeed3(none2());
+}));
+var findFirstLoop = (iterator, index, predicate, value) => flatMap(predicate(value, index), (keep) => {
+  if (keep) {
+    return succeed3(some2(value));
+  }
+  const next = iterator.next();
+  if (!next.done) {
+    return findFirstLoop(iterator, index + 1, predicate, next.value);
+  }
+  return succeed3(none2());
+});
 var whileLoop = /* @__PURE__ */ makePrimitive({
   op: "While",
   [contA](value, fiber) {
@@ -4600,6 +4618,7 @@ var buildFromOptions = (options) => {
 };
 
 var all2 = all;
+var findFirst2 = findFirst;
 var forEach2 = forEach;
 var promise2 = promise;
 var tryPromise2 = tryPromise;
@@ -8690,7 +8709,7 @@ var describeFailure = (error, words = CLAUDE_WORDS) => {
   };
 };
 
-import { constants as constants6, fstatSync } from "fs";
+import { constants as constants7, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
 import { resolve as resolve15 } from "path";
 var version = "0.4.0";
@@ -8755,9 +8774,8 @@ var package_default = {
 var PI_PROJECT_FLAG = "--project";
 var projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
 
-import { lstat as lstat3, mkdir as mkdir4, mkdtemp as mkdtemp2, writeFile as writeFile4 } from "fs/promises";
-import { dirname as dirname4, join as join6, resolve as resolve3 } from "path";
-import { pathToFileURL as pathToFileURL2 } from "url";
+import { lstat as lstat2, mkdir as mkdir3, mkdtemp, writeFile as writeFile3 } from "fs/promises";
+import { dirname as dirname2, join as join3, resolve as resolve3 } from "path";
 
 import { join as join2 } from "path";
 
@@ -9449,6 +9467,10 @@ var PROVIDER_ROUTES = {
   "kimi-coding-global": KIMI_ROUTES,
   "openai-codex": CODEX_ROUTES
 };
+var defaultRootRoute = (provider, profile) => {
+  const baseline = PROVIDER_ROUTES[provider].root;
+  return profile === "fast" && provider === "openai-codex" ? { ...baseline, model: "gpt-6.1-terra" } : baseline;
+};
 var route = () => defaulted(Struct({
   provider: optionalKey2(PiProvider),
   model: optionalKey2(ModelId),
@@ -9505,11 +9527,10 @@ var withProviderRoutes = (pi) => {
     (() => {
       const override = pi.routes[key];
       const provider = override.provider ?? (pi.providers?.length === 1 ? pi.providers[0] : pi.provider);
-      const baseline = PROVIDER_ROUTES[provider][key];
-      const profileModel = pi.profile === "fast" && key === "root" && provider === "openai-codex" ? "gpt-6.1-terra" : baseline.model;
+      const baseline = key === "root" ? defaultRootRoute(provider, pi.profile) : PROVIDER_ROUTES[provider][key];
       return {
         ...override.provider === undefined ? {} : { provider: override.provider },
-        model: override.model ?? profileModel,
+        model: override.model ?? baseline.model,
         thinking: override.thinking ?? baseline.thinking
       };
     })()
@@ -9615,1553 +9636,6 @@ var loadConfigWithSource = ({ projectDirectories, env = process.env }) => gen2(f
   return { config, written };
 });
 var loadConfig = (sources) => loadConfigWithSource(sources).pipe(map4(({ config }) => config));
-import { lstat as lstat2, mkdir as mkdir3, mkdtemp, readdir, rename as rename3, rm as rm3, stat as stat2, writeFile as writeFile3 } from "fs/promises";
-import { userInfo } from "os";
-import { basename, dirname as dirname3, join as join5, posix as posix2, win32 as win322 } from "path";
-import { pathToFileURL } from "url";
-
-import { homedir as homedir2 } from "os";
-import { join as join3 } from "path";
-var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
-var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
-var homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback();
-var claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join3(homeDirectory2(env, home), ".claude");
-var userFiles = (env) => {
-  const home = homeDirectory2(env);
-  const claudeDir = claudeConfigDirectory(env, () => home);
-  return {
-    claudeDir,
-    settings: join3(claudeDir, "settings.json"),
-    ctx7Credentials: join3(home, ".config", "context7", "credentials.json")
-  };
-};
-import { constants, realpathSync } from "fs";
-import { delimiter, dirname as dirname2, join as join4, posix, win32 } from "path";
-import { fileURLToPath } from "url";
-
-var UNQUOTABLE = /["%^!]|\p{Cc}/u;
-var BARE_SYNTAX = /[&|<>()]/;
-var cmdExeArguments = (command, args) => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
-      };
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
-      };
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
-};
-var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
-
-import { spawn as spawnChild } from "child_process";
-var spawn = (program, args, options) => callback2((resume) => {
-  const child = spawnChild(program, args, {
-    cwd: options.cwd,
-    env: options.env,
-    detached: process.platform !== "win32",
-    stdio: options.discard === true ? ["ignore", "ignore", "ignore"] : ["pipe", "pipe", "pipe"],
-    windowsHide: true
-  });
-  const stdout = [];
-  const stderr = [];
-  child.stdout?.on("data", (chunk) => stdout.push(chunk));
-  child.stderr?.on("data", (chunk) => stderr.push(chunk));
-  child.stdin?.on("error", () => {});
-  child.once("error", (cause) => resume(die3(cause)));
-  child.once(options.discard === true ? "exit" : "close", (code) => resume(succeed6({
-    code: code ?? -1,
-    stdout: Buffer.concat(stdout),
-    stderr: Buffer.concat(stderr).toString("utf8")
-  })));
-  child.stdin?.end(options.stdin);
-  return suspend2(() => {
-    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined)
-      return void_3;
-    const killed = process.platform === "win32" ? callback2((done) => {
-      const killer = spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true
-      });
-      killer.once("error", () => {
-        child.kill("SIGKILL");
-        done(void_3);
-      });
-      killer.once("close", () => done(void_3));
-    }) : sync2(() => {
-      try {
-        if (child.pid !== undefined)
-          process.kill(-child.pid, "SIGKILL");
-      } catch {
-        child.kill("SIGKILL");
-      }
-    });
-    const exited = callback2((done) => {
-      const finish = () => done(void_3);
-      child.once("exit", finish);
-      if (child.exitCode !== null || child.signalCode !== null)
-        finish();
-      return sync2(() => {
-        child.removeListener("exit", finish);
-      });
-    });
-    return killed.pipe(andThen2(exited), timeoutOption2(2000), asVoid2);
-  });
-});
-
-var whichWith = (fs, command, options) => {
-  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
-  for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join4(directory || ".", name);
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-        if (fs.statSync(candidate).isFile())
-          return candidate;
-      } catch {}
-    }
-  }
-  return null;
-};
-var which = (command, options) => whichWith(nodeFileSystem, command, options);
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join4(options.home, ".bun");
-  const bunBin = join4(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
-};
-var strictWhich = (command, path, strict, lookup = which) => {
-  const windows = (strict.platform ?? process.platform) === "win32";
-  const api = windows ? win32 : posix;
-  if (!api.isAbsolute(strict.cwd))
-    return null;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
-  if (trusted.length === 0)
-    return null;
-  const acceptable = (found) => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
-      return false;
-    if (windows && !found.toLowerCase().endsWith(".exe"))
-      return false;
-    if (strict.which === undefined) {
-      try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
-          return false;
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  };
-  if (strict.which !== undefined) {
-    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
-    return acceptable(found) ? found : null;
-  }
-  for (const directory of trusted) {
-    const found = lookup(command, { PATH: directory });
-    if (acceptable(found))
-      return found;
-  }
-  return null;
-};
-var findCommand = (env, command, options, lookup = which) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
-  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
-};
-var EMPTY_BUNFIG = join4(dirname2(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => {
-        const runEnv = definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value });
-        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
-        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
-        if (batch !== undefined && !batch.ok)
-          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
-        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
-          exitCode: result.code,
-          stdout: new TextDecoder().decode(result.stdout),
-          stderr: result.stderr
-        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
-      }
-    }));
-  };
-}
-
-var {$ } = globalThis.Bun;
-var shellLive = (env) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  return succeed5(Shell, Shell.of({
-    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
-    run: (command, args, options) => tryPromise2({
-      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-        exitCode: result.exitCode,
-        stdout: result.stdout.toString(),
-        stderr: result.stderr.toString()
-      })),
-      catch: (error) => String(error)
-    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-  }));
-};
-
-var TUI_BUNDLE = "setup-tui.js";
-
-var TUI_MANIFEST_NAME = "holyagent-setup-tui";
-var Dependencies = optional2(Record(String5, String5));
-var Entry = TupleWithRest(Tuple([
-  String5,
-  String5,
-  Struct({
-    dependencies: Dependencies,
-    optionalDependencies: Dependencies,
-    peerDependencies: Dependencies
-  })
-]), [Unknown2]);
-var Lock = Struct({
-  lockfileVersion: Number5,
-  configVersion: optional2(Number5),
-  packages: Record(String5, Unknown2)
-});
-
-var TUI_PACKAGES = {
-  "@opentui/core": "0.9.7",
-  "@opentui/solid": "0.9.7",
-  "solid-js": "1.9.20"
-};
-var TUI_LOCK = `{
-  "lockfileVersion": 2,
-  "configVersion": 1,
-  "workspaces": {
-    "": {
-      "name": "holyagent-setup-tui",
-      "dependencies": {
-        "@opentui/core": "0.9.7",
-        "@opentui/solid": "0.9.7",
-        "solid-js": "1.9.20"
-      }
-    }
-  },
-  "packages": {
-    "@babel/code-frame": [
-      "@babel/code-frame@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "js-tokens": "^4.0.0",
-          "picocolors": "^1.1.1"
-        }
-      },
-      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
-    ],
-    "@babel/compat-data": [
-      "@babel/compat-data@7.29.7",
-      "",
-      {},
-      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
-    ],
-    "@babel/core": [
-      "@babel/core@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.7",
-          "@babel/helper-compilation-targets": "^7.29.7",
-          "@babel/helper-module-transforms": "^7.29.7",
-          "@babel/helpers": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/template": "^7.29.7",
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7",
-          "@jridgewell/remapping": "^2.3.5",
-          "convert-source-map": "^2.0.0",
-          "debug": "^4.1.0",
-          "gensync": "^1.0.0-beta.2",
-          "json5": "^2.2.3",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
-    ],
-    "@babel/generator": [
-      "@babel/generator@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/parser": "^7.29.15",
-          "@babel/types": "^7.29.15",
-          "@jridgewell/gen-mapping": "^0.3.12",
-          "@jridgewell/trace-mapping": "^0.3.28",
-          "jsesc": "^3.0.2"
-        }
-      },
-      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
-    ],
-    "@babel/helper-annotate-as-pure": [
-      "@babel/helper-annotate-as-pure@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
-    ],
-    "@babel/helper-compilation-targets": [
-      "@babel/helper-compilation-targets@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/compat-data": "^7.29.7",
-          "@babel/helper-validator-option": "^7.29.7",
-          "browserslist": "^4.24.0",
-          "lru-cache": "^5.1.1",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
-    ],
-    "@babel/helper-create-class-features-plugin": [
-      "@babel/helper-create-class-features-plugin@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/helper-replace-supers": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.13",
-          "semver": "^6.3.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
-    ],
-    "@babel/helper-globals": [
-      "@babel/helper-globals@7.29.7",
-      "",
-      {},
-      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
-    ],
-    "@babel/helper-member-expression-to-functions": [
-      "@babel/helper-member-expression-to-functions@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.14",
-          "@babel/types": "^7.29.14"
-        }
-      },
-      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
-    ],
-    "@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
-    ],
-    "@babel/helper-module-transforms": [
-      "@babel/helper-module-transforms@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "^7.29.7",
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "@babel/traverse": "^7.29.14"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
-    ],
-    "@babel/helper-optimise-call-expression": [
-      "@babel/helper-optimise-call-expression@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
-    ],
-    "@babel/helper-plugin-utils": [
-      "@babel/helper-plugin-utils@7.29.7",
-      "",
-      {},
-      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
-    ],
-    "@babel/helper-replace-supers": [
-      "@babel/helper-replace-supers@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/traverse": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
-    ],
-    "@babel/helper-skip-transparent-expression-wrappers": [
-      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.13",
-          "@babel/types": "^7.29.11"
-        }
-      },
-      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
-    ],
-    "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.15",
-      "",
-      {},
-      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
-    ],
-    "@babel/helper-validator-identifier": [
-      "@babel/helper-validator-identifier@7.29.7",
-      "",
-      {},
-      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
-    ],
-    "@babel/helper-validator-option": [
-      "@babel/helper-validator-option@7.29.7",
-      "",
-      {},
-      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
-    ],
-    "@babel/helpers": [
-      "@babel/helpers@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15"
-        }
-      },
-      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
-    ],
-    "@babel/parser": [
-      "@babel/parser@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.15"
-        },
-        "bin": "./bin/babel-parser.js"
-      },
-      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
-    ],
-    "@babel/plugin-syntax-jsx": [
-      "@babel/plugin-syntax-jsx@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
-    ],
-    "@babel/plugin-syntax-typescript": [
-      "@babel/plugin-syntax-typescript@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
-    ],
-    "@babel/plugin-transform-modules-commonjs": [
-      "@babel/plugin-transform-modules-commonjs@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-transforms": "^7.29.14",
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
-    ],
-    "@babel/plugin-transform-typescript": [
-      "@babel/plugin-transform-typescript@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-create-class-features-plugin": "^7.29.13",
-          "@babel/helper-plugin-utils": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/plugin-syntax-typescript": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
-    ],
-    "@babel/preset-typescript": [
-      "@babel/preset-typescript@7.27.1",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.27.1",
-          "@babel/helper-validator-option": "^7.27.1",
-          "@babel/plugin-syntax-jsx": "^7.27.1",
-          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-          "@babel/plugin-transform-typescript": "^7.27.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
-    ],
-    "@babel/template": [
-      "@babel/template@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
-    ],
-    "@babel/traverse": [
-      "@babel/traverse@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.15",
-          "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.15",
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15",
-          "debug": "^4.3.1"
-        }
-      },
-      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
-    ],
-    "@babel/types": [
-      "@babel/types@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-string-parser": "^7.29.15",
-          "@babel/helper-validator-identifier": "^7.29.7"
-        }
-      },
-      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
-    ],
-    "@jridgewell/gen-mapping": [
-      "@jridgewell/gen-mapping@0.3.13",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/sourcemap-codec": "^1.5.0",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
-    ],
-    "@jridgewell/remapping": [
-      "@jridgewell/remapping@2.3.5",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/gen-mapping": "^0.3.5",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
-    ],
-    "@jridgewell/resolve-uri": [
-      "@jridgewell/resolve-uri@3.1.3",
-      "",
-      {},
-      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
-    ],
-    "@jridgewell/sourcemap-codec": [
-      "@jridgewell/sourcemap-codec@1.6.0",
-      "",
-      {},
-      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
-    ],
-    "@jridgewell/trace-mapping": [
-      "@jridgewell/trace-mapping@0.3.31",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/resolve-uri": "^3.1.0",
-          "@jridgewell/sourcemap-codec": "^1.4.14"
-        }
-      },
-      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
-    ],
-    "@opentui/core": [
-      "@opentui/core@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "bun-ffi-structs": "0.3.1",
-          "diff": "9.0.0",
-          "string-width": "7.2.0"
-        },
-        "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.7",
-          "@opentui/core-darwin-x64": "0.9.7",
-          "@opentui/core-linux-arm64": "0.9.7",
-          "@opentui/core-linux-arm64-musl": "0.9.7",
-          "@opentui/core-linux-x64": "0.9.7",
-          "@opentui/core-linux-x64-musl": "0.9.7",
-          "@opentui/core-win32-arm64": "0.9.7",
-          "@opentui/core-win32-x64": "0.9.7"
-        },
-        "peerDependencies": {
-          "web-tree-sitter": "0.25.10"
-        }
-      },
-      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
-    ],
-    "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "arm64"
-      },
-      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
-    ],
-    "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "x64"
-      },
-      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
-    ],
-    "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64"
-      },
-      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
-    ],
-    "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64",
-        "libc": "musl"
-      },
-      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
-    ],
-    "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64"
-      },
-      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
-    ],
-    "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64",
-        "libc": "musl"
-      },
-      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
-    ],
-    "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "arm64"
-      },
-      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
-    ],
-    "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "x64"
-      },
-      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
-    ],
-    "@opentui/solid": [
-      "@opentui/solid@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/core": "7.29.7",
-          "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.7",
-          "babel-plugin-module-resolver": "5.0.2",
-          "babel-preset-solid": "1.9.16",
-          "entities": "7.0.1",
-          "s-js": "^0.4.9"
-        },
-        "peerDependencies": {
-          "solid-js": "^1.9.12"
-        }
-      },
-      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
-    ],
-    "ansi-regex": [
-      "ansi-regex@6.6.0",
-      "",
-      {},
-      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
-    ],
-    "babel-plugin-jsx-dom-expressions": [
-      "babel-plugin-jsx-dom-expressions@0.40.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "7.18.6",
-          "@babel/plugin-syntax-jsx": "^7.18.6",
-          "@babel/types": "^7.20.7",
-          "html-entities": "2.3.3",
-          "parse5": "^7.1.2"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.20.12"
-        }
-      },
-      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
-    ],
-    "babel-plugin-module-resolver": [
-      "babel-plugin-module-resolver@5.0.2",
-      "",
-      {
-        "dependencies": {
-          "find-babel-config": "^2.1.1",
-          "glob": "^9.3.3",
-          "pkg-up": "^3.1.0",
-          "reselect": "^4.1.7",
-          "resolve": "^1.22.8"
-        }
-      },
-      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
-    ],
-    "babel-preset-solid": [
-      "babel-preset-solid@1.9.16",
-      "",
-      {
-        "dependencies": {
-          "babel-plugin-jsx-dom-expressions": "^0.40.11"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0",
-          "solid-js": "^1.9.16"
-        },
-        "optionalPeers": [
-          "solid-js"
-        ]
-      },
-      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
-    ],
-    "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.39",
-      "",
-      {
-        "bin": {
-          "baseline-browser-mapping": "dist/cli.cjs"
-        }
-      },
-      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
-    ],
-    "browserslist": [
-      "browserslist@4.29.6",
-      "",
-      {
-        "dependencies": {
-          "baseline-browser-mapping": "^2.11.37",
-          "caniuse-lite": "^1.0.30001826",
-          "electron-to-chromium": "^1.5.486",
-          "node-releases": "^2.0.64",
-          "update-browserslist-db": "^1.4.0"
-        },
-        "bin": {
-          "browserslist": "cli.js"
-        }
-      },
-      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
-    ],
-    "bun-ffi-structs": [
-      "bun-ffi-structs@0.3.1",
-      "",
-      {
-        "peerDependencies": {
-          "typescript": "^5"
-        }
-      },
-      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
-    ],
-    "caniuse-lite": [
-      "caniuse-lite@1.0.30001827",
-      "",
-      {},
-      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
-    ],
-    "convert-source-map": [
-      "convert-source-map@2.0.0",
-      "",
-      {},
-      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
-    ],
-    "csstype": [
-      "csstype@3.2.4",
-      "",
-      {},
-      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
-    ],
-    "debug": [
-      "debug@4.4.3",
-      "",
-      {
-        "dependencies": {
-          "ms": "^2.1.3"
-        },
-        "peerDependencies": {
-          "supports-color": "*"
-        },
-        "optionalPeers": [
-          "supports-color"
-        ]
-      },
-      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
-    ],
-    "diff": [
-      "diff@9.0.0",
-      "",
-      {},
-      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
-    ],
-    "electron-to-chromium": [
-      "electron-to-chromium@1.5.492",
-      "",
-      {},
-      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
-    ],
-    "emoji-regex": [
-      "emoji-regex@10.6.0",
-      "",
-      {},
-      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
-    ],
-    "entities": [
-      "entities@7.0.1",
-      "",
-      {},
-      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
-    ],
-    "es-errors": [
-      "es-errors@1.3.0",
-      "",
-      {},
-      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
-    ],
-    "escalade": [
-      "escalade@3.2.0",
-      "",
-      {},
-      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
-    ],
-    "find-babel-config": [
-      "find-babel-config@2.1.2",
-      "",
-      {
-        "dependencies": {
-          "json5": "^2.2.3"
-        }
-      },
-      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
-    ],
-    "fs.realpath": [
-      "fs.realpath@1.0.0",
-      "",
-      {},
-      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
-    ],
-    "function-bind": [
-      "function-bind@1.1.2",
-      "",
-      {},
-      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
-    ],
-    "gensync": [
-      "gensync@1.0.0-beta.2",
-      "",
-      {},
-      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
-    ],
-    "get-east-asian-width": [
-      "get-east-asian-width@1.6.0",
-      "",
-      {},
-      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
-    ],
-    "glob": [
-      "glob@9.3.5",
-      "",
-      {
-        "dependencies": {
-          "fs.realpath": "^1.0.0",
-          "minimatch": "^8.0.2",
-          "minipass": "^4.2.4",
-          "path-scurry": "^1.6.1"
-        }
-      },
-      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
-    ],
-    "hasown": [
-      "hasown@2.0.4",
-      "",
-      {
-        "dependencies": {
-          "function-bind": "^1.1.2"
-        }
-      },
-      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
-    ],
-    "is-core-module": [
-      "is-core-module@2.18.0",
-      "",
-      {
-        "dependencies": {
-          "hasown": "^2.0.4"
-        }
-      },
-      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
-    ],
-    "js-tokens": [
-      "js-tokens@4.0.0",
-      "",
-      {},
-      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
-    ],
-    "jsesc": [
-      "jsesc@3.1.0",
-      "",
-      {
-        "bin": {
-          "jsesc": "bin/jsesc"
-        }
-      },
-      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
-    ],
-    "json5": [
-      "json5@2.2.3",
-      "",
-      {
-        "bin": {
-          "json5": "lib/cli.js"
-        }
-      },
-      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
-    ],
-    "minipass": [
-      "minipass@4.2.8",
-      "",
-      {},
-      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
-    ],
-    "ms": [
-      "ms@2.1.3",
-      "",
-      {},
-      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
-    ],
-    "node-releases": [
-      "node-releases@2.0.65",
-      "",
-      {},
-      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
-    ],
-    "p-try": [
-      "p-try@2.2.0",
-      "",
-      {},
-      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
-    ],
-    "parse5": [
-      "parse5@7.3.0",
-      "",
-      {
-        "dependencies": {
-          "entities": "^6.0.0"
-        }
-      },
-      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
-    ],
-    "path-parse": [
-      "path-parse@1.0.7",
-      "",
-      {},
-      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
-    ],
-    "path-scurry": [
-      "path-scurry@1.11.1",
-      "",
-      {
-        "dependencies": {
-          "lru-cache": "^10.2.0",
-          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
-        }
-      },
-      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
-    ],
-    "picocolors": [
-      "picocolors@1.1.1",
-      "",
-      {},
-      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
-    ],
-    "pkg-up": [
-      "pkg-up@3.1.0",
-      "",
-      {
-        "dependencies": {
-          "find-up": "^3.0.0"
-        }
-      },
-      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
-    ],
-    "reselect": [
-      "reselect@4.1.8",
-      "",
-      {},
-      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
-    ],
-    "resolve": [
-      "resolve@1.22.14",
-      "",
-      {
-        "dependencies": {
-          "es-errors": "^1.3.0",
-          "is-core-module": "^2.18.0",
-          "path-parse": "^1.0.7",
-          "supports-preserve-symlinks-flag": "^1.0.0"
-        },
-        "bin": {
-          "resolve": "bin/resolve"
-        }
-      },
-      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
-    ],
-    "s-js": [
-      "s-js@0.4.9",
-      "",
-      {},
-      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
-    ],
-    "seroval": [
-      "seroval@1.6.12",
-      "",
-      {},
-      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
-    ],
-    "seroval-plugins": [
-      "seroval-plugins@1.6.12",
-      "",
-      {
-        "peerDependencies": {
-          "seroval": "^1.0"
-        }
-      },
-      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
-    ],
-    "solid-js": [
-      "solid-js@1.9.20",
-      "",
-      {
-        "dependencies": {
-          "csstype": "^3.1.0",
-          "seroval": "~1.6.11",
-          "seroval-plugins": "~1.6.8"
-        }
-      },
-      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
-    ],
-    "string-width": [
-      "string-width@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "emoji-regex": "^10.3.0",
-          "get-east-asian-width": "^1.0.0",
-          "strip-ansi": "^7.1.0"
-        }
-      },
-      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
-    ],
-    "strip-ansi": [
-      "strip-ansi@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "ansi-regex": "^6.2.2"
-        }
-      },
-      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
-    ],
-    "supports-preserve-symlinks-flag": [
-      "supports-preserve-symlinks-flag@1.0.0",
-      "",
-      {},
-      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
-    ],
-    "typescript": [
-      "typescript@5.9.3",
-      "",
-      {
-        "bin": {
-          "tsc": "bin/tsc",
-          "tsserver": "bin/tsserver"
-        }
-      },
-      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
-    ],
-    "update-browserslist-db": [
-      "update-browserslist-db@1.4.0",
-      "",
-      {
-        "dependencies": {
-          "escalade": "^3.2.0",
-          "picocolors": "^1.1.1"
-        },
-        "peerDependencies": {
-          "browserslist": ">= 4.21.0"
-        },
-        "bin": {
-          "update-browserslist-db": "cli.js"
-        }
-      },
-      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
-    ],
-    "web-tree-sitter": [
-      "web-tree-sitter@0.25.10",
-      "",
-      {
-        "peerDependencies": {
-          "@types/emscripten": "^1.40.0"
-        },
-        "optionalPeers": [
-          "@types/emscripten"
-        ]
-      },
-      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
-    ],
-    "yallist": [
-      "yallist@3.1.1",
-      "",
-      {},
-      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
-    ],
-    "@babel/core/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-compilation-targets/lru-cache": [
-      "lru-cache@5.1.1",
-      "",
-      {
-        "dependencies": {
-          "yallist": "^3.0.2"
-        }
-      },
-      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
-    ],
-    "@babel/helper-compilation-targets/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-create-class-features-plugin/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.18.6",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.18.6"
-        }
-      },
-      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
-    ],
-    "babel-plugin-jsx-dom-expressions/html-entities": [
-      "html-entities@2.3.3",
-      "",
-      {},
-      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
-    ],
-    "glob/minimatch": [
-      "minimatch@8.0.7",
-      "",
-      {
-        "dependencies": {
-          "brace-expansion": "^2.0.1"
-        }
-      },
-      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
-    ],
-    "parse5/entities": [
-      "entities@6.0.1",
-      "",
-      {},
-      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
-    ],
-    "path-scurry/lru-cache": [
-      "lru-cache@10.4.3",
-      "",
-      {},
-      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
-    ],
-    "path-scurry/minipass": [
-      "minipass@7.1.3",
-      "",
-      {},
-      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
-    ],
-    "pkg-up/find-up": [
-      "find-up@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "locate-path": "^3.0.0"
-        }
-      },
-      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
-    ],
-    "glob/minimatch/brace-expansion": [
-      "brace-expansion@2.1.8",
-      "",
-      {
-        "dependencies": {
-          "balanced-match": "^1.0.0"
-        }
-      },
-      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
-    ],
-    "pkg-up/find-up/locate-path": [
-      "locate-path@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-locate": "^3.0.0",
-          "path-exists": "^3.0.0"
-        }
-      },
-      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
-    ],
-    "glob/minimatch/brace-expansion/balanced-match": [
-      "balanced-match@1.0.2",
-      "",
-      {},
-      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate": [
-      "p-locate@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-limit": "^2.0.0"
-        }
-      },
-      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
-    ],
-    "pkg-up/find-up/locate-path/path-exists": [
-      "path-exists@3.0.0",
-      "",
-      {},
-      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate/p-limit": [
-      "p-limit@2.3.0",
-      "",
-      {
-        "dependencies": {
-          "p-try": "^2.0.0"
-        }
-      },
-      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
-    ]
-  }
-}
-`;
-
-class TuiUnavailable extends TaggedError2("TuiUnavailable") {
-  get message() {
-    return this.reason;
-  }
-}
-var pathModule = (platform) => platform === "win32" ? win322 : posix2;
-var cacheHome = (env, platform = process.platform) => {
-  const home = homeDirectory2(env);
-  const { join } = pathModule(platform);
-  if (platform === "win32")
-    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
-  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
-  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
-};
-var guardedFolders = (env, platform) => {
-  const { join } = pathModule(platform);
-  const holyagent = join(cacheHome(env, platform), "holyagent");
-  return [holyagent, join(holyagent, "setup-tui")];
-};
-var lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8);
-var tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
-  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
-  lockHash(lock)
-].join("_"));
-var INSTALLED_MARKER = ".holyagent-installed";
-var markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
-`;
-var FORMAT_CHARACTERS = /\p{Cf}/gu;
-var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
-  const code = character.codePointAt(0) ?? 0;
-  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
-}).join("");
-var oneLine = (text) => plain(text.trim().split(`
-`)[0] ?? "").trim();
-var failureLine = (text) => {
-  const lines = text.split(`
-`).map((line) => plain(line).trim()).filter((line) => line !== "");
-  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
-};
-var unavailable = (what, cause) => new TuiUnavailable({
-  reason: plain(`${what}: ${oneLine(cause instanceof Error ? cause.message : String(cause))}`)
-});
-var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
-  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
-`;
-  for (const [file, text] of [
-    ["package.json", manifest],
-    ["bun.lock", lock]
-  ])
-    yield* tryPromise2({
-      try: () => Bun.write(join5(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join5(directory, file)}`, cause)
-    });
-  const shell = yield* Shell;
-  const result = yield* shell.run("bun", [
-    "--no-env-file",
-    `--config=${EMPTY_BUNFIG}`,
-    "install",
-    "--frozen-lockfile",
-    "--ignore-scripts"
-  ], { cwd: directory });
-  if (result.exitCode !== 0)
-    return yield* new TuiUnavailable({
-      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
-    });
-});
-var importFile = (path) => tryPromise2({
-  try: () => import(pathToFileURL(path).href),
-  catch: (cause) => unavailable(`cannot import ${path}`, cause)
-});
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join5(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
-  return;
-}));
-var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join5(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
-  return;
-}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
-var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
-var loadPackagedSetupTui = (bundle = join5(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
-  const preload = yield* try_2({
-    try: () => Bun.resolveSync("@opentui/solid/preload", dirname3(bundle)),
-    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
-  });
-  yield* importFile(preload);
-  const loaded = yield* importFile(bundle);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
-  return loaded;
-});
-var fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) });
-var STICKY = 512;
-var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
-var privateFolder = (folder, uid, create, home) => gen2(function* () {
-  if (create)
-    yield* fileSystem2(`cannot create ${folder}`, () => mkdir3(folder, { recursive: true, mode: 448 }));
-  const found = yield* tryPromise2({
-    try: () => lstat2(folder),
-    catch: (cause) => cause
-  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
-  if (found === undefined || uid === undefined)
-    return;
-  const refuse = (why) => new TuiUnavailable({
-    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
-  });
-  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat2(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
-  if (target.isSymbolicLink() || !target.isDirectory())
-    return yield* refuse("is not a plain directory");
-  if (target.uid !== uid)
-    return yield* refuse("belongs to another user");
-  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
-    return;
-  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
-    return;
-  return yield* refuse("can be written by others");
-});
-var namesPrivateGroup = (groupFile, gid, userName) => {
-  const entries = groupFile.split(`
-`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
-  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
-};
-var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
-  const name = userName ?? (yield* try_2(() => userInfo().username));
-  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
-  return namesPrivateGroup(text, gid, name);
-}).pipe(orElseSucceed2(() => false));
-var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile3(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename3(temporary, target)))), (temporary) => promise2(() => rm3(temporary, { force: true })));
-var remove = (path) => promise2(() => rm3(path, { recursive: true, force: true }));
-var promote = (temporary, directory, packages, lock) => gen2(function* () {
-  for (let attempt = 0;attempt < 3; attempt += 1) {
-    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename3(temporary, directory)));
-    if (moved._tag === "Success")
-      return;
-    if (yield* installed(directory, packages, lock))
-      return;
-    yield* remove(directory);
-  }
-  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
-});
-var STALE_AFTER_MS = 60 * 60 * 1000;
-var newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat2(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir(folder)).pipe(map4((names) => names.map((name) => join5(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join5(path, "node_modules"))];
-  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
-  return Math.max(...times);
-});
-var sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname3(directory);
-  const prefix = `.${basename(directory)}-`;
-  const cutoff = Date.now() - STALE_AFTER_MS;
-  const names = yield* tryPromise2(() => readdir(parent));
-  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join5(parent, name);
-    const found = yield* tryPromise2(() => lstat2(path));
-    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
-      yield* remove(path);
-  }).pipe(ignore2));
-}).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp(join5(dirname3(directory), `.${basename(directory)}-`))))), (temporary) => gen2(function* () {
-  yield* install(temporary, packages, lock);
-  if (!(yield* hasPackages(temporary, packages)))
-    return yield* new TuiUnavailable({
-      reason: `the install finished but ${directory} does not hold the expected package versions`
-    });
-  yield* writeFresh(join5(temporary, INSTALLED_MARKER), markerText(packages, lock));
-  yield* promote(temporary, directory, packages, lock);
-}), remove);
-var loadSetupTui = (env, options = {}) => gen2(function* () {
-  const packages = options.packages ?? TUI_PACKAGES;
-  const lock = options.lock ?? TUI_LOCK;
-  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join5(import.meta.dir, TUI_BUNDLE);
-  const install = options.install ?? bunInstall;
-  const importModule = options.importModule ?? importFile;
-  const uid = options.uid ?? process.getuid?.();
-  const text = yield* tryPromise2({
-    try: () => Bun.file(source).text(),
-    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
-  });
-  if (options.directory === undefined)
-    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname3(directory)])
-    yield* privateFolder(folder, uid, true);
-  yield* privateFolder(directory, uid, false);
-  if (!(yield* installed(directory, packages, lock))) {
-    if (options.notify !== undefined)
-      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
-`);
-    yield* installAtomically(directory, packages, lock, install, uid);
-  }
-  const target = join5(directory, TUI_BUNDLE);
-  yield* writeFresh(target, text);
-  yield* importModule(join5(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
-  const loaded = yield* importModule(target);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
-  return loaded;
-});
-
 var subjects = (lines, mark) => {
   const counts = new Map;
   for (const line of lines) {
@@ -11180,75 +9654,52 @@ var resultHeadline = (ok, dryRun) => {
     return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
   return ok ? "Setup finished." : "Setup finished with failures.";
 };
+var setupNotice = (line) => {
+  if (/^= (?:pi package|Pi model providers|Codex plugin): /i.test(line))
+    return "status";
+  if (!line.startsWith("~ "))
+    return;
+  const detail = line.slice(2);
+  if (/^(?:scope|form|setup harness|Codex home|Startup): /i.test(detail))
+    return "status";
+  if (/^(?:Start Codex with this CODEX_HOME\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(detail))
+    return "next";
+  return "warning";
+};
 var summarizeResult = (result, dryRun) => {
-  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
-  const warnings = [
-    ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
-  ];
+  const linesOf = (kind) => result.lines.filter((line) => setupNotice(line) === kind);
+  const status = linesOf("status").map((line) => line.slice(2));
+  const failures = subjects(result.lines, "! ");
+  const warnings = subjects(linesOf("warning"), "~ ");
+  const next = linesOf("next").map((line) => line.slice(2));
+  if (!result.ok)
+    next.push("Check the failures in the full report before running setup again.");
+  else if (warnings.length > 0)
+    next.push("Check the warnings in the full report.");
   return [
     {
       title: dryRun ? "Planned changes" : "Changes",
       lines: changes.length === 0 ? ["No changes."] : changes
     },
+    ...status.length > 0 ? [{ title: "Status", lines: status }] : [],
+    ...failures.length > 0 ? [{ title: "Failures", lines: failures }] : [],
     ...warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : [],
-    ...warnings.length > 0 || !result.ok ? [
-      {
-        title: "Next steps",
-        lines: [
-          result.ok ? "Check the warnings in the full report." : "Check the failures in the full report before running setup again."
-        ]
-      }
-    ] : []
+    ...next.length > 0 ? [{ title: "Next steps", lines: next }] : []
   ];
 };
 
-var AGENT_EMAIL = "noreply@anthropic.com";
-var AGENT_NAMES = ["claude", "claude code"];
-var looksLikeAgent = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase());
-var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
-var parseIdent = (line) => {
-  const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
-  return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
-};
-
-var FORM_CHOICES = CAPABILITY_FORMS;
-var DEFAULT_FORM_CHOICE = {
-  form: "normal",
-  source: "default",
-  reason: "no form was asked for"
-};
-var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
-var inCi = (env) => {
-  const value = env["CI"]?.trim().toLowerCase();
-  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
-};
-var detectForm = (env, platform = process.platform) => {
-  if (inCloudSession(env))
-    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
-  if (inCi(env))
-    return { form: "headless", source: "detected", reason: "CI is set" };
-  if (!hasDisplay(env, platform))
-    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
-  return { form: "normal", source: "detected", reason: "a graphical session is available" };
-};
-var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
-var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
-var BOLD_TONES = new Set(["heading", "focus"]);
-var set = (value) => value !== undefined && value !== "";
-var colorEnabled = (env, tty) => {
-  if (set(env["NO_COLOR"]) || env["TERM"] === "dumb")
-    return false;
-  if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0")
-    return true;
-  if (inCi(env))
-    return false;
-  return tty;
-};
+var FORMAT_CHARACTERS = /\p{Cf}/gu;
+var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join("");
+var segmenter = new Intl.Segmenter;
+var FOLDERS = new Set(["/", "\\"]);
+var MARKS = new Set([".", "_", "-"]);
 
 class SetupResult {
   title;
@@ -11265,22 +9716,22 @@ class SetupResult {
   }
 }
 var saveSetupResult = fn2("saveSetupResult")(function* (report, dryRun, env) {
-  const directory = resolve3(dirname4(userConfigFile(env)), "setup-reports");
+  const directory = resolve3(dirname2(userConfigFile(env)), "setup-reports");
   const title = resultHeadline(report.ok, dryRun);
   const sections = summarizeResult(report, dryRun);
   const code = report.ok ? 0 : 1;
   if (dryRun)
     return new SetupResult(title, sections, code);
   return yield* tryPromise2({
-    try: () => mkdir4(directory, { mode: 448, recursive: true }).then(() => lstat3(directory)).then((metadata) => {
+    try: () => mkdir3(directory, { mode: 448, recursive: true }).then(() => lstat2(directory)).then((metadata) => {
       if (!metadata.isDirectory())
         throw new Error("report folder is not a directory");
-      return mkdtemp2(join6(directory, "run-"));
+      return mkdtemp(join3(directory, "run-"));
     }).then((run) => {
-      const file = join6(run, "report.txt");
+      const file = join3(run, "report.txt");
       const contents = [title, "", ...report.lines.map(plain), ""].join(`
 `);
-      return writeFile4(file, contents, { flag: "wx", mode: 384 }).then(() => file);
+      return writeFile3(file, contents, { flag: "wx", mode: 384 }).then(() => file);
     }),
     catch: (cause) => cause instanceof Error ? cause.message : String(cause)
   }).pipe(match4({
@@ -11288,30 +9739,36 @@ var saveSetupResult = fn2("saveSetupResult")(function* (report, dryRun, env) {
     onSuccess: (file) => new SetupResult(title, sections, code, file)
   }));
 });
-var renderSetupResult = (result, env, tty) => {
-  const styled = tty && colorEnabled(env, true);
-  const heading = (message) => {
-    const label = plain(message);
-    return styled ? "\x1B[1m" + label + "\x1B[0m" : label;
-  };
-  const lines = [
-    heading(result.title),
-    ...result.sections.flatMap(({ title, lines }) => [
-      heading(title),
-      ...lines.map((line) => "  " + plain(line))
-    ])
-  ];
-  if (result.reportFile !== undefined) {
-    const visible = plain(result.reportFile);
-    const hyperlink = styled ? "\x1B]8;;" + pathToFileURL2(result.reportFile).href + "\x1B\\" + visible + "\x1B]8;;\x1B\\" : visible;
-    lines.push("Full report: " + hyperlink);
-  }
-  if (result.failure !== undefined)
-    lines.push("Could not save the full report: " + plain(result.failure));
-  return lines.join(`
+var setupResultLines = (result) => [
+  { text: plain(result.title), tone: result.code === 0 ? "success" : "error" },
+  ...result.sections.flatMap(({ title, lines }) => {
+    const heading = title === "Warnings" ? "warning" : title === "Failures" ? "error" : "heading";
+    const detail = heading === "heading" ? title === "Next steps" ? "option" : "argument" : heading;
+    return [
+      { text: plain(title), tone: heading },
+      ...lines.map((line) => ({
+        text: "  " + plain(line),
+        tone: detail
+      }))
+    ];
+  }),
+  ...result.reportFile === undefined ? [] : [
+    {
+      text: "Full report: " + plain(result.reportFile),
+      tone: "option",
+      reportFile: result.reportFile
+    }
+  ],
+  ...result.failure === undefined ? [] : [
+    {
+      text: "Could not save the full report: " + plain(result.failure),
+      tone: "warning"
+    }
+  ]
+];
+var renderSetupResult = (result) => setupResultLines(result).map(({ text }) => text).join(`
 `) + `
 `;
-};
 import { createHash } from "crypto";
 
 var SpecialistEntry = Struct({
@@ -11439,7 +9896,7 @@ var encodeLocal = (directory, change) => gen2(function* () {
     });
   return files;
 });
-import { join as join12, relative as relative2, sep as sep3 } from "path";
+import { join as join9, relative as relative2, sep as sep3 } from "path";
 
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
@@ -11560,8 +10017,8 @@ var pullsOf = (links, intentId) => {
   return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
 
-import { link as link2, lstat as lstat4, mkdir as mkdir5, open as open2, rename as rename4, rm as rm4, stat as stat3 } from "fs/promises";
-import { dirname as dirname5 } from "path";
+import { link as link2, lstat as lstat3, mkdir as mkdir4, open as open2, rename as rename3, rm as rm3, stat as stat2 } from "fs/promises";
+import { dirname as dirname3 } from "path";
 var LockOwner = Struct({
   pid: Int,
   token: String5,
@@ -11572,22 +10029,22 @@ var readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
   return;
 }));
 var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH"))));
-var inTheWay = (file) => tryPromise2({ try: () => lstat4(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
-var putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename4(taken, file))))), ignore2);
+var inTheWay = (file) => tryPromise2({ try: () => lstat3(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
+var putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename3(taken, file))))), ignore2);
 var breakIfStale = (file, authorize) => gen2(function* () {
   const owner = yield* readOwner(file);
-  const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - (yield* io(file, () => stat3(file)).pipe(map4((item) => item.mtimeMs), orElseSucceed2(() => 0))) > UNREADABLE_STALE_MS;
+  const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - (yield* io(file, () => stat2(file)).pipe(map4((item) => item.mtimeMs), orElseSucceed2(() => 0))) > UNREADABLE_STALE_MS;
   if (!stale)
     return;
   yield* authorize;
   const taken = `${file}.stale-${crypto.randomUUID()}`;
-  const moved = yield* io(file, () => rename4(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
+  const moved = yield* io(file, () => rename3(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
   if (!moved)
     return;
   const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token;
   if (claimedMeanwhile)
     yield* putBack(taken, file);
-  yield* io(taken, () => rm4(taken, { force: true }));
+  yield* io(taken, () => rm3(taken, { force: true }));
 }).pipe(catchTag2("StateIo", () => void_3));
 var BLOCKED_CODES = ["EPERM", "EACCES", "EBUSY"];
 var create = (file, retry = true) => tryPromise2({ try: () => open2(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
@@ -11606,7 +10063,7 @@ var claim = (file, authorize) => gen2(function* () {
   const content = yield* encodeJson(LockOwner, owner).pipe(orDie2);
   yield* authorize;
   const handle = yield* create(file);
-  yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm4(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
+  yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm3(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 });
 var HOOK_WAIT_MS = 5000;
@@ -11637,15 +10094,15 @@ var acquire = (file, patience, authorize) => {
     })
   }));
 };
-var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm4(file, { force: true })) : void_3), ignore2);
-var withFileLock = (file, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(authorize.pipe(andThen2(io(file, () => mkdir5(dirname5(file), { recursive: true }))), andThen2(acquire(file, patience, authorize))), () => use, (token) => release(file, token));
+var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm3(file, { force: true })) : void_3), ignore2);
+var withFileLock = (file, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(authorize.pipe(andThen2(io(file, () => mkdir4(dirname3(file), { recursive: true }))), andThen2(acquire(file, patience, authorize))), () => use, (token) => release(file, token));
 var withStateLock = (directory, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(ensureLocalDirectory(directory, authorize).pipe(andThen2(acquire(localFile(directory, "lock"), patience, authorize))), () => use, (token) => release(localFile(directory, "lock"), token));
 
-import { readdir as readdir2 } from "fs/promises";
-import { join as join7 } from "path";
+import { readdir } from "fs/promises";
+import { join as join4 } from "path";
 var scanFiles = async (directory) => {
   const visit = async (prefix) => {
-    const entries = await readdir2(join7(directory, prefix), { withFileTypes: true });
+    const entries = await readdir(join4(directory, prefix), { withFileTypes: true });
     const rows = await Promise.all(entries.map(async (entry) => {
       const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
       return entry.isDirectory() ? visit(path) : entry.isFile() ? [path] : [];
@@ -11664,7 +10121,7 @@ var scanMatching = async (directory, pattern) => {
     const segment = parts[index];
     if (segment === undefined)
       return [];
-    const entries = await readdir2(join7(directory, prefix), { withFileTypes: true }).catch((error) => {
+    const entries = await readdir(join4(directory, prefix), { withFileTypes: true }).catch((error) => {
       if (error.code === "ENOENT" || error.code === "ENOTDIR")
         return [];
       throw error;
@@ -11686,31 +10143,31 @@ var scanMatching = async (directory, pattern) => {
 
 import { createHash as createHash5 } from "crypto";
 import {
-  lstat as lstat7,
-  mkdir as mkdir8,
+  lstat as lstat6,
+  mkdir as mkdir7,
   open as open6,
-  readdir as readdir4,
+  readdir as readdir3,
   readFile as readFile4,
   realpath as realpath4,
-  rm as rm8,
+  rm as rm7,
   rmdir,
-  stat as stat4,
-  writeFile as writeFile6
+  stat as stat3,
+  writeFile as writeFile5
 } from "fs/promises";
-import { basename as basename3, dirname as dirname8, join as join11, relative, sep as sep2 } from "path";
+import { basename as basename2, dirname as dirname6, join as join8, relative, sep as sep2 } from "path";
 
 import { createHash as createHash3, randomUUID } from "crypto";
-import { constants as constants3 } from "fs";
-import { link as link4, lstat as lstat6, mkdir as mkdir7, open as open4, realpath as realpath3, rename as rename6, rm as rm6, unlink } from "fs/promises";
-import { dirname as dirname7, isAbsolute as isAbsolute3, join as join9, resolve as resolve5 } from "path";
+import { constants as constants2 } from "fs";
+import { link as link4, lstat as lstat5, mkdir as mkdir6, open as open4, realpath as realpath3, rename as rename5, rm as rm5, unlink } from "fs/promises";
+import { dirname as dirname5, isAbsolute as isAbsolute3, join as join6, resolve as resolve5 } from "path";
 
 var sameMigrationIdentity = (left, right) => left.ino !== 0n && left.dev === right.dev && left.ino === right.ino;
 
 import { execFile } from "child_process";
 import { createHash as createHash2 } from "crypto";
-import { constants as constants2 } from "fs";
-import { link as link3, lstat as lstat5, mkdir as mkdir6, open as open3, readdir as readdir3, realpath as realpath2, rename as rename5, rm as rm5 } from "fs/promises";
-import { basename as basename2, dirname as dirname6, isAbsolute as isAbsolute2, join as join8, resolve as resolve4 } from "path";
+import { constants } from "fs";
+import { link as link3, lstat as lstat4, mkdir as mkdir5, open as open3, readdir as readdir2, realpath as realpath2, rename as rename4, rm as rm4 } from "fs/promises";
+import { basename, dirname as dirname4, isAbsolute as isAbsolute2, join as join5, resolve as resolve4 } from "path";
 import { promisify } from "util";
 var MigrationJournalFile = Struct({
   path: String5,
@@ -11868,7 +10325,7 @@ var windowsAclProblem = async (parent, options = {}) => {
   if (system === undefined || !isAbsolute2(system))
     return "missing Windows system directory";
   try {
-    const { stdout } = await runWindowsAcl(join8(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
+    const { stdout } = await runWindowsAcl(join5(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
       "-NoLogo",
       "-NoProfile",
       "-NonInteractive",
@@ -11905,14 +10362,14 @@ var windowsAclProblem = async (parent, options = {}) => {
 var ensureMigrationJournalDirectory = async (directory) => {
   if (process.platform !== "win32") {
     try {
-      await mkdir6(directory, { mode: 448 });
+      await mkdir5(directory, { mode: 448 });
     } catch (cause) {
       if (!(typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "EEXIST"))
         throw cause;
     }
     return;
   }
-  const ancestor = dirname6(directory);
+  const ancestor = dirname4(directory);
   if (!canonicalAbsolute(directory) || await realpath2(ancestor) !== ancestor)
     throw new Error("journal directory ancestor is not a canonical directory");
   const problem = await windowsAclProblem(directory, { create: true });
@@ -11920,14 +10377,14 @@ var ensureMigrationJournalDirectory = async (directory) => {
     throw new Error(`cannot create private journal directory: ${problem}`);
 };
 var temporaryAlias = async (location, info) => {
-  const prefix = `${basename2(location.path)}.`;
-  const names = await readdir3(dirname6(location.path));
+  const prefix = `${basename(location.path)}.`;
+  const names = await readdir2(dirname4(location.path));
   const candidates = names.filter((name) => name.startsWith(prefix) && /^[0-9a-f-]{36}\.tmp$/.test(name.slice(prefix.length)));
   const aliases = [];
   for (const name of candidates) {
-    const path = join8(dirname6(location.path), name);
+    const path = join5(dirname4(location.path), name);
     try {
-      const entry = await lstat5(path, { bigint: true });
+      const entry = await lstat4(path, { bigint: true });
       if (entry.isFile() && !entry.isSymbolicLink() && sameMigrationIdentity(entry, info))
         aliases.push(path);
     } catch (cause) {
@@ -11938,26 +10395,26 @@ var temporaryAlias = async (location, info) => {
   return aliases;
 };
 var removeTemporaryAlias = async (location) => {
-  const info = await lstat5(location.path, { bigint: true });
+  const info = await lstat4(location.path, { bigint: true });
   if (info.nlink === 2n) {
     const aliases = await temporaryAlias(location, info);
     if (aliases.length !== 1)
       throw invalid3(location, "journal has an unexpected hard link");
-    await rm5(aliases[0]);
+    await rm4(aliases[0]);
   }
 };
 var checkLocation = async (location) => {
   if (![location.path, location.sourceRoot, location.targetRoot].every(canonicalAbsolute))
     throw invalid3(location, "journal path and trusted roots must be canonical absolute paths");
   try {
-    const parent = dirname6(location.path);
+    const parent = dirname4(location.path);
     const [directory, actualParent, source, target, sourceInfo, targetInfo] = await Promise.all([
-      lstat5(parent, { bigint: true }),
+      lstat4(parent, { bigint: true }),
       realpath2(parent),
       realpath2(location.sourceRoot),
       realpath2(location.targetRoot),
-      lstat5(location.sourceRoot, { bigint: true }),
-      lstat5(location.targetRoot, { bigint: true })
+      lstat4(location.sourceRoot, { bigint: true }),
+      lstat4(location.targetRoot, { bigint: true })
     ]);
     if (!directory.isDirectory() || directory.isSymbolicLink() || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot || process.platform !== "win32" && !owner(directory))
       throw invalid3(location, "journal parent or trusted roots are not private canonical directories");
@@ -11971,7 +10428,7 @@ var read = async (location) => {
   await checkLocation(location);
   let handle;
   try {
-    handle = await open3(location.path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
+    handle = await open3(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   } catch (cause) {
     if (isMissing(cause))
       return;
@@ -11980,17 +10437,17 @@ var read = async (location) => {
   try {
     const [info, pathInfo] = await Promise.all([
       handle.stat({ bigint: true }),
-      lstat5(location.path, { bigint: true })
+      lstat4(location.path, { bigint: true })
     ]);
     if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || process.platform !== "win32" && (!owner(info) || (info.mode & 0o077n) !== 0n) || !sameMigrationIdentity(info, pathInfo) || info.size > MAX_BYTES)
       throw invalid3(location, "journal is not an owned private regular file");
     if (info.nlink !== 1n && !(info.nlink === 2n && (await temporaryAlias(location, info)).length === 1))
       throw invalid3(location, "journal has an unexpected hard link");
     if (process.platform === "win32") {
-      const problem = await windowsAclProblem(dirname6(location.path), { file: location.path });
+      const problem = await windowsAclProblem(dirname4(location.path), { file: location.path });
       if (problem !== undefined)
         throw invalid3(location, `journal or its parent does not have a private access list: ${problem}`);
-      const checkedPath = await lstat5(location.path, { bigint: true });
+      const checkedPath = await lstat4(location.path, { bigint: true });
       if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "journal changed while verifying its access list");
     }
@@ -12011,7 +10468,7 @@ var read = async (location) => {
 var syncDirectory = async (location) => {
   if (process.platform === "win32")
     return;
-  const directory = await open3(dirname6(location.path), "r");
+  const directory = await open3(dirname4(location.path), "r");
   try {
     await directory.sync();
   } finally {
@@ -12035,12 +10492,12 @@ var write = async (location, record, create) => {
       await checkLocation(location);
     handle = await open3(temporary, "wx", 384);
     if (process.platform === "win32") {
-      const problem = await windowsAclProblem(dirname6(location.path), { file: temporary });
+      const problem = await windowsAclProblem(dirname4(location.path), { file: temporary });
       if (problem !== undefined)
         throw invalid3(location, `cannot create a private journal in this directory: ${problem}`);
       const [info, checkedPath] = await Promise.all([
         handle.stat({ bigint: true }),
-        lstat5(temporary, { bigint: true })
+        lstat4(temporary, { bigint: true })
       ]);
       if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "temporary journal changed while verifying its access list");
@@ -12051,13 +10508,13 @@ var write = async (location, record, create) => {
     handle = undefined;
     if (create) {
       await link3(temporary, location.path);
-      await rm5(temporary);
+      await rm4(temporary);
     } else
-      await rename5(temporary, location.path);
+      await rename4(temporary, location.path);
     await syncDirectory(location);
   } finally {
     await handle?.close().catch(() => {});
-    await rm5(temporary, { force: true }).catch(() => {});
+    await rm4(temporary, { force: true }).catch(() => {});
   }
 };
 var operation = (location, run) => tryPromise2({
@@ -12103,7 +10560,7 @@ var finishMigrationJournal = (location, transaction, authorize) => gen2(function
     if (latest === undefined || JSON.stringify(latest) !== JSON.stringify(current))
       throw invalid3(location, "journal changed during authorization; reload recovery state");
     await removeTemporaryAlias(location);
-    await rm5(location.path);
+    await rm4(location.path);
     await syncDirectory(location);
   }));
 });
@@ -12123,7 +10580,7 @@ var operation2 = (path, run) => tryPromise2({
 var missing2 = (cause) => hasCode(cause, "ENOENT");
 var infoOrMissing = async (path) => {
   try {
-    return await lstat6(path, { bigint: true });
+    return await lstat5(path, { bigint: true });
   } catch (cause) {
     if (missing2(cause))
       return;
@@ -12170,13 +10627,13 @@ var validateSources = (root, input) => {
   return source;
 };
 var parents = async (root, path) => {
-  const rootInfo = await lstat6(root, { bigint: true });
+  const rootInfo = await lstat5(root, { bigint: true });
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || await realpath3(root) !== root)
     throw fail6(root, "root is not a canonical directory");
   const checked = [{ path: root, info: rootInfo }];
   let current = root;
   for (const part of path.split("/").slice(0, -1)) {
-    current = join9(current, part);
+    current = join6(current, part);
     const info = await infoOrMissing(current);
     if (info === undefined)
       break;
@@ -12188,7 +10645,7 @@ var parents = async (root, path) => {
 };
 var recheck = async (checked, path) => {
   for (const entry of checked) {
-    const latest = await lstat6(entry.path, { bigint: true });
+    const latest = await lstat5(entry.path, { bigint: true });
     if (!latest.isDirectory() || latest.isSymbolicLink() || !sameMigrationIdentity(entry.info, latest) || await realpath3(entry.path) !== entry.path)
       throw fail6(path, "parent changed");
   }
@@ -12199,10 +10656,10 @@ var readRegular = async (path) => {
     return;
   if (!before.isFile() || before.isSymbolicLink())
     throw fail6(path, "path is not a regular file");
-  const handle = await open4(path, constants3.O_RDONLY | (constants3.O_NOFOLLOW ?? 0));
+  const handle = await open4(path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
   try {
     const info = await handle.stat({ bigint: true });
-    const latest = await lstat6(path, { bigint: true });
+    const latest = await lstat5(path, { bigint: true });
     if (!info.isFile() || !latest.isFile() || latest.isSymbolicLink() || !sameMigrationIdentity(before, info) || !sameMigrationIdentity(info, latest))
       throw fail6(path, "file changed while reading");
     return { bytes: await handle.readFile(), info };
@@ -12227,7 +10684,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
   yield* initialTerminal(options.root, options.authorize, "terminalAuthorize" in options, options.terminalAuthorize);
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join9(options.root, file.path);
+    const path = join6(options.root, file.path);
     let checked = yield* operation2(path, () => parents(options.root, file.path));
     const existing = yield* operation2(path, () => readRegular(path));
     if (existing !== undefined) {
@@ -12241,13 +10698,13 @@ var publishMigrationFiles = (options) => gen2(function* () {
       return yield* fail6(file.path, "preexisting file was deleted");
     const components = file.path.split("/").slice(0, -1);
     for (let i = checked.length - 1;i < components.length; i++) {
-      const dir = join9(options.root, ...components.slice(0, i + 1));
+      const dir = join6(options.root, ...components.slice(0, i + 1));
       yield* options.authorize;
       yield* operation2(dir, () => recheck(checked, path));
       yield* operation2(dir, async () => {
         terminal(dir, options.authorize, options.terminalAuthorize);
         try {
-          await mkdir7(dir);
+          await mkdir6(dir);
         } catch (cause) {
           if (!hasCode(cause, "EEXIST"))
             throw cause;
@@ -12257,7 +10714,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
     }
     yield* options.authorize;
     yield* operation2(path, () => recheck(checked, path));
-    const temporary = join9(dirname7(path), `.holyagent-migration-${randomUUID()}.tmp`);
+    const temporary = join6(dirname5(path), `.holyagent-migration-${randomUUID()}.tmp`);
     let identity;
     yield* acquireUseRelease2(sync2(() => {
       const preparation = (async () => {
@@ -12287,7 +10744,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
       }
       yield* operation2(path, () => {
         terminal(path, options.authorize, options.terminalAuthorize);
-        return existing === undefined ? link4(temporary, path) : rename6(temporary, path);
+        return existing === undefined ? link4(temporary, path) : rename5(temporary, path);
       }).pipe(uninterruptible2);
     }), (preparation) => sync2(() => {
       preparation.catch(() => {}).then(async () => {
@@ -12297,7 +10754,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
           return;
         });
         if (current?.isFile() && !current.isSymbolicLink() && sameMigrationIdentity(identity, current))
-          await rm6(temporary, { force: true }).catch(() => {});
+          await rm5(temporary, { force: true }).catch(() => {});
       });
     }));
   }
@@ -12308,7 +10765,7 @@ var cleanupMigrationSources = (options) => gen2(function* () {
   const removed = [];
   const retained = [];
   for (const file of source) {
-    const path = join9(options.root, file.path);
+    const path = join6(options.root, file.path);
     const checked = yield* operation2(path, () => parents(options.root, file.path));
     const current = yield* operation2(path, () => readRegular(path));
     if (current === undefined)
@@ -12348,7 +10805,7 @@ var cleanupMigrationSources = (options) => gen2(function* () {
 var verifyMigrationFiles = (options) => gen2(function* () {
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join9(options.root, file.path);
+    const path = join6(options.root, file.path);
     yield* operation2(path, async () => {
       const checked = await parents(options.root, file.path);
       const actual = await readRegular(path);
@@ -12361,7 +10818,7 @@ var verifyMigrationFiles = (options) => gen2(function* () {
 var verifyMigrationFilePreimages = (options) => gen2(function* () {
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join9(options.root, file.path);
+    const path = join6(options.root, file.path);
     yield* operation2(path, async () => {
       const checked = await parents(options.root, file.path);
       const actual = await readRegular(path);
@@ -12374,7 +10831,7 @@ var verifyMigrationFilePreimages = (options) => gen2(function* () {
 var readMigrationSource = (options) => operation2(options.root, async () => {
   validatePaths(options.root, [options.path]);
   const checked = await parents(options.root, options.path);
-  const value = await readRegular(join9(options.root, options.path));
+  const value = await readRegular(join6(options.root, options.path));
   if (value === undefined)
     throw fail6(options.path, "source disappeared during preparation");
   await recheck(checked, options.path);
@@ -12385,10 +10842,66 @@ var readMigrationSource = (options) => operation2(options.root, async () => {
 });
 
 import { createHash as createHash4, randomUUID as randomUUID2 } from "crypto";
-import { constants as constants4 } from "fs";
-import { copyFile, mkdtemp as mkdtemp3, open as open5, readFile as readFile3, rename as rename7, rm as rm7, writeFile as writeFile5 } from "fs/promises";
+import { constants as constants3 } from "fs";
+import { copyFile, mkdtemp as mkdtemp2, open as open5, readFile as readFile3, rename as rename6, rm as rm6, writeFile as writeFile4 } from "fs/promises";
 import { tmpdir } from "os";
-import { isAbsolute as isAbsolute4, join as join10, resolve as resolve6 } from "path";
+import { isAbsolute as isAbsolute4, join as join7, resolve as resolve6 } from "path";
+
+import { spawn as spawnChild } from "child_process";
+var spawn = (program, args, options) => callback2((resume) => {
+  const child = spawnChild(program, args, {
+    cwd: options.cwd,
+    env: options.env,
+    detached: process.platform !== "win32",
+    stdio: options.discard === true ? ["ignore", "ignore", "ignore"] : ["pipe", "pipe", "pipe"],
+    windowsHide: true
+  });
+  const stdout = [];
+  const stderr = [];
+  child.stdout?.on("data", (chunk) => stdout.push(chunk));
+  child.stderr?.on("data", (chunk) => stderr.push(chunk));
+  child.stdin?.on("error", () => {});
+  child.once("error", (cause) => resume(die3(cause)));
+  child.once(options.discard === true ? "exit" : "close", (code) => resume(succeed6({
+    code: code ?? -1,
+    stdout: Buffer.concat(stdout),
+    stderr: Buffer.concat(stderr).toString("utf8")
+  })));
+  child.stdin?.end(options.stdin);
+  return suspend2(() => {
+    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined)
+      return void_3;
+    const killed = process.platform === "win32" ? callback2((done) => {
+      const killer = spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true
+      });
+      killer.once("error", () => {
+        child.kill("SIGKILL");
+        done(void_3);
+      });
+      killer.once("close", () => done(void_3));
+    }) : sync2(() => {
+      try {
+        if (child.pid !== undefined)
+          process.kill(-child.pid, "SIGKILL");
+      } catch {
+        child.kill("SIGKILL");
+      }
+    });
+    const exited = callback2((done) => {
+      const finish = () => done(void_3);
+      child.once("exit", finish);
+      if (child.exitCode !== null || child.signalCode !== null)
+        finish();
+      return sync2(() => {
+        child.removeListener("exit", finish);
+      });
+    });
+    return killed.pipe(andThen2(exited), timeoutOption2(2000), asVoid2);
+  });
+});
+
 var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env, stdin }).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))));
 var repositoryVariables = new Set([
   "GIT_DIR",
@@ -12417,7 +10930,7 @@ var validate3 = (cwd, files) => {
   }
   return;
 };
-var environment2 = (env, index) => {
+var environment = (env, index) => {
   const result = {};
   for (const [key, value] of Object.entries({ ...process.env, ...env }))
     if (value !== undefined && !repositoryVariables.has(key))
@@ -12430,7 +10943,7 @@ var environment2 = (env, index) => {
 var git = (options, args, index, stdin) => (options.runGit ?? defaultRunner)({
   cwd: options.cwd,
   args,
-  env: environment2(options.env, index),
+  env: environment(options.env, index),
   ...stdin === undefined ? {} : { stdin }
 }).pipe(flatMap2((result) => result.code === 0 ? try_2({
   try: () => new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }).decode(result.stdout),
@@ -12458,13 +10971,13 @@ var fingerprint = (files, after) => createHash4("sha256").update(JSON.stringify(
   after ? file.after : file.before,
   after || file.before !== null ? file.mode : null
 ]))).digest("hex");
-var temporary = (options, use) => acquireUseRelease2(options.authorize.pipe(andThen2(io(tmpdir(), () => mkdtemp3(join10(tmpdir(), "holyagent-migration-"))))), use, (dir) => io(dir, () => rm7(dir, { recursive: true, force: true })).pipe(ignore2));
+var temporary = (options, use) => acquireUseRelease2(options.authorize.pipe(andThen2(io(tmpdir(), () => mkdtemp2(join7(tmpdir(), "holyagent-migration-"))))), use, (dir) => io(dir, () => rm6(dir, { recursive: true, force: true })).pipe(ignore2));
 var prepareMigrationCommit = (options) => gen2(function* () {
   const invalid = validate3(options.cwd, options.files);
   if (invalid !== undefined)
     return yield* invalid;
   return yield* temporary(options, (dir) => gen2(function* () {
-    const index = join10(dir, "index");
+    const index = join7(dir, "index");
     const parent = (yield* git(options, ["rev-parse", "--verify", "HEAD"])).trim();
     if (!oidPattern.test(parent))
       return yield* fail7(options.cwd, "invalid HEAD object id");
@@ -12474,9 +10987,9 @@ var prepareMigrationCommit = (options) => gen2(function* () {
     const live = yield* entries(options);
     const files = [];
     for (const file of options.files) {
-      const contentPath = join10(dir, randomUUID2());
+      const contentPath = join7(dir, randomUUID2());
       yield* options.authorize;
-      yield* io(contentPath, () => writeFile5(contentPath, Buffer.from(file.content, "base64")));
+      yield* io(contentPath, () => writeFile4(contentPath, Buffer.from(file.content, "base64")));
       yield* options.authorize;
       const after = (yield* git(options, [
         "hash-object",
@@ -12545,10 +11058,10 @@ var publishMigrationIndex = (options) => gen2(function* () {
   const lock = `${index}.lock`;
   let published = false;
   return yield* acquireUseRelease2(options.authorize.pipe(andThen2(tryPromise2({
-    try: () => open5(lock, constants4.O_WRONLY | constants4.O_CREAT | constants4.O_EXCL | (constants4.O_NOFOLLOW ?? 0), 438),
+    try: () => open5(lock, constants3.O_WRONLY | constants3.O_CREAT | constants3.O_EXCL | (constants3.O_NOFOLLOW ?? 0), 438),
     catch: (cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile: lock }) : new StateIo({ path: lock, cause })
   }))), (handle) => temporary(options, (dir) => gen2(function* () {
-    const copy = join10(dir, "index");
+    const copy = join7(dir, "index");
     yield* options.authorize;
     const copied = yield* io(index, () => copyFile(index, copy)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
     if (!copied) {
@@ -12573,10 +11086,10 @@ var publishMigrationIndex = (options) => gen2(function* () {
     });
     yield* options.authorize;
     yield* io(index, async () => {
-      await rename7(lock, index);
+      await rename6(lock, index);
       published = true;
     }).pipe(uninterruptible2);
-  })), (handle) => io(lock, () => handle.close()).pipe(ignore2, andThen2(suspend2(() => published ? void_3 : io(lock, () => rm7(lock, { force: true })).pipe(ignore2)))));
+  })), (handle) => io(lock, () => handle.close()).pipe(ignore2, andThen2(suspend2(() => published ? void_3 : io(lock, () => rm6(lock, { force: true })).pipe(ignore2)))));
 });
 var treeEntries = (options, tree) => git(options, ["ls-tree", "-r", "-t", "-z", "--full-tree", tree]).pipe(flatMap2((output) => {
   const found = new Map;
@@ -12749,8 +11262,8 @@ var parseStateMode = (value) => value === undefined || value.trim() === "" ? suc
   cause: `"${value.trim()}" is not a state mode; set ${STATE_MODE_KEY} in git config to branch, work or local`
 })));
 
-var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
-var looksLikeAgent2 = ({
+var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
+var looksLikeAgent = ({
   name,
   email
 }) => email.trim().toLowerCase() === "noreply@anthropic.com" || ["claude", "claude code"].includes(name.replace(/\s+/g, " ").trim().toLowerCase());
@@ -12768,7 +11281,7 @@ var REPOSITORY_VARIABLES = new Set([
   "GIT_NAMESPACE",
   "GIT_QUARANTINE_PATH"
 ]);
-var gitEnvironment = (env) => definedEnv2({ ...process.env, ...env }, REPOSITORY_VARIABLES);
+var gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES);
 var git2 = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
   cwd,
   env: gitEnvironment(env),
@@ -12814,7 +11327,7 @@ var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE, a
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
-  yield* withFileLock(join11(common, "holyagent", "exclude.lock"), gen2(function* () {
+  yield* withFileLock(join8(common, "holyagent", "exclude.lock"), gen2(function* () {
     const before = linesOf(yield* readText(path));
     const lines = yield* edit(before);
     if (lines.join(`
@@ -12831,7 +11344,7 @@ var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE, a
 var ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience, authorize);
 var excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines)));
 var unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines)));
-var isDirectory = (path) => io(path, () => stat4(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var isDirectory = (path) => io(path, () => stat3(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var stateBranch = (top, env) => gen2(function* () {
   const configured = yield* git2(top, env, ["config", "--get", BRANCH_KEY]);
   const fromGit = configured.code === 0 ? configured.stdout.trim() : "";
@@ -12873,7 +11386,7 @@ var NEUTRAL_IDENTITY = {
 };
 var committing = (cwd, env) => git2(cwd, env, ["var", "GIT_COMMITTER_IDENT"]).pipe(map4((ran) => {
   const ident = /^(.*) <(.*)> \d+ [+-]\d{4}$/.exec(ran.stdout.trim());
-  return ran.code === 0 && ident !== null && !looksLikeAgent2({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
+  return ran.code === 0 && ident !== null && !looksLikeAgent({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
 }));
 var baseStart = (top, env) => gen2(function* () {
   const head = yield* git2(top, env, ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"]);
@@ -12898,7 +11411,7 @@ var holdsRecords = (top, listed) => gen2(function* () {
     const folder = stateDirectory(entry);
     if (!(yield* isDirectory(folder)))
       continue;
-    const names = yield* io(folder, () => readdir4(folder));
+    const names = yield* io(folder, () => readdir3(folder));
     if (names.some((name) => name !== CONFIG_FILE))
       return true;
   }
@@ -12959,7 +11472,7 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS, authorize
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
-var migrationSweepPath = (common, branch) => join11(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`);
+var migrationSweepPath = (common, branch) => join8(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`);
 var checkSweepFile = (path, info) => {
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || process.platform !== "win32" && ((info.mode & 63) !== 0 || typeof process.getuid === "function" && info.uid !== process.getuid()))
     throw new Error(`unsafe migration sweep marker: ${path}`);
@@ -12967,7 +11480,7 @@ var checkSweepFile = (path, info) => {
 var syncSweepDirectory = async (path) => {
   if (process.platform === "win32")
     return;
-  const dir = await open6(dirname8(path), "r");
+  const dir = await open6(dirname6(path), "r");
   try {
     await dir.sync();
   } finally {
@@ -12976,11 +11489,11 @@ var syncSweepDirectory = async (path) => {
 };
 var beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
   const path = migrationSweepPath(common, branch);
-  const parent = dirname8(path);
+  const parent = dirname6(path);
   const commonRoot = yield* io(common, () => realpath4(common));
-  const info = yield* io(parent, () => lstat7(parent));
+  const info = yield* io(parent, () => lstat6(parent));
   const actual = yield* io(parent, () => realpath4(parent));
-  if (!info.isDirectory() || info.isSymbolicLink() || actual !== join11(commonRoot, "holyagent"))
+  if (!info.isDirectory() || info.isSymbolicLink() || actual !== join8(commonRoot, "holyagent"))
     return yield* new StateIo({
       path: parent,
       cause: "migration marker parent is not a canonical directory"
@@ -12997,7 +11510,7 @@ var beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
       }
       if (handle !== undefined)
         await handle.sync();
-      const marker = await lstat7(path);
+      const marker = await lstat6(path);
       checkSweepFile(path, marker);
     } finally {
       await handle?.close();
@@ -13008,31 +11521,31 @@ var beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
 var finishMigrationSweep = (common, branch, authorize, terminalAuthorize) => gen2(function* () {
   const path = migrationSweepPath(common, branch);
   const before = yield* io(path, async () => {
-    const info = await lstat7(path);
+    const info = await lstat6(path);
     checkSweepFile(path, info);
     return { dev: info.dev, ino: info.ino };
   });
   yield* authorize;
   yield* io(path, async () => {
-    const current = await lstat7(path);
+    const current = await lstat6(path);
     checkSweepFile(path, current);
     if (current.dev !== before.dev || current.ino !== before.ino)
       throw new Error("migration sweep marker changed during authorization");
     if (terminalAuthorize() !== true)
       throw new Error("terminal migration authority is unavailable or revoked");
-    await rm8(path);
+    await rm7(path);
     await syncSweepDirectory(path);
   }).pipe(uninterruptible2);
 });
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join11(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join8(common, "holyagent", "worktree.lock"), gen2(function* () {
   yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
     if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
       yield* authorize;
-      yield* io(ready, () => mkdir8(dirname8(ready), { recursive: true }).then(() => writeFile6(ready, "")));
+      yield* io(ready, () => mkdir7(dirname6(ready), { recursive: true }).then(() => writeFile5(ready, "")));
     }
     return { kind: "ready", path: again, created: false };
   }
@@ -13054,38 +11567,38 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
     return { kind: "deferred" };
   yield* beginMigrationSweep(common, branch, authorize);
   yield* authorize;
-  yield* io(ready, () => rm8(ready, { force: true }));
+  yield* io(ready, () => rm7(ready, { force: true }));
   yield* authorize;
-  yield* io(path, () => rm8(path, { recursive: true, force: true }));
+  yield* io(path, () => rm7(path, { recursive: true, force: true }));
   yield* authorize;
-  yield* io(path, () => mkdir8(dirname8(path), { recursive: true }));
+  yield* io(path, () => mkdir7(dirname6(path), { recursive: true }));
   yield* authorize;
   yield* gitText(top, env, [...add, ...target]);
-  yield* uninterruptible2(io(ready, () => mkdir8(dirname8(ready), { recursive: true }).then(() => writeFile6(ready, ""))));
+  yield* uninterruptible2(io(ready, () => mkdir7(dirname6(ready), { recursive: true }).then(() => writeFile5(ready, ""))));
   return { kind: "ready", path, created: true };
 }), patience, authorize);
 var LOCAL_FILES = new Set(["local/specialists.json"]);
 var sameBytes = (a, b) => all2([io(a, () => readFile4(a)), io(b, () => readFile4(b))]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
-var fileExists = (path) => io(path, () => stat4(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
-var kindAt = (path) => io(path, () => lstat7(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
-var realStateFolder = (root) => canonical(dirname8(root)).pipe(map4((parent) => join11(parent, basename3(root))));
+var fileExists = (path) => io(path, () => stat3(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var kindAt = (path) => io(path, () => lstat6(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
+var realStateFolder = (root) => canonical(dirname6(root)).pipe(map4((parent) => join8(parent, basename2(root))));
 var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 }))));
 var isPlainFile = (root, relative) => gen2(function* () {
-  const path = join11(root, relative);
+  const path = join8(root, relative);
   if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
     return false;
   const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
-  return real === join11(base, relative);
+  return real === join8(base, relative);
 });
 var requirePlainTarget = (root, relative) => gen2(function* () {
   yield* requireStateFolder(root);
   const parts = relative.split("/");
   let current = root;
   for (const [index, part] of parts.entries()) {
-    current = join11(current, part);
+    current = join8(current, part);
     const kind = yield* kindAt(current);
     if (kind === undefined)
       return;
@@ -13124,8 +11637,8 @@ var workTreeEntries = (top, env) => gen2(function* () {
   }
   return files.filter((path) => path !== CONFIG_FILE).filter((path) => !path.startsWith("local/") || LOCAL_FILES.has(path)).toSorted().map((path) => ({ path, status: status.get(path) }));
 });
-var migrationMarker = (common, top) => io(top, () => realpath4(top)).pipe(map4((real) => join11(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16))));
-var migrationJournalPath = (common) => join11(common, "holyagent", "migration", "journal.json");
+var migrationMarker = (common, top) => io(top, () => realpath4(top)).pipe(map4((real) => join8(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16))));
+var migrationJournalPath = (common) => join8(common, "holyagent", "migration", "journal.json");
 var pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map4((kind) => kind !== undefined));
 var pendingReadMigration = (common, branch) => gen2(function* () {
   if (yield* pendingMigration(common))
@@ -13153,22 +11666,22 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
       return;
     if (!(yield* pendingMigration(common)) && (yield* workTreeEntries(top, env)).length === 0) {
       yield* authorize;
-      yield* io(marker, () => mkdir8(dirname8(marker), { recursive: true }).then(() => writeFile6(marker, "")));
+      yield* io(marker, () => mkdir7(dirname6(marker), { recursive: true }).then(() => writeFile5(marker, "")));
       return;
     }
     const sourceRoot = yield* io(top, () => realpath4(top));
     const targetRoot = yield* io(worktree, () => realpath4(worktree));
     const journalPath = migrationJournalPath(common);
     const commonRoot = yield* io(common, () => realpath4(common));
-    const privateRoot = join11(commonRoot, "holyagent");
-    for (const directory of [privateRoot, join11(privateRoot, "migration")]) {
+    const privateRoot = join8(commonRoot, "holyagent");
+    for (const directory of [privateRoot, join8(privateRoot, "migration")]) {
       yield* authorize;
       if (directory === privateRoot) {
-        yield* io(directory, () => mkdir8(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
+        yield* io(directory, () => mkdir7(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
       } else {
         yield* io(directory, () => ensureMigrationJournalDirectory(directory));
       }
-      const info = yield* io(directory, () => lstat7(directory));
+      const info = yield* io(directory, () => lstat6(directory));
       const actual = yield* io(directory, () => realpath4(directory));
       if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
         return yield* new StateIo({
@@ -13177,7 +11690,7 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
         });
     }
     const location = {
-      path: join11(commonRoot, "holyagent", "migration", "journal.json"),
+      path: join8(commonRoot, "holyagent", "migration", "journal.json"),
       sourceRoot,
       targetRoot
     };
@@ -13209,7 +11722,7 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
               continue;
             yield* requirePlainTarget(target, entry.path);
             const path = `${STATE_DIRECTORY}/${entry.path}`;
-            const to = join11(target, entry.path);
+            const to = join8(target, entry.path);
             const there = (yield* kindAt(to)) !== undefined;
             const dirty = entry.status !== undefined && !entry.status.includes("D");
             if (local(path) && there)
@@ -13296,19 +11809,19 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
               cause: "source state changed during migration; inspect and retry"
             });
           for (const path of cleaned.removed) {
-            let folder = dirname8(join11(sourceRoot, path));
+            let folder = dirname6(join8(sourceRoot, path));
             while (folder.startsWith(`${source}${sep2}`)) {
               yield* begin;
               const removed = yield* io(folder, () => rmdir(folder)).pipe(as2(true), orElseSucceed2(() => false));
               if (!removed)
                 break;
-              folder = dirname8(folder);
+              folder = dirname6(folder);
             }
           }
           yield* begin;
           yield* io(source, () => rmdir(source)).pipe(ignore2);
           yield* begin;
-          yield* io(marker, () => mkdir8(dirname8(marker), { recursive: true }).then(() => writeFile6(marker, "")));
+          yield* io(marker, () => mkdir7(dirname6(marker), { recursive: true }).then(() => writeFile5(marker, "")));
         })
       }
     });
@@ -13337,7 +11850,7 @@ var stageState = (worktree, env, copied, begin) => gen2(function* () {
   }
 });
 var commitState = (directory, env, message, copied = [], resolved, begin = void_3) => gen2(function* () {
-  const worktree = dirname8(directory);
+  const worktree = dirname6(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
   const top = yield* git2(worktree, env, ["rev-parse", "--show-toplevel"]);
@@ -13467,7 +11980,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
     const resolved = { mode, branch };
     const listed = yield* listWorktrees(top, env);
     const found = yield* checkedOut(listed, branch);
-    const standard = join11(common, "holyagent", worktreeFolder(branch));
+    const standard = join8(common, "holyagent", worktreeFolder(branch));
     const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
     if (ensure === "peek" && found !== undefined && !settled)
       return yield* new StateIo({
@@ -13489,7 +12002,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
     const worktree = ensured.path;
     const directory = stateDirectory(worktree);
     if (ensure !== "peek") {
-      yield* withFileLock(join11(common, "holyagent", "migration-sweep.lock"), gen2(function* () {
+      yield* withFileLock(join8(common, "holyagent", "migration-sweep.lock"), gen2(function* () {
         const pending = yield* pendingMigration(common);
         let sweeping = (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
         if (pending && !sweeping) {
@@ -13504,9 +12017,9 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
           return;
         }
         const sweepPath = migrationSweepPath(common, branch);
-        yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat7(sweepPath)));
+        yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat6(sweepPath)));
         const registered = yield* listWorktrees(top, env);
-        const own = join11(yield* io(common, () => realpath4(common)), "holyagent");
+        const own = join8(yield* io(common, () => realpath4(common)), "holyagent");
         const commonRoot = yield* io(common, () => realpath4(common));
         const candidates = [];
         for (const entry of registered) {
@@ -13549,7 +12062,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
           let recorded;
           for (const sourceRoot of candidates) {
             const matches = yield* readMigrationJournal({
-              path: join11(commonRoot, "holyagent", "migration", "journal.json"),
+              path: join8(commonRoot, "holyagent", "migration", "journal.json"),
               sourceRoot,
               targetRoot
             }).pipe(match4({
@@ -13589,13 +12102,13 @@ var requireHandoffState = (cwd, env, directory) => gen2(function* () {
       path: directory,
       cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`
     });
-  const own = join11(common, "holyagent");
+  const own = join8(common, "holyagent");
   for (const entry of listed) {
     if (entry.prunable || stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree)) || entry.path.startsWith(`${own}${sep2}`))
       continue;
     const source = stateDirectory(entry.path);
     yield* requireStateFolder(source);
-    const records = join11(source, "intents");
+    const records = join8(source, "intents");
     const kind = yield* kindAt(records);
     if (kind === undefined)
       continue;
@@ -13622,8 +12135,8 @@ var requireHandoffState = (cwd, env, directory) => gen2(function* () {
       return yield* failed(entry.path, ["ls-files", "--cached", "-z", "--", `${STATE_DIRECTORY}/intents`], trackedResult);
     const tracked = new Set(trackedResult.stdout.split("\x00").map((path) => path.slice(STATE_DIRECTORY.length + 1)));
     for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
-      const target = join11(directory, file.path);
-      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join11(source, file.path), target)))
+      const target = join8(directory, file.path);
+      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join8(source, file.path), target)))
         return yield* new StateIo({
           path: source,
           cause: "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff"
@@ -13645,7 +12158,7 @@ var readStateMode = (cwd, env) => gen2(function* () {
 var modeRestore = (top, env, previous) => gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(map4((configured) => configured ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY])));
 var setStateMode = (cwd, env, mode) => gen2(function* () {
   const { top, common } = yield* requireRepository(cwd, env);
-  return yield* withFileLock(join11(common, "holyagent", "worktree.lock"), gen2(function* () {
+  return yield* withFileLock(join8(common, "holyagent", "worktree.lock"), gen2(function* () {
     const previous = yield* stateModeOf(top, env);
     if (previous === "branch" && mode !== "branch") {
       const branch = yield* stateBranch(top, env);
@@ -13684,7 +12197,7 @@ var requireLocation = (path, expected) => path === expected ? void_3 : fail5(new
 var READ_CONCURRENCY = 16;
 var loadIntents = (directory) => gen2(function* () {
   const read = yield* forEach2(yield* scan(directory, "intents/*/intent.json"), (file) => gen2(function* () {
-    const path = join12(directory, file);
+    const path = join9(directory, file);
     const intent = yield* readJson(Intent, path);
     if (intent === undefined)
       return [];
@@ -13695,7 +12208,7 @@ var loadIntents = (directory) => gen2(function* () {
 });
 var loadAssignments = (directory, relatives, intents) => gen2(function* () {
   const read = yield* forEach2(relatives, (file) => gen2(function* () {
-    const path = join12(directory, file);
+    const path = join9(directory, file);
     const assignment = yield* readJson(Assignment, path);
     if (assignment === undefined)
       return [];
@@ -13717,7 +12230,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
     const folder = intentFolder(directory, intent);
     const prefix = relative2(directory, folder);
     for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
-      const path = join12(directory, file);
+      const path = join9(directory, file);
       const record = yield* readJson(BranchRecord, path);
       if (record === undefined)
         continue;
@@ -13727,7 +12240,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
       branches.push(record);
     }
     for (const file of yield* scan(directory, globBelow(prefix, "pulls/*.json"))) {
-      const path = join12(directory, file);
+      const path = join9(directory, file);
       const record = yield* readJson(PullRecord, path);
       if (record === undefined)
         continue;
@@ -15593,7 +14106,7 @@ var encodeRecord = (value) => encode2(value, {
   replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
 }).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
-var spawn2 = (program, args, options) => spawn(program, args, { ...options, env: definedEnv2(options.env) }).pipe(catchDefect2((cause) => succeed6({ code: 127, stdout: new Uint8Array, stderr: String(cause) })));
+var spawn2 = (program, args, options) => spawn(program, args, { ...options, env: definedEnv(options.env) }).pipe(catchDefect2((cause) => succeed6({ code: 127, stdout: new Uint8Array, stderr: String(cause) })));
 
 class Git extends Service()("holyagent/vcs/Git") {
 }
@@ -15671,8 +14184,8 @@ var decodeAnswer = (schema, what, answer) => decodeUnknownEffect2(schema)(answer
 })));
 var vcsLive = (root, env) => merge2(gitLive(root, env), githubLive(root, env));
 
-import { readFile as readFile5, realpath as realpath6, stat as stat5 } from "fs/promises";
-import { basename as basename6, resolve as resolve9 } from "path";
+import { readFile as readFile5, realpath as realpath6, stat as stat4 } from "fs/promises";
+import { basename as basename5, resolve as resolve9 } from "path";
 
 var AcceptanceInput = Struct({
   rationale: Text,
@@ -15941,6 +14454,22 @@ var resolvedRoute = (key, provider, row, screen) => {
   };
 };
 var ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
+var rootModelSettings = (config) => {
+  const configured = routeModel(config, "root");
+  const enabled = enabledPiProviders(config);
+  const [fallback] = enabled;
+  if (fallback === undefined)
+    return;
+  const {
+    provider,
+    model: id,
+    thinking
+  } = enabled.some((candidate) => PROVIDERS[candidate].id === configured.provider) ? configured : resolvedRoute("root", fallback, defaultRootRoute(fallback, config.pi.profile), false);
+  const prefix = `${provider}/`;
+  const model = id.startsWith(prefix) && id.length > prefix.length ? id.slice(prefix.length) : id;
+  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
+};
+var ROOT_MODEL_KEYS = [...ROOT_MODEL_PAIR, "defaultThinkingLevel"];
 var subagentModel = ({ provider, model }) => `${provider}/${model}`;
 var enabledPiProviders = (config) => [
   ...new Set(config.pi.providers ?? [
@@ -16068,23 +14597,23 @@ var selectConfiguredRoute = (config, written, host, role, screen, profile, now, 
   };
 };
 
-import { lstat as lstat8, realpath as realpath5 } from "fs/promises";
-import { basename as basename4, dirname as dirname9, isAbsolute as isAbsolute5, join as join13, resolve as resolve7, sep as sep4 } from "path";
+import { lstat as lstat7, realpath as realpath5 } from "fs/promises";
+import { basename as basename3, dirname as dirname7, isAbsolute as isAbsolute5, join as join10, resolve as resolve7, sep as sep4 } from "path";
 var canonical2 = (path) => io(path, () => realpath5(path)).pipe(catch_2((error) => {
   if (!hasCode(error.cause, "ENOENT"))
     return fail5(new InvalidDraft({
       message: `Cannot resolve operational target ${path}: ${error.message}`
     }));
-  return io(path, () => lstat8(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
+  return io(path, () => lstat7(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
     message: `Cannot resolve operational target ${path}: dangling symlink or inaccessible path`
   }))), catch_2((problem) => {
     if (problem instanceof InvalidDraft)
       return fail5(problem);
-    if (!hasCode(problem.cause, "ENOENT") || dirname9(path) === path)
+    if (!hasCode(problem.cause, "ENOENT") || dirname7(path) === path)
       return fail5(new InvalidDraft({
         message: `Cannot inspect operational target ${path}: ${problem.message}`
       }));
-    return canonical2(dirname9(path)).pipe(map4((parent) => join13(parent, basename4(path))));
+    return canonical2(dirname7(path)).pipe(map4((parent) => join10(parent, basename3(path))));
   }));
 }));
 var comparable = (path) => resolve7(path).split(sep4).join("/").toLowerCase();
@@ -16108,13 +14637,13 @@ var validateOperationalResources = (resources, worktrees) => gen2(function* () {
   }
 });
 
-import { isAbsolute as isAbsolute6, join as join14, resolve as resolve8 } from "path";
+import { isAbsolute as isAbsolute6, join as join11, resolve as resolve8 } from "path";
 var artifactFile = (context, root, directory, kind, id) => spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
   cwd: root,
   env: gitEnvironment(context.env)
 }).pipe(catchDefect2(() => succeed6({ code: -1, stdout: new Uint8Array, stderr: "" })), map4(({ code, stdout }) => {
   const common = new TextDecoder().decode(stdout).trim();
-  return code === 0 && isAbsolute6(common) ? join14(resolve8(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
+  return code === 0 && isAbsolute6(common) ? join11(resolve8(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
 }));
 
 class Unauthorized extends TaggedError2("Unauthorized") {
@@ -16179,7 +14708,7 @@ var resolveIntent = (snapshot) => {
   return chosen === undefined ? fail5(new NoActiveIntent2({ open: open.map(({ id, objective }) => ({ id, objective })) })) : succeed6(chosen);
 };
 
-var oneLine2 = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine = (text) => text.replace(/\s+/g, " ").trim();
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
   changed_paths: ArraySchema(String5),
@@ -16191,9 +14720,9 @@ var REPORT_FIELDS = Struct({
 var JsonReport = StructWithRest(REPORT_FIELDS, [
   Record(String5, Unknown2)
 ]);
-var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine2(line)}`)];
+var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)];
 var KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
-var extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine2(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`);
+var extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`);
 var renderJsonReport = (report) => [
   `status: ${report.status}`,
   ...section("changed", report.changed_paths),
@@ -16201,11 +14730,11 @@ var renderJsonReport = (report) => [
   ...section("blockers", report.blockers),
   ...section("notes", report.notes),
   ...extraLines(report),
-  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine2(key)}: ${support}`))
+  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
 ].join(`
 `);
 
-import { basename as basename5 } from "path";
+import { basename as basename4 } from "path";
 
 import { createHash as createHash6 } from "crypto";
 var KEY_LENGTH = 32;
@@ -16575,7 +15104,7 @@ var dispatchedCall = (assignment, agent, briefPath, launch, form = "normal") => 
 var refused = (_hint) => (error) => new InvalidDraft({ message: error.message });
 var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
   const { reports, notReported } = matchJournal(entries, calls);
-  const run = basename5(source).replace(/\.workflow\.jsonl$/, "");
+  const run = basename4(source).replace(/\.workflow\.jsonl$/, "");
   return {
     reports: reports.map(({ id, report }) => ({ id, report })),
     notAssignmentIds: notReported.map(({ id, index, reason }) => ({
@@ -16789,7 +15318,7 @@ var reports = (context, input) => gen2(function* () {
   return yield* withState(context, "assignment.reports", "peek", ({ root, directory, read }) => gen2(function* () {
     const path = resolve9(context.cwd, request.source);
     const source = yield* io(path, () => realpath6(path));
-    if (!(yield* io(source, () => stat5(source))).isFile())
+    if (!(yield* io(source, () => stat4(source))).isFile())
       return yield* new InvalidDraft({ message: "Report source must be a regular local file" });
     const text = yield* io(source, () => readFile5(source, "utf8"));
     const snapshot = yield* read(directory);
@@ -16808,7 +15337,7 @@ var reports = (context, input) => gen2(function* () {
         reports: [...selected].map(([id, report]) => ({ id, report })),
         notAssignmentIds: rejected
       };
-    } else if (!basename6(source).endsWith(".workflow.jsonl")) {
+    } else if (!basename5(source).endsWith(".workflow.jsonl")) {
       found = yield* piRecordReports(text, source, snapshot.project.assignments.flatMap(({ id, specialist }) => specialist?.agentId !== undefined && (specialist.agentId.startsWith("pi:") || specialist.agentId.startsWith("pi-workflow:")) ? [{ id, agentId: specialist.agentId }] : []));
     } else {
       const settings = yield* loadConfigWithSource({
@@ -16838,7 +15367,7 @@ var reports = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { rm as rm9 } from "fs/promises";
+import { rm as rm8 } from "fs/promises";
 var schemas2 = {
   create: Struct({
     objective: IntentDraft.fields.objective,
@@ -16891,7 +15420,7 @@ var close3 = (context, input) => gen2(function* () {
     const change = yield* apply((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, request, at).pipe(map4((closed) => ({
       ...closed,
       owned: snapshot.project.assignments.filter((row) => row.intentId === current.id).map((row) => row.id)
-    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm9(path, { force: true })).pipe(catch_2((error) => sync2(() => {
+    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm8(path, { force: true })).pipe(catch_2((error) => sync2(() => {
       unremoved.push(error.message);
     }))))))).pipe(asVoid2));
     return { ...change, unremoved };
@@ -16917,6 +15446,15 @@ var use = (context, input) => gen2(function* () {
     return { intent: found, activeIntent: found.id };
   })).pipe(map4(({ intent }) => intent)));
 });
+var AGENT_EMAIL = "noreply@anthropic.com";
+var AGENT_NAMES = ["claude", "claude code"];
+var looksLikeAgent2 = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase());
+var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
+var parseIdent = (line) => {
+  const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
+  return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
+};
+
 var IDENTITY_USAGE = "vcs identity --name <name> --email <email>";
 var setAuthor = (request) => gen2(function* () {
   const name = request.name.trim();
@@ -16927,7 +15465,7 @@ var setAuthor = (request) => gen2(function* () {
     return yield* refuse("--name needs the user's name, without angle brackets or control characters");
   if (!/^[^\s<>@]+@[^\s<>@]+$/.test(email) || !plain(email))
     return yield* refuse("--email needs an email address such as 1234+login@users.noreply.github.com");
-  if (looksLikeAgent({ name, email }))
+  if (looksLikeAgent2({ name, email }))
     return yield* refuse(`${name} <${email}> is the agent's own identity, not the user's`);
   yield* git3(["config", "--local", "author.name", name]);
   yield* git3(["config", "--local", "author.email", email]);
@@ -16948,7 +15486,7 @@ var requireOwnIdentity = gen2(function* () {
     name: (yield* gitMaybe(["config", "user.name"])) ?? "",
     email: (yield* gitMaybe(["config", "user.email"])) ?? ""
   };
-  if (looksLikeAgent(identity))
+  if (looksLikeAgent2(identity))
     return yield* new AgentIdentity({ identity: `${identity.name} <${identity.email}>` });
 });
 var requireOwnAuthor = gen2(function* () {
@@ -16956,7 +15494,7 @@ var requireOwnAuthor = gen2(function* () {
   const author = line === undefined ? undefined : parseIdent(line);
   if (author === undefined)
     return yield* new CloudAuthor({ author: "(none set)" });
-  if (author.name === "" || author.email === "" || looksLikeAgent(author))
+  if (author.name === "" || author.email === "" || looksLikeAgent2(author))
     return yield* new CloudAuthor({ author: `${author.name} <${author.email}>` });
 });
 var stagedPaths = git3(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
@@ -17064,7 +15602,7 @@ var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
 var SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi;
 var PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi;
 var PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i;
-var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
+var namesAgent = (coAuthor) => looksLikeAgent2({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
   if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
     return true;
@@ -17115,8 +15653,8 @@ var prepareMessage = (parts, allowed) => checkedText(parts.join(`
   })) : succeed6({ headline: headline.trim(), ...body === "" ? {} : { body } });
 }));
 
-import { constants as constants5 } from "fs";
-import { join as join15, relative as relative3, sep as sep6 } from "path";
+import { constants as constants4 } from "fs";
+import { join as join12, relative as relative3, sep as sep6 } from "path";
 
 var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 var describeFailure2 = (error) => ({
@@ -17170,7 +15708,7 @@ var readBodyFile = (root, file) => {
       return yield* refuse(`is not a project path (${problem})`);
     if (hasGitSegment(file))
       return yield* refuse("is inside .git");
-    const path = join15(root, toPosix(file));
+    const path = join12(root, toPosix(file));
     const resolve = io(path, () => fs.realpath(path));
     const real = yield* resolve.pipe(catchIf2((error) => hasCode(error.cause, "ENOENT"), () => fail5(refuse("does not exist"))));
     const base = yield* io(root, () => fs.realpath(root));
@@ -17188,7 +15726,7 @@ var readBodyFile = (root, file) => {
         code: ignored.code,
         output: ignored.stderr.trim()
       });
-    const text = yield* acquireUseRelease2(io(real, () => fs.open(real, constants5.O_RDONLY | constants5.O_NOFOLLOW)), (handle) => gen2(function* () {
+    const text = yield* acquireUseRelease2(io(real, () => fs.open(real, constants4.O_RDONLY | constants4.O_NOFOLLOW)), (handle) => gen2(function* () {
       const info = yield* io(real, () => handle.stat());
       if (!info.isFile())
         return yield* refuse("is not a regular file");
@@ -17326,7 +15864,30 @@ var pr = (context, root, state, input) => gen2(function* () {
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { join as join18 } from "path";
+var FORM_CHOICES = CAPABILITY_FORMS;
+var DEFAULT_FORM_CHOICE = {
+  form: "normal",
+  source: "default",
+  reason: "no form was asked for"
+};
+var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  if (inCi(env))
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
+};
+var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
+var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
+
+import { join as join17 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
 var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
@@ -17344,9 +15905,25 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   return names.map((name) => piPackageSource(name));
 };
 
-import { isAbsolute as isAbsolute7, join as join17 } from "path";
+import { isAbsolute as isAbsolute7, join as join15 } from "path";
 
-import { basename as basename7, dirname as dirname10, join as join16 } from "path";
+import { homedir as homedir2 } from "os";
+import { join as join13 } from "path";
+var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
+var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
+var homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback();
+var claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join13(homeDirectory2(env, home), ".claude");
+var userFiles = (env) => {
+  const home = homeDirectory2(env);
+  const claudeDir = claudeConfigDirectory(env, () => home);
+  return {
+    claudeDir,
+    settings: join13(claudeDir, "settings.json"),
+    ctx7Credentials: join13(home, ".config", "context7", "credentials.json")
+  };
+};
+
+import { basename as basename6, dirname as dirname8, join as join14 } from "path";
 var JsonObjectText = fromJsonString2(Record(String5, Unknown2), {
   space: 2
 });
@@ -17385,16 +15962,16 @@ var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
   return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
-var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
-var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
+var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, { text: unchangedSince });
+var replaceJsonObject = (path, value, options, snapshot) => gen2(function* () {
   const fs = yield* fileSystem;
   const exists = yield* fileOperation(path, "write", () => fs.stat(path).then(() => true, (error) => error.code === "ENOENT" ? false : Promise.reject(error)));
   const target = exists ? yield* fileOperation(path, "write", () => fs.realpath(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => fs.stat(target))).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join16(dirname10(target), `.${basename7(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname10(target), "write", () => fs.mkdir(dirname10(target), { recursive: true }));
+  const temporary = join14(dirname8(target), `.${basename6(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname8(target), "write", () => fs.mkdir(dirname8(target), { recursive: true }));
   yield* tryPromise2({
     try: () => fs.writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -17404,7 +15981,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   return yield* gen2(function* () {
     if (mode !== undefined)
       yield* fileOperation(temporary, "write", () => fs.chmod(temporary, mode));
-    if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => fs.readFile(target, "utf8"))) !== unchangedSince) {
+    if (snapshot !== undefined && (yield* readJsonText(target)) !== snapshot.text) {
       yield* fileOperation(temporary, "remove", () => fs.rm(temporary, { force: true }));
       return false;
     }
@@ -17472,9 +16049,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty2(env["XDG_DATA_HOME"]);
-  return join17(data !== undefined && isAbsolute7(data) ? data : join17(homeDirectory2(env), ".local", "share"), "browse");
+  return join15(data !== undefined && isAbsolute7(data) ? data : join15(homeDirectory2(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join17(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join15(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String5, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String5.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -17513,7 +16090,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
-    const support = join17(home, "Library", "Application Support");
+    const support = join15(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -17523,22 +16100,24 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Brave", "BraveSoftware/Brave-Browser"],
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
+      ["Helium", "net.imput.helium"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join17(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join15(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join17(home, "AppData", "Local");
-    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join17(home, "AppData", "Roaming");
+    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join15(home, "AppData", "Local");
+    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join15(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join17(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join17(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join17(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join17(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join17(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join15(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join15(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join15(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join15(local, "Vivaldi", "User Data") },
+      { name: "Helium", directory: join15(local, "imput", "Helium", "User Data") },
+      { name: "Opera", directory: join15(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty2(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute7(configured) ? configured : join17(home, ".config");
+  const config = configured !== undefined && isAbsolute7(configured) ? configured : join15(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -17547,8 +16126,9 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Microsoft Edge", "microsoft-edge"],
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
-    ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join17(config, folder) }));
+    ["Vivaldi", "vivaldi"],
+    ["Helium", "net.imput.helium"]
+  ].map(([name = "", folder = ""]) => ({ name, directory: join15(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String5, Open)) }), [Open]))
@@ -17564,14 +16144,14 @@ var isDisabled = (setting) => {
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
 var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join17(directory, "Local State"));
+  const state = yield* readOptional(join15(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
     if (profile === "." || profile === ".." || /[/\\]/.test(profile) || profile.includes("\x00"))
       return [];
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join17(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join15(directory, profile, file)).pipe(map4((text) => {
       if (text === undefined)
         return;
       const parsed = decodeUnknownOption2(Preferences)(text, {
@@ -17618,7 +16198,123 @@ var describeBrowseState = (state, runner = "npm") => {
 };
 
 import { existsSync as existsSync2, readdirSync as readdirSync2 } from "fs";
-import { posix as posix3, win32 as win323 } from "path";
+import { posix as posix2, win32 as win322 } from "path";
+
+import { constants as constants5, realpathSync } from "fs";
+import { delimiter, dirname as dirname9, join as join16, posix, win32 } from "path";
+import { fileURLToPath } from "url";
+
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
+var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
+
+var whichWith = (fs, command, options) => {
+  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
+  for (const directory of options.PATH.split(delimiter)) {
+    for (const name of names) {
+      const candidate = join16(directory || ".", name);
+      try {
+        fs.accessSync(candidate, process.platform === "win32" ? constants5.F_OK : constants5.X_OK);
+        if (fs.statSync(candidate).isFile())
+          return candidate;
+      } catch {}
+    }
+  }
+  return null;
+};
+var which = (command, options) => whichWith(nodeFileSystem, command, options);
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join16(options.home, ".bun");
+  const bunBin = join16(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+};
+var strictWhich = (command, path, strict, lookup = which) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  if (!api.isAbsolute(strict.cwd))
+    return null;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  if (trusted.length === 0)
+    return null;
+  const acceptable = (found) => {
+    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
+      return false;
+    if (windows && !found.toLowerCase().endsWith(".exe"))
+      return false;
+    if (strict.which === undefined) {
+      try {
+        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
+          return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
+    return acceptable(found) ? found : null;
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory });
+    if (acceptable(found))
+      return found;
+  }
+  return null;
+};
+var findCommand = (env, command, options, lookup = which) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
+};
+var EMPTY_BUNFIG = join16(dirname9(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => {
+        const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
+        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
+        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
+        if (batch !== undefined && !batch.ok)
+          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
+        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
+          exitCode: result.code,
+          stdout: new TextDecoder().decode(result.stdout),
+          stderr: result.stderr
+        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
+      }
+    }));
+  };
+}
+
 var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH";
 var LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
 var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
@@ -17630,7 +16326,7 @@ var BUILD_EXECUTABLES = {
   ],
   win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
 };
-var pathsOf = (platform) => platform === "win32" ? win323 : posix3;
+var pathsOf = (platform) => platform === "win32" ? win322 : posix2;
 var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
 var inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
@@ -17761,8 +16457,8 @@ var piAgentDirectory = (env) => {
   const home = homeDirectory2(env);
   const set = firstNonEmpty2(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join18(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
+    return join17(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join17(home, set.slice(2)) : set;
 };
 var piSettingsSources = (file) => gen2(function* () {
   const fs = yield* fileSystem;
@@ -17777,7 +16473,7 @@ var piSettingsSources = (file) => gen2(function* () {
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
-var piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")];
+var piSettingsFiles = (env, cwd) => [join17(piAgentDirectory(env), "settings.json"), join17(cwd, ".pi", "settings.json")];
 var piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
@@ -17969,7 +16665,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE, surface = piExecu
   }));
 });
 
-import { join as join21, resolve as resolve12 } from "path";
+import { join as join20, resolve as resolve12 } from "path";
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
@@ -17985,7 +16681,7 @@ var toolSettings = (config, _profile = providerProfile(config), form = "normal",
   ];
 };
 
-import { join as join19, resolve as resolve10 } from "path";
+import { join as join18, resolve as resolve10 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String5),
   value: Unknown2
@@ -17993,7 +16689,7 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String5, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join19(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var recordPath = (env) => join18(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve10(file);
 var load2 = (env) => gen2(function* () {
   const path = recordPath(env);
@@ -18048,7 +16744,7 @@ var removeRecorded = fn2("removeRecorded")(function* (env, file, removed) {
   yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]));
 });
 
-import { dirname as dirname11, isAbsolute as isAbsolute8, join as join20, relative as relative4, resolve as resolve11, sep as sep7 } from "path";
+import { dirname as dirname10, isAbsolute as isAbsolute8, join as join19, relative as relative4, resolve as resolve11, sep as sep7 } from "path";
 
 var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
 var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
@@ -18211,7 +16907,7 @@ var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action)
     return;
   const parts = relative4(cwd, file).split(sep7);
   for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join20(cwd, ...parts.slice(0, depth));
+    const path = join19(cwd, ...parts.slice(0, depth));
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
         message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -18226,17 +16922,17 @@ var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve11(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join20(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join19(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  return { folder: join20(root, ".claude"), root, trusted, notice };
+  return { folder: join19(root, ".claude"), root, trusted, notice };
 });
 var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
     return { file: userFiles(env).settings };
   const { folder, notice } = yield* claudeFolder(cwd);
-  const file = join20(folder, fileName(scope));
+  const file = join19(folder, fileName(scope));
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -18248,18 +16944,18 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
 });
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
   const roots = [resolve11(cwd)];
-  for (let folder = resolve11(cwd);; folder = dirname11(folder)) {
-    if (yield* present2(join20(folder, ".git"))) {
+  for (let folder = resolve11(cwd);; folder = dirname10(folder)) {
+    if (yield* present2(join19(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
     }
-    if (dirname11(folder) === folder)
+    if (dirname10(folder) === folder)
       break;
   }
   return roots.flatMap((root) => [
-    join20(root, ".claude", "settings.json"),
-    join20(root, ".claude", "settings.local.json")
+    join19(root, ".claude", "settings.json"),
+    join19(root, ".claude", "settings.local.json")
   ]);
 });
 var enablement = fn2("enablement")(function* (folder, file) {
@@ -18290,7 +16986,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
   const own = yield* identity3(file);
   if (own !== undefined) {
     for (const entry of tracked) {
-      if ((yield* identity3(join20(root, entry))) === own)
+      if ((yield* identity3(join19(root, entry))) === own)
         return "git tracks it";
     }
   }
@@ -18302,7 +16998,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
       if (component === folderName || seen.has(component))
         continue;
       seen.add(component);
-      if ((yield* identity3(join20(root, component))) === home)
+      if ((yield* identity3(join19(root, component))) === home)
         return `git tracks ${component} as ${folderName}`;
     }
   }
@@ -18315,8 +17011,8 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
-  const local = join20(folder, fileName("local"));
-  const project = join20(folder, fileName("project"));
+  const local = join19(folder, fileName("local"));
+  const project = join19(folder, fileName("project"));
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
@@ -18379,6 +17075,8 @@ var KNOWN_FILES = [
 ];
 var AGENT_PREFIX = "~/.pi/agent/";
 var PI_PREFIX = "~/.pi/";
+var KIMI_SETTINGS = PROVIDERS["kimi-coding-global"].toolsFile;
+var kimiRegionDefault = (env, scope, config) => scope === "user" && config.pi.enable && config.pi.providers?.includes("kimi-coding-global") === true && firstNonEmpty2(env["KIMI_CODE_REGION"], env["KIMI_CODE_BASE_URL"], env["KIMI_BASE_URL"], env["KIMI_CODE_OAUTH_HOST"], env["KIMI_OAUTH_HOST"]) === undefined;
 var locate2 = (env, cwd, scope, logical) => {
   const project = scope !== "user";
   const home = homeDirectory2(env);
@@ -18388,20 +17086,20 @@ var locate2 = (env, cwd, scope, logical) => {
     const explicit = firstNonEmpty2(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
       return resolve12(cwd, explicit);
-    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join21(home, ".config");
-    return join21(base, "billion-context", "billion-context.json");
+    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join20(home, ".config");
+    return join20(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join21(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join20(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join21(cwd, ".pi", name) : join21(piAgentDirectory(env), name);
+    return project ? join20(cwd, ".pi", name) : join20(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join21(cwd, ".pi", name) : join21(home, ".pi", name);
+    return project ? join20(cwd, ".pi", name) : join20(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join21(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join20(home, logical.slice(2));
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
@@ -18410,6 +17108,12 @@ var planFor = (env, cwd, scope, config, form) => {
   for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
+  if (KIMI_SETTINGS !== undefined && kimiRegionDefault(env, scope, config))
+    byFile.set(KIMI_SETTINGS, [
+      ...byFile.get(KIMI_SETTINGS) ?? [],
+      ...leaves({ region: "global" })
+    ]);
+  const startupModel = leaves(rootModelSettings(config) ?? {});
   const targets = [];
   const unplaced = [];
   for (const [logical, all] of byFile) {
@@ -18422,24 +17126,28 @@ var planFor = (env, cwd, scope, config, form) => {
       file,
       global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
       all,
-      defaults: PACKAGE_DEFAULTS.get(logical)
+      defaults: PACKAGE_DEFAULTS.get(logical),
+      startupModel: logical === PI_SETTINGS_FILE ? startupModel : []
     });
   }
   return { targets, unplaced };
 };
-var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
+var resolveTarget = fn2("resolveToolSettingsTarget")(function* (env, target) {
   const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
-  const existing = yield* readJsonObject(target.file);
+  const { value: existing, text: unchangedSince } = yield* readJsonObjectSnapshot(target.file);
   const setIn = (content, key) => content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added";
   const setGlobally = (key) => setIn(global, key);
   const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
   const free = target.all.filter((key) => !setGlobally(key));
+  const startupNote = target.startupModel.length === 0 ? undefined : ROOT_MODEL_KEYS.some((key) => global?.[key] !== undefined) ? "kept the startup model preferences in your global file" : ROOT_MODEL_KEYS.some((key) => existing[key] !== undefined) ? "kept the existing startup model preferences" : (yield* readRecorded(env, target.file)).some(({ path }) => ROOT_MODEL_KEYS.includes(path.join("."))) ? "kept the startup model reset" : undefined;
   return {
     file: target.file,
     existing,
-    keys: free.filter((key) => !isDefault(key)),
+    unchangedSince,
+    keys: [...free.filter((key) => !isDefault(key)), ...startupNote ? [] : target.startupModel],
     atDefault: free.filter(isDefault).map(keyName),
-    atGlobal: target.all.filter(setGlobally).map(keyName)
+    atGlobal: target.all.filter(setGlobally).map(keyName),
+    startupNote
   };
 });
 var planAt = (env, cwd, scope, form, choices, providers) => loadPiConfig(env, cwd, scope, choices, providers).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
@@ -18451,7 +17159,7 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   const { dryRun } = options;
   const { file } = planned;
   yield* refuseLinks(options.cwd, options.scope, file, "write");
-  const target = yield* resolveTarget(planned);
+  const target = yield* resolveTarget(env, planned);
   const { merged, entries } = applyDefaults(target.existing, target.keys);
   const added = entries.filter((entry) => entry.status === "added");
   const kept = entries.filter((entry) => entry.status === "kept");
@@ -18459,7 +17167,12 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   if (added.length > 0 && !dryRun) {
     const names = new Set(added.map((entry) => entry.path));
     yield* readRecorded(env, file);
-    yield* writeJsonObject(file, merged);
+    if (planned.startupModel.length === 0)
+      yield* writeJsonObject(file, merged);
+    else if (!(yield* writeJsonObjectIfUnchanged(file, merged, target.unchangedSince)))
+      return yield* new SetupFailure({
+        message: `${file} changed while setup was working on it, so nothing was written. Run setup again`
+      });
     yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join(".")))).pipe(mapError2((error) => new SetupFailure({
       message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
     })));
@@ -18471,7 +17184,8 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
     ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
     ...kept.map((entry) => `kept ${entry.path} ${show3(entry.value)} (HolyAgent sets ${show3(entry.wanted)}; yours wins)`),
     ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
-    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
+    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`],
+    ...target.startupNote === undefined ? [] : [target.startupNote]
   ];
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
@@ -18597,7 +17311,7 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   for (const planned of plan.targets) {
     lines.push(...yield* gen2(function* () {
       yield* refuseLinks(cwd, scope, planned.file, "write");
-      const target = yield* resolveTarget(planned);
+      const target = yield* resolveTarget(env, planned);
       const missing = applyDefaults(target.existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
       return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
     }).pipe(catchTag2("SetupFailure", (error) => succeed6([
@@ -18636,7 +17350,7 @@ var searchToolLines = (cwd, format) => gen2(function* () {
   return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
 });
 
-import { join as join22 } from "path";
+import { join as join21 } from "path";
 var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "");
 var isBunxPackageRoot = (root) => /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root));
 var isNpmExecPackageRoot = (root) => /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root));
@@ -18646,7 +17360,7 @@ var packageRunner = (root, env) => {
     return "bunx";
   if (/\/installs\/npm-holyagent\/[^/]+\/(?:lib\/)?node_modules\/holyagent$/i.test(path))
     return "mise";
-  const bun = portable(env.BUN_INSTALL ?? join22(homeDirectory2(env), ".bun"));
+  const bun = portable(env.BUN_INSTALL ?? join21(homeDirectory2(env), ".bun"));
   if (path === `${bun}/install/global/node_modules/holyagent`)
     return "bunx";
   if (isNpmExecPackageRoot(path))
@@ -18699,8 +17413,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return [...headless?.lines ?? [], ...lines.flat()];
 });
 
-import { join as join23 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join23(stateDirectory(cwd), CONFIG_FILE);
+import { join as join22 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join22(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -18791,7 +17505,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
-import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join24, relative as relative5, resolve as resolve13 } from "path";
+import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute9, join as join23, relative as relative5, resolve as resolve13 } from "path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
   return;
@@ -18819,7 +17533,7 @@ var staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
 var realPath = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.realpath(path))), orElseSucceed2(() => {
   return;
 }));
-var installedLayout = (path) => basename8(path) === "holyagent" && basename8(dirname12(path)) === "node_modules";
+var installedLayout = (path) => basename7(path) === "holyagent" && basename7(dirname11(path)) === "node_modules";
 var installedPackage = fn2("installedPiPackage")(function* (path) {
   const invalid = new SetupFailure({
     message: `${JSON.stringify(path)} is not an installed HolyAgent ${package_default.version} package; install the CLI globally and run it again`
@@ -18830,8 +17544,8 @@ var installedPackage = fn2("installedPiPackage")(function* (path) {
   const physical = yield* realPath(root);
   if (physical === undefined || !installedLayout(physical))
     return yield* invalid;
-  const manifest = yield* readJsonObject(join24(root, "package.json"));
-  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join24(root, "extensions", "holyagent.js"))))
+  const manifest = yield* readJsonObject(join23(root, "package.json"));
+  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join23(root, "extensions", "holyagent.js"))))
     return yield* invalid;
   return { root, physical, version: String(manifest.version) };
 });
@@ -18842,10 +17556,10 @@ var piLocalSourcePath = (env, file, source) => {
     return;
   if (source === "~" || /^~[/\\]/.test(source))
     return resolve13(homeDirectory2(env), source.slice(2));
-  return resolve13(dirname12(file), source);
+  return resolve13(dirname11(file), source);
 };
-var sourcePackageRoot = (path) => basename8(path) === "holyagent.js" && basename8(dirname12(path)) === "extensions" ? dirname12(dirname12(path)) : path;
-var localHolyagentPackageAt = (path) => readJsonObject(join24(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
+var sourcePackageRoot = (path) => basename7(path) === "holyagent.js" && basename7(dirname11(path)) === "extensions" ? dirname11(dirname11(path)) : path;
+var localHolyagentPackageAt = (path) => readJsonObject(join23(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
 var registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
   const { root, physical, version } = yield* installedPackage(path);
   const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
@@ -18990,7 +17704,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   return lines;
 });
 
-import { join as join25 } from "path";
+import { join as join24 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -19001,7 +17715,7 @@ var T3_BRANCH_INSTRUCTIONS = "Name each branch by the repository's own branch na
 var label2 = "t3 settings";
 var needsNotice = (entry) => entry.status === "kept" && !(entry.path === "branchNamingMode" && (entry.value === "semantic" || entry.value === "static"));
 var restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false));
-var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+var writeSettings = (path, value, unchangedSince) => writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
 var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
@@ -19011,21 +17725,21 @@ var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
     ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
   ];
 });
-var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join25(homeDirectory2(env), ".t3");
-var t3SettingsFile = (env) => join25(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3");
+var t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty2(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join25(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join24(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty2(env["ANDROID_HOME"]),
     firstNonEmpty2(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join25(home, "Library", "Android", "sdk") : platform === "win32" ? join25(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join25(home, "AppData", "Local"), "Android", "Sdk") : join25(home, "Android", "Sdk")
+    platform === "darwin" ? join24(home, "Library", "Android", "sdk") : platform === "win32" ? join24(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join24(home, "AppData", "Local"), "Android", "Sdk") : join24(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -19039,7 +17753,25 @@ var BALANCED = {
   pauseWhenClientLowPower: true,
   pauseWhenOnBattery: false
 };
-var units = (devices, worktrees) => [
+var startupModelRefusal = (existing, recorded) => {
+  const instances = existing["providerInstances"];
+  if (instances !== undefined && !isJsonObject2(instances))
+    return "providerInstances is not an object";
+  const instance = instances?.["pi"];
+  if (instance !== undefined) {
+    if (!isJsonObject2(instance))
+      return "providerInstances.pi is not an object";
+    if (instance["driver"] !== undefined && instance["driver"] !== "pi")
+      return "providerInstances.pi is another driver's instance";
+    const config = instance["config"];
+    if (instance["enabled"] === false || isJsonObject2(config) && config["enabled"] === false)
+      return "the Pi provider instance is disabled";
+  }
+  if (existing["defaultModelSelection"] === undefined && recorded.some(({ path }) => path[0] === "defaultModelSelection"))
+    return "kept the startup model reset";
+  return;
+};
+var units = (devices, worktrees, root) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -19057,6 +17789,23 @@ var units = (devices, worktrees) => [
       return isJsonObject2(config) && config["enabled"] === false ? "providerInstances.pi.config.enabled is false" : undefined;
     }
   },
+  ...root === undefined ? [] : [
+    {
+      name: "default model for new threads",
+      keys: [
+        {
+          path: ["defaultModelSelection"],
+          value: {
+            instanceId: "pi",
+            model: `${root.defaultProvider}/${root.defaultModel}`,
+            options: [{ id: "thinking", value: root.defaultThinkingLevel }]
+          },
+          default: null
+        }
+      ],
+      refuse: startupModelRefusal
+    }
+  ],
   ...devices ? [
     {
       name: "device access",
@@ -19140,7 +17889,7 @@ var units = (devices, worktrees) => [
 var unitOutcome = (existing, unit, recorded) => {
   if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole))
     return { status: "own" };
-  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing, recorded);
   return reason !== undefined ? { status: "left", reason } : { status: "keys", keys: unit.keys.filter((key) => !equals(key.value, key.default)) };
 };
 var wantedKeys = (existing, all, recorded = []) => {
@@ -19159,7 +17908,7 @@ var wantedKeys = (existing, all, recorded = []) => {
   return { keys, left, own };
 };
 var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
-  const config = options.config ?? (yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
+  const config = options.config ?? (yield* loadPiConfig(env, cwd, "user", undefined, options.providers).pipe(orElseSucceed2(() => {
     return;
   })));
   if (config === undefined || !config.pi.enable)
@@ -19179,7 +17928,7 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
   return {
     target: {
       file: t3SettingsFile(env),
-      units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+      units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees, rootModelSettings(config)),
       deviceNote,
       device: host,
       worktreesAllowed: config.pi.t3.worktrees
@@ -19317,7 +18066,8 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
           fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
         ];
     }
-    const { keys } = wantedKeys(value, wanted);
+    const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+    const { keys } = wantedKeys(value, wanted, recorded);
     const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
     return [
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
@@ -19425,6 +18175,7 @@ var setup = fn2("setup")(function* (env, options) {
       ...scope === "user" ? [
         phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
           dryRun: options.dryRun,
+          ...options.piProviders === undefined ? {} : { providers: options.piProviders },
           ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
           ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
         })), whenPiSaved)
@@ -19757,10 +18508,10 @@ var stateMode2 = (context, input) => gen2(function* () {
     return yield* setStateMode(context.cwd, context.env, request.mode);
   }));
 });
-import { copyFile as copyFile2, lstat as lstat9, mkdir as mkdir9, readdir as readdir5 } from "fs/promises";
-import { dirname as dirname13, join as join27, relative as relative6 } from "path";
+import { copyFile as copyFile2, lstat as lstat8, mkdir as mkdir8, readdir as readdir4 } from "fs/promises";
+import { dirname as dirname12, join as join26, relative as relative6 } from "path";
 
-import { join as join26 } from "path";
+import { join as join25 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -19916,7 +18667,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join26(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join25(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -20037,13 +18788,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join26(root, folderName);
+  const legacy = join25(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join26(legacy, "intents", folder);
+    const base = join25(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -20051,7 +18802,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join26(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join25(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -20062,10 +18813,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join26(base, path), to: join26(target, path) });
+      state.notes.push({ from: join25(base, path), to: join25(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join26(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join25(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -20167,13 +18918,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join26(root, folderName);
+  const legacy = join25(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join26(legacy, folder);
+    const base = join25(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -20187,7 +18938,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join26(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join25(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -20198,10 +18949,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join26(base, path), to: join26(target, path) });
+      state.notes.push({ from: join25(base, path), to: join25(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join26(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join25(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -20263,7 +19014,7 @@ class MigrationUnverified extends TaggedError2("MigrationUnverified") {
     return `The records were written but reloading .holyagent/ failed: ${this.detail}. Delete the files written by this run (git status lists them) before trying again`;
   }
 }
-var exists = (path) => io(path, () => lstat9(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var exists = (path) => io(path, () => lstat8(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var countsOf = (gathered) => ({
   intents: gathered.records.filter((record) => record.kind === "intent").length,
   assignments: gathered.records.filter((record) => record.kind === "assignment").length,
@@ -20302,7 +19053,7 @@ var writeAll = (found) => gen2(function* () {
       yield* commitFile(record.file.path, record.file.content);
   const notes = found.flatMap((gathered) => gathered.notes);
   for (const note of notes) {
-    yield* io(note.to, () => mkdir9(dirname13(note.to), { recursive: true }));
+    yield* io(note.to, () => mkdir8(dirname12(note.to), { recursive: true }));
     yield* io(note.to, () => copyFile2(note.from, note.to));
   }
   return { records, copied: notes.map((note) => note.to) };
@@ -20327,10 +19078,10 @@ var mentionsOf = (root, folders) => gen2(function* () {
   if (output.code === 0 || output.code === 1)
     return new TextDecoder().decode(output.stdout).split(`
 `).filter((line) => line !== "").toSorted();
-  const names = yield* io(root, () => readdir5(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
+  const names = yield* io(root, () => readdir4(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join27(root, name));
+    const text = yield* readText(join26(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20372,7 +19123,7 @@ var migrate = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { join as join28 } from "path";
+import { join as join27 } from "path";
 var setting = (raw) => raw?.trim() || undefined;
 var WorkflowSettings = Struct({
   disableWorkflows: optionalKey2(Boolean3),
@@ -20398,11 +19149,11 @@ var workflowAvailability = (options, root) => gen2(function* () {
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join28(homeDirectory(env), ".claude");
+  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join27(homeDirectory(env), ".claude");
   return !(yield* forEach2([
-    join28(claudeDir, "settings.json"),
-    join28(root, ".claude", "settings.json"),
-    join28(root, ".claude", "settings.local.json")
+    join27(claudeDir, "settings.json"),
+    join27(root, ".claude", "settings.json"),
+    join27(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 });
 var executionConfig = (options, root) => gen2(function* () {
@@ -20719,7 +19470,7 @@ var loadConfig2 = (env, root) => gen2(function* () {
   return yield* executionConfig({ cwd: root, env, host, authorize: () => true }, root).pipe(mapError2((error) => new Usage({ message: error.message, hint: "Check HolyAgent execution settings." })));
 });
 var present3 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
-var oneLine3 = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine2 = (text) => text.replace(/\s+/g, " ").trim();
 var intentView = (intent, links) => present3({
   id: intent.id,
   revision: intent.revision,
@@ -20766,14 +19517,14 @@ var assignmentRow = (assignment) => ({
   rev: assignment.intentRevision,
   accepted: assignment.acceptance !== undefined,
   agent: assignment.specialist?.agentId ?? null,
-  objective: oneLine3(assignment.objective)
+  objective: oneLine2(assignment.objective)
 });
 var intentRow = (intent, inUse) => ({
   id: intent.id,
   state: intent.state,
   revision: intent.revision,
   inUse,
-  objective: oneLine3(intent.objective)
+  objective: oneLine2(intent.objective)
 });
 var byId = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 var valueOf = (args, name) => args.values[name]?.[0];
@@ -20890,6 +19641,21 @@ var VCS_COMMANDS = [
     }).pipe(provide3(call.vcs))
   }
 ];
+var {$ } = globalThis.Bun;
+var shellLive = (env) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  return succeed5(Shell, Shell.of({
+    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
+    run: (command, args, options) => tryPromise2({
+      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+        exitCode: result.exitCode,
+        stdout: result.stdout.toString(),
+        stderr: result.stderr.toString()
+      })),
+      catch: (error) => String(error)
+    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+  }));
+};
 var DETAIL_CHARS = 400;
 
 class ProviderNotReady extends TaggedError2("ProviderNotReady") {
@@ -20974,7 +19740,7 @@ var cliPiModelCatalog = (cwd, env) => (config) => gen2(function* () {
     return;
   return yield* listModelCatalog((_command, args) => spawn(executable.value, args, {
     cwd: homeDirectory2(env),
-    env: definedEnv({ ...env, ...providerEnv(config), PI_OFFLINE: "1" })
+    env: definedEnv2({ ...env, ...providerEnv(config), PI_OFFLINE: "1" })
   }).pipe(map4(({ code, stdout, stderr }) => ({
     exitCode: code,
     stdout: new TextDecoder().decode(stdout),
@@ -21073,14 +19839,14 @@ var FIRST_PASS = {
 var ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
 var firstPassPrompt = (roleTask) => FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback) => fallback);
 var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
-var oneLine4 = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine3 = (text) => text.replace(/\s+/g, " ").trim();
 var byId2 = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 var assignmentRow2 = (row) => ({
   id: row.id,
   role: row.roleTask,
   rev: row.intentRevision,
   agent: row.specialist?.agentId ?? null,
-  objective: oneLine4(row.objective)
+  objective: oneLine3(row.objective)
 });
 var statusFrom = (snapshot) => {
   const open = byId2(snapshot.project.intents.filter((intent) => intent.state === "Open"));
@@ -21096,7 +19862,7 @@ var statusFrom = (snapshot) => {
     intents: open.map(({ id, revision, objective }) => ({
       id,
       revision,
-      objective: oneLine4(objective),
+      objective: oneLine3(objective),
       ...id === inUse ? {} : {
         running: waiting(id).filter(isRunning).length,
         unaccepted: waiting(id).filter(isUnaccepted).length
@@ -21598,9 +20364,9 @@ var ASSIGNMENT_COMMANDS = [
     run: coreCommand("assignment list")
   }
 ];
-import { mkdir as mkdir10, mkdtemp as mkdtemp4, rm as rm10 } from "fs/promises";
+import { mkdir as mkdir9, mkdtemp as mkdtemp3, rm as rm9 } from "fs/promises";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join29 } from "path";
+import { join as join28 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -21609,7 +20375,7 @@ class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
 var READY_TIMEOUT_MS = 20000;
 var POLL_MS = 100;
 var STOP_GRACE_MS = 3000;
-var FOLDERS = { profile: "profile", config: "browser-use", harness: "harness" };
+var FOLDERS2 = { profile: "profile", config: "browser-use", harness: "harness" };
 var chromiumArguments = (profile, sandbox) => [
   "--headless=new",
   "--remote-debugging-port=0",
@@ -21662,7 +20428,7 @@ var reachesServer = (name) => {
   return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_");
 };
 var serverEnvironment = (inherited, port, folders) => ({
-  ...Object.fromEntries(Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name))),
+  ...Object.fromEntries(Object.entries(definedEnv2(inherited)).filter(([name]) => reachesServer(name))),
   BU_CDP_URL: `http://127.0.0.1:${port}`,
   BU_NAME: `holyagent-${port}`,
   ANONYMIZED_TELEMETRY: "0",
@@ -21692,13 +20458,13 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join29(base, FOLDERS.profile),
-    config: join29(base, FOLDERS.config),
-    harness: join29(base, FOLDERS.harness)
+    profile: join28(base, FOLDERS2.profile),
+    config: join28(base, FOLDERS2.config),
+    harness: join28(base, FOLDERS2.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
-  const inherited = definedEnv(options.env);
+  const inherited = definedEnv2(options.env);
   const chromium = yield* acquireRelease2(host.spawn({
     command: executable,
     args: chromiumArguments(folders.profile, !host.root),
@@ -21759,19 +20525,19 @@ var liveHost = {
     },
     catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join29(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join28(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp4(join29(tmpdir2(), prefix)),
+    try: () => mkdtemp3(join28(tmpdir2(), prefix)),
     catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
-    try: () => mkdir10(path, { recursive: true }),
+    try: () => mkdir9(path, { recursive: true }),
     catch: (cause) => failed3(`cannot create ${path}: ${reason(cause)}`)
   }).pipe(asVoid2),
-  removeDirectory: (path) => tryPromise2(() => rm10(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+  removeDirectory: (path) => tryPromise2(() => rm9(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
   signals: acquireRelease2(sync2(() => {
     const received = makeUnsafe2();
     const handlers = SIGNALS.map(([name, code]) => {
@@ -21807,8 +20573,8 @@ var BROWSER_SERVER_COMMANDS = [
   }
 ];
 
-import { stat as stat6 } from "fs/promises";
-var hasStateFolder = (directory) => io(directory, () => stat6(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+import { stat as stat5 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat5(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 
 var delegating_default = `## Delegating
 
@@ -21859,7 +20625,7 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent-cli state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent-cli vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
-var setupNotice = (env, cwd) => {
+var setupNotice2 = (env, cwd) => {
   if (inCloudSession(env))
     return succeed6(undefined);
   const missing = isNone2(findCommand(env, "ctx7", { includeBunBin: true })) ? ["ctx7"] : [];
@@ -21878,17 +20644,17 @@ var setupNotice = (env, cwd) => {
     return lacking.length === 0 ? undefined : `holyagent: setup is incomplete (missing ${lacking.join(", ")}). Offer the user to run /holyagent:setup, which installs and configures; do not run it unasked.`;
   }));
 };
-import { lstat as lstat10, mkdir as mkdir11, open as open7 } from "fs/promises";
-import { tmpdir as tmpdir3, userInfo as userInfo2 } from "os";
-import { join as join30 } from "path";
+import { lstat as lstat9, mkdir as mkdir10, open as open7 } from "fs/promises";
+import { tmpdir as tmpdir3, userInfo } from "os";
+import { join as join29 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join30(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo2().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join30(markers(), sessionId);
+var markers = () => join29(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join29(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir11(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat10(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir10(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat9(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -22067,7 +20833,7 @@ var resolveIntent2 = (snapshot) => {
   return chosen === undefined ? fail5(new NoActiveIntent({
     open: openIntents(snapshot).map(({ id, objective }) => ({
       id,
-      objective: oneLine3(objective)
+      objective: oneLine2(objective)
     }))
   })) : succeed6(chosen);
 };
@@ -29576,7 +28342,7 @@ var HOOK_COMMANDS = [
     const core = rootCore(payload, call);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
     return gen2(function* () {
-      const notices = [yield* setupNotice(call.env, call.cwd), yield* cloudCheckoutNotice(call)];
+      const notices = [yield* setupNotice2(call.env, call.cwd), yield* cloudCheckoutNotice(call)];
       const notice = notices.filter((text) => text !== undefined).join(`
 
 `) || undefined;
@@ -29739,8 +28505,8 @@ var MIGRATE_COMMANDS = [
 import { join as join34 } from "path";
 
 import { randomUUID as randomUUID4 } from "crypto";
-import { lstat as lstat11, mkdir as mkdir12, readdir as readdir6, readFile as readFile6, realpath as realpath7, rename as rename8, rm as rm11, writeFile as writeFile7 } from "fs/promises";
-import { basename as basename9, dirname as dirname14, isAbsolute as isAbsolute11, join as join32, resolve as resolve14 } from "path";
+import { lstat as lstat10, mkdir as mkdir11, readdir as readdir5, readFile as readFile6, realpath as realpath7, rename as rename7, rm as rm10, writeFile as writeFile6 } from "fs/promises";
+import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, resolve as resolve14 } from "path";
 
 var SKILL_default = `---
 name: holyagent-workflow
@@ -29838,8 +28604,8 @@ var codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independen
   };
 });
 
-import { mkdtemp as mkdtemp5 } from "fs/promises";
-import { isAbsolute as isAbsolute10, join as join31 } from "path";
+import { mkdtemp as mkdtemp4 } from "fs/promises";
+import { isAbsolute as isAbsolute10, join as join30 } from "path";
 var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace";
 var catalogName = "root-only-models.json";
 var verifiedCatalog = "d50b6749506d97e5f334dbabcb666eb1689f423cf3e88cfabdcf3c536b873068";
@@ -29894,13 +28660,13 @@ var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile,
   return [
     {
       path: "config.toml",
-      content: codexStartupConfig(catalog === undefined ? undefined : join31(target, catalogName))
+      content: codexStartupConfig(catalog === undefined ? undefined : join30(target, catalogName))
     },
     ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
     { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
     ...codexRoleFiles(),
     ...codexMarketplaceFiles(version).map(({ path, content }) => ({
-      path: join31(CODEX_STARTUP_MARKETPLACE, path),
+      path: join30(CODEX_STARTUP_MARKETPLACE, path),
       content
     }))
   ];
@@ -29911,12 +28677,12 @@ var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile)
   if (catalogFile !== undefined)
     yield* readRootOnlyCatalog(catalogFile);
   const target = yield* tryPromise2({
-    try: () => mkdtemp5(join31(parent, "holyagent-codex-")),
+    try: () => mkdtemp4(join30(parent, "holyagent-codex-")),
     catch: (cause) => new StartupStageError({ detail: String(cause) })
   });
   const files = yield* codexStartupFiles(target, catalogFile);
   yield* forEach2(files, ({ path, content }) => tryPromise2({
-    try: () => Bun.write(join31(target, path), content),
+    try: () => Bun.write(join30(target, path), content),
     catch: (cause) => new StartupStageError({ detail: `${path}: ${String(cause)}` })
   }));
   return target;
@@ -29938,12 +28704,12 @@ var PluginList = Struct({
     enabled: Boolean3
   }))
 });
-var receiptFile = join32("holyagent", "setup-v1.json");
+var receiptFile = join31("holyagent", "setup-v1.json");
 var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
 var fail9 = (detail) => new StartupStageError({ detail });
-var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex");
+var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex");
 var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) });
-var statOptional = (path) => tryPromise2({ try: () => lstat11(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`))));
+var statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`))));
 var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
   const target = resolve14(candidate);
   const root = yield* statOptional(target);
@@ -29952,10 +28718,10 @@ var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
   let ancestor = target;
   const suffix = [];
   while ((yield* statOptional(ancestor)) === undefined) {
-    suffix.unshift(basename9(ancestor));
-    ancestor = dirname14(ancestor);
+    suffix.unshift(basename8(ancestor));
+    ancestor = dirname13(ancestor);
   }
-  return join32(yield* io2(ancestor, () => realpath7(ancestor)), ...suffix);
+  return join31(yield* io2(ancestor, () => realpath7(ancestor)), ...suffix);
 });
 var inside = fn2("codexSetupPath")(function* (home, relativePath) {
   let path = home;
@@ -29966,7 +28732,7 @@ var inside = fn2("codexSetupPath")(function* (home, relativePath) {
   if (pieces.some((piece) => piece === "" || piece === "." || piece === ".."))
     return yield* fail9(`Invalid relative profile path: ${relativePath}`);
   for (const [i, piece] of pieces.entries()) {
-    path = join32(path, piece);
+    path = join31(path, piece);
     const entry = yield* statOptional(path);
     if (entry !== undefined && (entry.isSymbolicLink() || i < pieces.length - 1 && !entry.isDirectory()))
       return yield* fail9(`Not a real profile path: ${path}`);
@@ -29986,7 +28752,7 @@ var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expecte
   const allowed = new Set(expected.map(({ path }) => path));
   const directories = new Set([root]);
   for (const { path } of expected)
-    for (let parent = dirname14(path);parent !== root; parent = dirname14(parent))
+    for (let parent = dirname13(path);parent !== root; parent = dirname13(parent))
       directories.add(parent);
   for (const directory of directories) {
     const absolute = yield* inside(home, directory);
@@ -29995,17 +28761,17 @@ var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expecte
       continue;
     if (stat === undefined || !stat.isDirectory())
       return yield* fail9(`Missing or invalid Codex plugin directory: ${absolute}`);
-    const names = yield* io2(absolute, () => readdir6(absolute));
+    const names = yield* io2(absolute, () => readdir5(absolute));
     for (const name of names) {
-      const file = join32(directory, name);
+      const file = join31(directory, name);
       if (!allowed.has(file) && !directories.has(file))
-        return yield* fail9(`Kept unowned entry in Codex plugin: ${join32(home, file)}`);
+        return yield* fail9(`Kept unowned entry in Codex plugin: ${join31(home, file)}`);
     }
   }
   if (complete) {
     for (const { path, content } of expected)
       if ((yield* read2(home, path)) !== content)
-        return yield* fail9(`Kept modified Codex plugin cache: ${join32(home, path)}`);
+        return yield* fail9(`Kept modified Codex plugin cache: ${join31(home, path)}`);
   }
 });
 var record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
@@ -30029,26 +28795,26 @@ var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expe
   if (expected === content)
     return;
   const path = yield* inside(home, relativePath);
-  yield* io2(path, () => mkdir12(dirname14(path), { recursive: true }));
+  yield* io2(path, () => mkdir11(dirname13(path), { recursive: true }));
   if ((yield* read2(home, relativePath)) !== expected)
     return yield* fail9(`Profile changed during setup: ${path}`);
   if (expected === undefined) {
-    yield* io2(path, () => writeFile7(path, content, { flag: "wx", mode: 384 }));
+    yield* io2(path, () => writeFile6(path, content, { flag: "wx", mode: 384 }));
     return;
   }
   const next = `${path}.${randomUUID4()}.tmp`;
-  yield* io2(path, () => writeFile7(next, content, { flag: "wx", mode: 384 }));
+  yield* io2(path, () => writeFile6(next, content, { flag: "wx", mode: 384 }));
   yield* gen2(function* () {
     if ((yield* read2(home, relativePath)) !== expected)
       return yield* fail9(`Profile changed during setup: ${path}`);
-    yield* io2(path, () => rename8(next, path));
-  }).pipe(ensuring2(io2(next, () => rm11(next, { force: true })).pipe(ignore2)));
+    yield* io2(path, () => rename7(next, path));
+  }).pipe(ensuring2(io2(next, () => rm10(next, { force: true })).pipe(ignore2)));
 });
 var setupCodex = fn2("setupCodex")(function* (env, options) {
   if (!isAbsolute11(options.home))
     return yield* fail9("--codex-home must be an absolute path");
   const home = yield* canonicalProfile(options.home);
-  if (home === dirname14(home))
+  if (home === dirname13(home))
     return yield* fail9("Choose a dedicated Codex profile, not a filesystem root");
   const version = options.version ?? CODEX_ASSET_VERSION;
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
@@ -30063,7 +28829,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
   const desired = yield* codexStartupFiles(home, options.catalog, version);
   const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
-    path: join32(CODEX_STARTUP_MARKETPLACE, path),
+    path: join31(CODEX_STARTUP_MARKETPLACE, path),
     content
   }));
   const config = desired.find(({ path }) => path === "config.toml")?.content;
@@ -30074,9 +28840,11 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   if (beforeOverride?.trim())
     return yield* fail9("This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.");
   const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig);
+  if (record4(settings.features).plugins === false)
+    return yield* fail9("This profile disables Codex plugins ([features] plugins = false). No files changed.");
   if (beforeConfig !== undefined)
     yield* checkPolicy(settings, yield* parseToml(config));
-  const market = join32(home, CODEX_STARTUP_MARKETPLACE);
+  const market = join31(home, CODEX_STARTUP_MARKETPLACE);
   const registered = record4(record4(settings.marketplaces)[CODEX_MARKETPLACE]);
   if (Object.keys(registered).length > 0 && (registered.source !== market || registered.source_type !== "local"))
     return yield* fail9(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}; kept it unchanged`);
@@ -30088,10 +28856,10 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
     const before = yield* read2(home, asset.path);
     if (before !== undefined && before !== asset.content && digest(before) !== receipt.files[asset.path] && before !== legacy.find(({ path }) => path === asset.path)?.content)
-      return yield* fail9(`Kept modified or unowned Codex setup file: ${join32(home, asset.path)}`);
+      return yield* fail9(`Kept modified or unowned Codex setup file: ${join31(home, asset.path)}`);
     return { ...asset, before };
   }));
-  const sourceRoot = join32(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+  const sourceRoot = join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
   const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
   yield* checkPluginTree(home, sourceRoot, pluginAssets, false);
   const nextReceipt = `${JSON.stringify({
@@ -30099,9 +28867,9 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
   }, null, 2)}
 `;
-  const cache = join32("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
+  const cache = join31("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
   const expectedCache = pluginAssets.map(({ path, content }) => ({
-    path: join32(cache, path.slice(sourceRoot.length + 1)),
+    path: join31(cache, path.slice(sourceRoot.length + 1)),
     content
   }));
   const cached = yield* statOptional(yield* inside(home, cache));
@@ -30128,6 +28896,9 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
     ...addMarket ? ["+ Codex plugin: register the local marketplace"] : [],
     ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present in the local cache`],
+    ...record4(settings.skills).include_instructions === false ? [
+      "~ Codex skills: this profile disables automatic skill listings. HolyAgent workflow will not be listed in the prompt under this setting."
+    ] : [],
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
   ];
   if (options.dryRun)
@@ -30145,8 +28916,8 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
       label: "Codex profile files",
       run: gen2(function* () {
         if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride)
-          return yield* fail9(`Profile changed during setup: ${join32(home, "config.toml")}`);
-        yield* io2(home, () => mkdir12(home, { recursive: true, mode: 448 }));
+          return yield* fail9(`Profile changed during setup: ${join31(home, "config.toml")}`);
+        yield* io2(home, () => mkdir11(home, { recursive: true, mode: 448 }));
         if (beforeConfig === undefined)
           yield* store2(home, "config.toml", undefined, config);
         for (const asset of assets)
@@ -30184,8 +28955,1654 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run);
   return { ok: true, lines, fingerprint };
 });
+import { constants as constants6 } from "fs";
+import { posix as posix3, win32 as win323 } from "path";
+var BROWSERS = [
+  {
+    id: "chrome",
+    name: "Google Chrome",
+    clients: ["Google Chrome", "Chrome"],
+    winExe: ["chrome.exe"],
+    winInstall: ["Google/Chrome/Application/chrome.exe"],
+    app: "Google Chrome",
+    commands: ["google-chrome", "google-chrome-stable"]
+  },
+  {
+    id: "chrome-beta",
+    name: "Google Chrome Beta",
+    clients: ["Google Chrome Beta", "Chrome Beta"],
+    winExe: ["chrome.exe"],
+    winInstall: ["Google/Chrome Beta/Application/chrome.exe"],
+    app: "Google Chrome Beta",
+    commands: ["google-chrome-beta"]
+  },
+  {
+    id: "chrome-canary",
+    name: "Google Chrome Canary",
+    clients: ["Google Chrome Canary", "Chrome Canary"],
+    winExe: ["chrome.exe"],
+    winInstall: ["Google/Chrome SxS/Application/chrome.exe"],
+    app: "Google Chrome Canary"
+  },
+  { id: "chrome-unstable", name: "Google Chrome Unstable", commands: ["google-chrome-unstable"] },
+  {
+    id: "chromium",
+    name: "Chromium",
+    clients: ["Chromium"],
+    winExe: ["chromium.exe", "chrome.exe"],
+    winInstall: ["Chromium/Application/chrome.exe"],
+    app: "Chromium",
+    commands: ["chromium", "chromium-browser"]
+  },
+  {
+    id: "edge",
+    name: "Microsoft Edge",
+    clients: ["Microsoft Edge", "MSEdge"],
+    winExe: ["msedge.exe"],
+    winInstall: ["Microsoft/Edge/Application/msedge.exe"],
+    app: "Microsoft Edge",
+    commands: ["microsoft-edge", "microsoft-edge-stable"]
+  },
+  {
+    id: "brave",
+    name: "Brave",
+    clients: ["Brave", "Brave Browser", "BraveSoftware.Brave-Browser"],
+    winExe: ["brave.exe"],
+    winInstall: ["BraveSoftware/Brave-Browser/Application/brave.exe"],
+    app: "Brave Browser",
+    commands: ["brave", "brave-browser"]
+  },
+  {
+    id: "opera",
+    name: "Opera",
+    clients: ["Opera", "OperaStable"],
+    winExe: ["opera.exe", "launcher.exe"],
+    winInstall: [
+      "Programs/Opera/opera.exe",
+      "Programs/Opera/launcher.exe",
+      "Opera/opera.exe",
+      "Opera/launcher.exe"
+    ],
+    app: "Opera",
+    commands: ["opera"]
+  },
+  {
+    id: "vivaldi",
+    name: "Vivaldi",
+    clients: ["Vivaldi"],
+    winExe: ["vivaldi.exe"],
+    winInstall: ["Vivaldi/Application/vivaldi.exe"],
+    app: "Vivaldi",
+    commands: ["vivaldi", "vivaldi-stable"]
+  },
+  {
+    id: "helium",
+    name: "Helium",
+    clients: ["Helium"],
+    winExe: ["helium.exe", "chrome.exe"],
+    winInstall: ["imput/Helium/Application/chrome.exe"],
+    app: "Helium",
+    commands: ["helium", "helium-browser"]
+  },
+  { id: "arc", name: "Arc", clients: ["Arc"], winExe: ["Arc.exe"], app: "Arc" },
+  {
+    id: "firefox",
+    name: "Firefox",
+    family: "gecko",
+    clients: ["Firefox", "FirefoxURL"],
+    winExe: ["firefox.exe"],
+    winInstall: ["Mozilla Firefox/firefox.exe", "Programs/Mozilla Firefox/firefox.exe"],
+    app: "Firefox",
+    macExe: "firefox",
+    commands: ["firefox", "firefox-esr"]
+  },
+  {
+    id: "librewolf",
+    name: "LibreWolf",
+    family: "gecko",
+    clients: ["LibreWolf"],
+    winExe: ["librewolf.exe"],
+    commands: ["librewolf"]
+  },
+  {
+    id: "waterfox",
+    name: "Waterfox",
+    family: "gecko",
+    clients: ["Waterfox"],
+    winExe: ["waterfox.exe"],
+    commands: ["waterfox"]
+  }
+];
+var envOf = (env, name, windows) => env[name] ?? (windows ? Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1] : undefined);
+var localPath = (value, windows) => {
+  if (Array.from(value).some((char) => (char.codePointAt(0) ?? 0) < 32))
+    return;
+  if (windows)
+    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win323.normalize(value) : undefined;
+  return value.startsWith("/") ? posix3.normalize(value) : undefined;
+};
+var checkFile = (path, executable, windows) => gen2(function* () {
+  const fs = yield* fileSystem;
+  const metadata = yield* tryPromise2(() => fs.stat(path));
+  if (!metadata.isFile() || executable && metadata.size === 0)
+    return false;
+  if (executable && !windows)
+    yield* try_2(() => fs.accessSync(path, constants6.X_OK));
+  return true;
+}).pipe(orElseSucceed2(() => false));
+var oneFile = (paths, windows) => findFirst2([...new Set(paths)], (path) => checkFile(path, true, windows));
+var profileRoot = (browser, env, platform) => {
+  const windows = platform === "win32";
+  const home = envOf(env, windows ? "USERPROFILE" : "HOME", windows) ?? homeDirectory2(env);
+  if (browser.id === "firefox") {
+    if (windows)
+      return localPath(win323.join(envOf(env, "APPDATA", true) ?? win323.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
+    return localPath(posix3.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
+  }
+  const profileEnv = windows ? {
+    ...env,
+    HOME: home,
+    LOCALAPPDATA: envOf(env, "LOCALAPPDATA", true),
+    APPDATA: envOf(env, "APPDATA", true)
+  } : env;
+  const directory = browserDirectories(profileEnv, platform).find(({ name }) => name === browser.name)?.directory;
+  return directory === undefined ? undefined : localPath(!windows && process.platform === "win32" ? directory.replaceAll("\\", "/") : directory, windows);
+};
+var compatibility = (browser, platform, profileDirectory) => browser.family === "gecko" ? "unsupported" : browser.id === "helium" && platform === "win32" || profileDirectory === undefined ? "unverified" : "supported";
+var evidence = (browser, source, platform, profileDirectory, executable) => ({
+  id: browser.id,
+  name: browser.name,
+  family: browser.family ?? "chromium",
+  source,
+  browseCompatibility: compatibility(browser, platform, profileDirectory),
+  ...profileDirectory === undefined ? {} : { profileDirectory },
+  ...executable === undefined ? {} : { executable }
+});
+var knownPaths = (browser, env, platform) => {
+  const home = homeDirectory2(env);
+  if (platform === "win32") {
+    const user = envOf(env, "USERPROFILE", true) ?? home;
+    const programRoots = [
+      envOf(env, "LOCALAPPDATA", true) ?? win323.join(user, "AppData", "Local"),
+      ...["ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"].map((name) => envOf(env, name, true))
+    ];
+    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win323.join(root, rest)) : []);
+  }
+  if (platform === "darwin" && browser.app !== undefined) {
+    const app = browser.app;
+    return ["/Applications", posix3.join(home, "Applications")].filter(posix3.isAbsolute).map((root) => posix3.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
+  }
+  if (platform === "linux")
+    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix3.join(root, command)));
+  return [];
+};
+var uniqueWinNames = (browser) => (browser.winExe ?? []).filter((exe) => exe.toLowerCase() !== "launcher.exe" && BROWSERS.filter((candidate) => candidate.winExe?.includes(exe)).length === 1);
+var pathsOnPath = (browser, env, windows) => {
+  const pathApi = windows ? win323 : posix3;
+  const names = windows ? uniqueWinNames(browser) : browser.commands ?? [];
+  return (envOf(env, "PATH", windows) ?? "").split(pathApi.delimiter).flatMap((entry) => {
+    const root = localPath(entry, windows);
+    return root === undefined ? [] : names.map((exe) => pathApi.join(root, exe));
+  });
+};
+var Clients = "SOFTWARE\\Clients\\StartMenuInternet";
+var AppPaths = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths";
+var hives = ["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"];
+var RegistryValue = String5.check(isPattern2(/^\s*.+?\s+REG_(?:EXPAND_)?SZ\s+.+$/i));
+var registryExecutable = (stdout, env) => {
+  for (const line of stdout.split(/\r?\n/)) {
+    if (!is2(RegistryValue)(line))
+      continue;
+    const match = /\sREG_(EXPAND_)?SZ\s+(.+)$/i.exec(line);
+    let command = match?.[2]?.trim();
+    if (command === undefined)
+      continue;
+    if (match?.[1] !== undefined)
+      command = command.replaceAll(/%([^%]+)%/g, (raw, name) => envOf(env, name, true) ?? raw);
+    const parsed = /^(?:"([^"]+\.exe)"|([^"\r\n]+?\.exe))(?:\s|$)/i.exec(command);
+    const exe = parsed?.[1] ?? parsed?.[2];
+    if (exe !== undefined)
+      return localPath(exe, true);
+  }
+  return;
+};
+var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
+  const root = envOf(env, "SystemRoot", true) ?? envOf(env, "WINDIR", true);
+  const local = root === undefined ? undefined : localPath(root, true);
+  if (local === undefined)
+    return new Map;
+  const reg = win323.join(local, "System32", "reg.exe");
+  if (!(yield* checkFile(reg, true, true)))
+    return new Map;
+  const shell = yield* Shell;
+  const views = ["/reg:64", "/reg:32"];
+  const query = (key, view, value) => shell.run(reg, ["query", key, ...value ? ["/ve"] : [], view], { cwd: local }).pipe(map4(({ exitCode, stdout }) => exitCode === 0 ? stdout : ""));
+  const registered = new Map;
+  const roots = hives.flatMap((hive) => views.map((view) => ({ hive, view })));
+  const all = yield* forEach2(roots, ({ hive, view }) => query(`${hive}\\${Clients}`, view, false).pipe(map4((text) => ({ hive, view, text }))), { concurrency: 4 });
+  for (const { hive, view, text } of all) {
+    const prefix = `${hive}\\${Clients}\\`;
+    const children = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.toLowerCase().startsWith(prefix.toLowerCase())).map((line) => line.slice(prefix.length)).filter((child) => /^[\w .-]{1,80}$/.test(child));
+    const chosen = children.flatMap((client) => {
+      const name = client.toLowerCase();
+      const browser = BROWSERS.find(({ clients }) => clients?.some((entry) => {
+        const registeredName = entry.toLowerCase();
+        if (name === registeredName)
+          return true;
+        return name.startsWith(registeredName + "-") && /^[a-f\d]{6,}$/i.test(name.slice(registeredName.length + 1));
+      }));
+      return browser === undefined || registered.has(browser.id) ? [] : [{ client, browser }];
+    });
+    const verified = yield* forEach2(chosen, ({ client, browser }) => gen2(function* () {
+      const output = yield* query(`${prefix}${client}\\shell\\open\\command`, view, true);
+      const path = registryExecutable(output, env);
+      return path !== undefined && browser.winExe?.some((exe) => exe.toLowerCase() === win323.basename(path).toLowerCase()) && (yield* checkFile(path, true, true)) ? { id: browser.id, path } : undefined;
+    }), { concurrency: 4 });
+    for (const entry of verified)
+      if (entry !== undefined && !registered.has(entry.id))
+        registered.set(entry.id, entry.path);
+  }
+  const missing = BROWSERS.filter((browser) => !registered.has(browser.id));
+  const appNames = ["chrome.exe", "firefox.exe", "helium.exe"].filter((exe) => missing.some(({ winExe }) => winExe?.includes(exe)));
+  const appResults = yield* forEach2(roots.flatMap(({ hive, view }) => appNames.map((exe) => ({ hive, view, exe }))), ({ hive, view, exe }) => query(`${hive}\\${AppPaths}\\${exe}`, view, true).pipe(map4((stdout) => ({ exe, path: registryExecutable(stdout, env) }))), { concurrency: 4 });
+  for (const { exe, path } of appResults) {
+    if (path === undefined || win323.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
+      continue;
+    const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win323.normalize(suffix).toLowerCase()}`)));
+    if (browser !== undefined && !registered.has(browser.id))
+      registered.set(browser.id, path);
+  }
+  return registered;
+});
+var discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = process.platform) {
+  const windows = platform === "win32";
+  const path = windows ? win323 : posix3;
+  if (!windows && platform !== "linux" && platform !== "darwin")
+    return [];
+  const registry = windows ? yield* windowsRegistrations(env) : new Map;
+  const browsers = yield* forEach2(BROWSERS, (browser) => gen2(function* () {
+    const profileDirectory = profileRoot(browser, env, platform);
+    const registered = registry.get(browser.id);
+    if (registered !== undefined)
+      return evidence(browser, "registry", platform, profileDirectory, registered);
+    const known = yield* oneFile(knownPaths(browser, env, platform), windows);
+    if (known._tag === "Some")
+      return evidence(browser, "known-path", platform, profileDirectory, known.value);
+    const resolved = yield* oneFile(pathsOnPath(browser, env, windows), windows);
+    if (resolved._tag === "Some")
+      return evidence(browser, "path", platform, profileDirectory, resolved.value);
+    if (profileDirectory === undefined)
+      return;
+    const markers = browser.family === "gecko" ? ["profiles.ini"] : ["Local State", "Default/Preferences"];
+    for (const marker of markers)
+      if (yield* checkFile(path.join(profileDirectory, marker), false, windows))
+        return evidence(browser, "profile", platform, profileDirectory);
+    return;
+  }), { concurrency: 4 });
+  return browsers.filter((browser) => browser !== undefined);
+});
+var checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absolutePath, platform = process.platform) {
+  const windows = platform === "win32";
+  const clean = localPath(absolutePath, windows);
+  if (clean === undefined || windows && !clean.toLowerCase().endsWith(".exe") || !(yield* checkFile(clean, true, windows)))
+    return;
+  const key = windows ? clean.toLowerCase() : clean;
+  const browser = BROWSERS.find((candidate) => [...knownPaths(candidate, env, platform), ...pathsOnPath(candidate, env, windows)].some((path) => (windows ? path.toLowerCase() : path) === key));
+  return browser === undefined ? {
+    id: "manual",
+    name: "Manually selected browser",
+    family: "unknown",
+    executable: clean,
+    source: "manual",
+    browseCompatibility: "unverified"
+  } : evidence(browser, "manual", platform, profileRoot(browser, env, platform), clean);
+});
 import { dirname as dirname15, join as join33 } from "path";
 var {$: $2 } = globalThis.Bun;
+import { lstat as lstat11, mkdir as mkdir12, mkdtemp as mkdtemp5, readdir as readdir6, rename as rename8, rm as rm11, stat as stat6, writeFile as writeFile7 } from "fs/promises";
+import { userInfo as userInfo2 } from "os";
+import { basename as basename9, dirname as dirname14, join as join32, posix as posix4, win32 as win324 } from "path";
+import { pathToFileURL } from "url";
+
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_MANIFEST_NAME = "holyagent-setup-tui";
+var Dependencies = optional2(Record(String5, String5));
+var Entry = TupleWithRest(Tuple([
+  String5,
+  String5,
+  Struct({
+    dependencies: Dependencies,
+    optionalDependencies: Dependencies,
+    peerDependencies: Dependencies
+  })
+]), [Unknown2]);
+var Lock = Struct({
+  lockfileVersion: Number5,
+  configVersion: optional2(Number5),
+  packages: Record(String5, Unknown2)
+});
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.9.7",
+  "@opentui/solid": "0.9.7",
+  "solid-js": "1.9.20"
+};
+var TUI_LOCK = `{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "holyagent-setup-tui",
+      "dependencies": {
+        "@opentui/core": "0.9.7",
+        "@opentui/solid": "0.9.7",
+        "solid-js": "1.9.20"
+      }
+    }
+  },
+  "packages": {
+    "@babel/code-frame": [
+      "@babel/code-frame@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "js-tokens": "^4.0.0",
+          "picocolors": "^1.1.1"
+        }
+      },
+      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
+    ],
+    "@babel/compat-data": [
+      "@babel/compat-data@7.29.7",
+      "",
+      {},
+      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
+    ],
+    "@babel/core": [
+      "@babel/core@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.7",
+          "@babel/helper-compilation-targets": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helpers": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/template": "^7.29.7",
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7",
+          "@jridgewell/remapping": "^2.3.5",
+          "convert-source-map": "^2.0.0",
+          "debug": "^4.1.0",
+          "gensync": "^1.0.0-beta.2",
+          "json5": "^2.2.3",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
+    ],
+    "@babel/generator": [
+      "@babel/generator@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/parser": "^7.29.15",
+          "@babel/types": "^7.29.15",
+          "@jridgewell/gen-mapping": "^0.3.12",
+          "@jridgewell/trace-mapping": "^0.3.28",
+          "jsesc": "^3.0.2"
+        }
+      },
+      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
+    ],
+    "@babel/helper-annotate-as-pure": [
+      "@babel/helper-annotate-as-pure@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
+    ],
+    "@babel/helper-compilation-targets": [
+      "@babel/helper-compilation-targets@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/compat-data": "^7.29.7",
+          "@babel/helper-validator-option": "^7.29.7",
+          "browserslist": "^4.24.0",
+          "lru-cache": "^5.1.1",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
+    ],
+    "@babel/helper-create-class-features-plugin": [
+      "@babel/helper-create-class-features-plugin@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/helper-replace-supers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.13",
+          "semver": "^6.3.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
+    ],
+    "@babel/helper-globals": [
+      "@babel/helper-globals@7.29.7",
+      "",
+      {},
+      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
+    ],
+    "@babel/helper-member-expression-to-functions": [
+      "@babel/helper-member-expression-to-functions@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.14",
+          "@babel/types": "^7.29.14"
+        }
+      },
+      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
+    ],
+    "@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
+    ],
+    "@babel/helper-module-transforms": [
+      "@babel/helper-module-transforms@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "^7.29.7",
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "@babel/traverse": "^7.29.14"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
+    ],
+    "@babel/helper-optimise-call-expression": [
+      "@babel/helper-optimise-call-expression@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
+    ],
+    "@babel/helper-plugin-utils": [
+      "@babel/helper-plugin-utils@7.29.7",
+      "",
+      {},
+      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
+    ],
+    "@babel/helper-replace-supers": [
+      "@babel/helper-replace-supers@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/traverse": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
+    ],
+    "@babel/helper-skip-transparent-expression-wrappers": [
+      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.13",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
+    ],
+    "@babel/helper-string-parser": [
+      "@babel/helper-string-parser@7.29.15",
+      "",
+      {},
+      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
+    ],
+    "@babel/helper-validator-identifier": [
+      "@babel/helper-validator-identifier@7.29.7",
+      "",
+      {},
+      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    ],
+    "@babel/helper-validator-option": [
+      "@babel/helper-validator-option@7.29.7",
+      "",
+      {},
+      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
+    ],
+    "@babel/helpers": [
+      "@babel/helpers@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15"
+        }
+      },
+      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
+    ],
+    "@babel/parser": [
+      "@babel/parser@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.15"
+        },
+        "bin": "./bin/babel-parser.js"
+      },
+      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
+    ],
+    "@babel/plugin-syntax-jsx": [
+      "@babel/plugin-syntax-jsx@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
+    ],
+    "@babel/plugin-syntax-typescript": [
+      "@babel/plugin-syntax-typescript@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
+    ],
+    "@babel/plugin-transform-modules-commonjs": [
+      "@babel/plugin-transform-modules-commonjs@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-transforms": "^7.29.14",
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
+    ],
+    "@babel/plugin-transform-typescript": [
+      "@babel/plugin-transform-typescript@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.13",
+          "@babel/helper-plugin-utils": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/plugin-syntax-typescript": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
+    ],
+    "@babel/preset-typescript": [
+      "@babel/preset-typescript@7.27.1",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.27.1",
+          "@babel/helper-validator-option": "^7.27.1",
+          "@babel/plugin-syntax-jsx": "^7.27.1",
+          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+          "@babel/plugin-transform-typescript": "^7.27.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
+    ],
+    "@babel/template": [
+      "@babel/template@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
+    ],
+    "@babel/traverse": [
+      "@babel/traverse@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.15",
+          "@babel/helper-globals": "^7.29.7",
+          "@babel/parser": "^7.29.15",
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15",
+          "debug": "^4.3.1"
+        }
+      },
+      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
+    ],
+    "@babel/types": [
+      "@babel/types@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-string-parser": "^7.29.15",
+          "@babel/helper-validator-identifier": "^7.29.7"
+        }
+      },
+      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
+    ],
+    "@jridgewell/gen-mapping": [
+      "@jridgewell/gen-mapping@0.3.13",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/sourcemap-codec": "^1.5.0",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
+    ],
+    "@jridgewell/remapping": [
+      "@jridgewell/remapping@2.3.5",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/gen-mapping": "^0.3.5",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
+    ],
+    "@jridgewell/resolve-uri": [
+      "@jridgewell/resolve-uri@3.1.3",
+      "",
+      {},
+      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
+    ],
+    "@jridgewell/sourcemap-codec": [
+      "@jridgewell/sourcemap-codec@1.6.0",
+      "",
+      {},
+      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    ],
+    "@jridgewell/trace-mapping": [
+      "@jridgewell/trace-mapping@0.3.31",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/resolve-uri": "^3.1.0",
+          "@jridgewell/sourcemap-codec": "^1.4.14"
+        }
+      },
+      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
+    ],
+    "@opentui/core": [
+      "@opentui/core@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "bun-ffi-structs": "0.3.1",
+          "diff": "9.0.0",
+          "string-width": "7.2.0"
+        },
+        "optionalDependencies": {
+          "@opentui/core-darwin-arm64": "0.9.7",
+          "@opentui/core-darwin-x64": "0.9.7",
+          "@opentui/core-linux-arm64": "0.9.7",
+          "@opentui/core-linux-arm64-musl": "0.9.7",
+          "@opentui/core-linux-x64": "0.9.7",
+          "@opentui/core-linux-x64-musl": "0.9.7",
+          "@opentui/core-win32-arm64": "0.9.7",
+          "@opentui/core-win32-x64": "0.9.7"
+        },
+        "peerDependencies": {
+          "web-tree-sitter": "0.25.10"
+        }
+      },
+      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
+    ],
+    "@opentui/core-darwin-arm64": [
+      "@opentui/core-darwin-arm64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "arm64"
+      },
+      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
+    ],
+    "@opentui/core-darwin-x64": [
+      "@opentui/core-darwin-x64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "x64"
+      },
+      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
+    ],
+    "@opentui/core-linux-arm64": [
+      "@opentui/core-linux-arm64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
+    ],
+    "@opentui/core-linux-arm64-musl": [
+      "@opentui/core-linux-arm64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64",
+        "libc": "musl"
+      },
+      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
+    ],
+    "@opentui/core-linux-x64": [
+      "@opentui/core-linux-x64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64"
+      },
+      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
+    ],
+    "@opentui/core-linux-x64-musl": [
+      "@opentui/core-linux-x64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64",
+        "libc": "musl"
+      },
+      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
+    ],
+    "@opentui/core-win32-arm64": [
+      "@opentui/core-win32-arm64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "arm64"
+      },
+      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
+    ],
+    "@opentui/core-win32-x64": [
+      "@opentui/core-win32-x64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "x64"
+      },
+      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
+    ],
+    "@opentui/solid": [
+      "@opentui/solid@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/core": "7.29.7",
+          "@babel/preset-typescript": "7.27.1",
+          "@opentui/core": "0.9.7",
+          "babel-plugin-module-resolver": "5.0.2",
+          "babel-preset-solid": "1.9.16",
+          "entities": "7.0.1",
+          "s-js": "^0.4.9"
+        },
+        "peerDependencies": {
+          "solid-js": "^1.9.12"
+        }
+      },
+      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
+    ],
+    "ansi-regex": [
+      "ansi-regex@6.6.0",
+      "",
+      {},
+      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
+    ],
+    "babel-plugin-jsx-dom-expressions": [
+      "babel-plugin-jsx-dom-expressions@0.40.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "7.18.6",
+          "@babel/plugin-syntax-jsx": "^7.18.6",
+          "@babel/types": "^7.20.7",
+          "html-entities": "2.3.3",
+          "parse5": "^7.1.2"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.20.12"
+        }
+      },
+      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
+    ],
+    "babel-plugin-module-resolver": [
+      "babel-plugin-module-resolver@5.0.2",
+      "",
+      {
+        "dependencies": {
+          "find-babel-config": "^2.1.1",
+          "glob": "^9.3.3",
+          "pkg-up": "^3.1.0",
+          "reselect": "^4.1.7",
+          "resolve": "^1.22.8"
+        }
+      },
+      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
+    ],
+    "babel-preset-solid": [
+      "babel-preset-solid@1.9.16",
+      "",
+      {
+        "dependencies": {
+          "babel-plugin-jsx-dom-expressions": "^0.40.11"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0",
+          "solid-js": "^1.9.16"
+        },
+        "optionalPeers": [
+          "solid-js"
+        ]
+      },
+      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
+    ],
+    "baseline-browser-mapping": [
+      "baseline-browser-mapping@2.11.39",
+      "",
+      {
+        "bin": {
+          "baseline-browser-mapping": "dist/cli.cjs"
+        }
+      },
+      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
+    ],
+    "browserslist": [
+      "browserslist@4.29.6",
+      "",
+      {
+        "dependencies": {
+          "baseline-browser-mapping": "^2.11.37",
+          "caniuse-lite": "^1.0.30001826",
+          "electron-to-chromium": "^1.5.486",
+          "node-releases": "^2.0.64",
+          "update-browserslist-db": "^1.4.0"
+        },
+        "bin": {
+          "browserslist": "cli.js"
+        }
+      },
+      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
+    ],
+    "bun-ffi-structs": [
+      "bun-ffi-structs@0.3.1",
+      "",
+      {
+        "peerDependencies": {
+          "typescript": "^5"
+        }
+      },
+      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
+    ],
+    "caniuse-lite": [
+      "caniuse-lite@1.0.30001827",
+      "",
+      {},
+      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
+    ],
+    "convert-source-map": [
+      "convert-source-map@2.0.0",
+      "",
+      {},
+      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
+    ],
+    "csstype": [
+      "csstype@3.2.4",
+      "",
+      {},
+      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
+    ],
+    "debug": [
+      "debug@4.4.3",
+      "",
+      {
+        "dependencies": {
+          "ms": "^2.1.3"
+        },
+        "peerDependencies": {
+          "supports-color": "*"
+        },
+        "optionalPeers": [
+          "supports-color"
+        ]
+      },
+      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
+    ],
+    "diff": [
+      "diff@9.0.0",
+      "",
+      {},
+      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
+    ],
+    "electron-to-chromium": [
+      "electron-to-chromium@1.5.492",
+      "",
+      {},
+      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
+    ],
+    "emoji-regex": [
+      "emoji-regex@10.6.0",
+      "",
+      {},
+      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
+    ],
+    "entities": [
+      "entities@7.0.1",
+      "",
+      {},
+      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
+    ],
+    "es-errors": [
+      "es-errors@1.3.0",
+      "",
+      {},
+      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
+    ],
+    "escalade": [
+      "escalade@3.2.0",
+      "",
+      {},
+      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
+    ],
+    "find-babel-config": [
+      "find-babel-config@2.1.2",
+      "",
+      {
+        "dependencies": {
+          "json5": "^2.2.3"
+        }
+      },
+      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
+    ],
+    "fs.realpath": [
+      "fs.realpath@1.0.0",
+      "",
+      {},
+      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
+    ],
+    "function-bind": [
+      "function-bind@1.1.2",
+      "",
+      {},
+      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
+    ],
+    "gensync": [
+      "gensync@1.0.0-beta.2",
+      "",
+      {},
+      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
+    ],
+    "get-east-asian-width": [
+      "get-east-asian-width@1.6.0",
+      "",
+      {},
+      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
+    ],
+    "glob": [
+      "glob@9.3.5",
+      "",
+      {
+        "dependencies": {
+          "fs.realpath": "^1.0.0",
+          "minimatch": "^8.0.2",
+          "minipass": "^4.2.4",
+          "path-scurry": "^1.6.1"
+        }
+      },
+      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
+    ],
+    "hasown": [
+      "hasown@2.0.4",
+      "",
+      {
+        "dependencies": {
+          "function-bind": "^1.1.2"
+        }
+      },
+      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
+    ],
+    "is-core-module": [
+      "is-core-module@2.18.0",
+      "",
+      {
+        "dependencies": {
+          "hasown": "^2.0.4"
+        }
+      },
+      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
+    ],
+    "js-tokens": [
+      "js-tokens@4.0.0",
+      "",
+      {},
+      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
+    ],
+    "jsesc": [
+      "jsesc@3.1.0",
+      "",
+      {
+        "bin": {
+          "jsesc": "bin/jsesc"
+        }
+      },
+      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
+    ],
+    "json5": [
+      "json5@2.2.3",
+      "",
+      {
+        "bin": {
+          "json5": "lib/cli.js"
+        }
+      },
+      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
+    ],
+    "minipass": [
+      "minipass@4.2.8",
+      "",
+      {},
+      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
+    ],
+    "ms": [
+      "ms@2.1.3",
+      "",
+      {},
+      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
+    ],
+    "node-releases": [
+      "node-releases@2.0.65",
+      "",
+      {},
+      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
+    ],
+    "p-try": [
+      "p-try@2.2.0",
+      "",
+      {},
+      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+    ],
+    "parse5": [
+      "parse5@7.3.0",
+      "",
+      {
+        "dependencies": {
+          "entities": "^6.0.0"
+        }
+      },
+      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
+    ],
+    "path-parse": [
+      "path-parse@1.0.7",
+      "",
+      {},
+      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
+    ],
+    "path-scurry": [
+      "path-scurry@1.11.1",
+      "",
+      {
+        "dependencies": {
+          "lru-cache": "^10.2.0",
+          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
+        }
+      },
+      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
+    ],
+    "picocolors": [
+      "picocolors@1.1.1",
+      "",
+      {},
+      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    ],
+    "pkg-up": [
+      "pkg-up@3.1.0",
+      "",
+      {
+        "dependencies": {
+          "find-up": "^3.0.0"
+        }
+      },
+      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
+    ],
+    "reselect": [
+      "reselect@4.1.8",
+      "",
+      {},
+      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
+    ],
+    "resolve": [
+      "resolve@1.22.14",
+      "",
+      {
+        "dependencies": {
+          "es-errors": "^1.3.0",
+          "is-core-module": "^2.18.0",
+          "path-parse": "^1.0.7",
+          "supports-preserve-symlinks-flag": "^1.0.0"
+        },
+        "bin": {
+          "resolve": "bin/resolve"
+        }
+      },
+      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
+    ],
+    "s-js": [
+      "s-js@0.4.9",
+      "",
+      {},
+      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
+    ],
+    "seroval": [
+      "seroval@1.6.12",
+      "",
+      {},
+      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
+    ],
+    "seroval-plugins": [
+      "seroval-plugins@1.6.12",
+      "",
+      {
+        "peerDependencies": {
+          "seroval": "^1.0"
+        }
+      },
+      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
+    ],
+    "solid-js": [
+      "solid-js@1.9.20",
+      "",
+      {
+        "dependencies": {
+          "csstype": "^3.1.0",
+          "seroval": "~1.6.11",
+          "seroval-plugins": "~1.6.8"
+        }
+      },
+      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
+    ],
+    "string-width": [
+      "string-width@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "emoji-regex": "^10.3.0",
+          "get-east-asian-width": "^1.0.0",
+          "strip-ansi": "^7.1.0"
+        }
+      },
+      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
+    ],
+    "strip-ansi": [
+      "strip-ansi@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "ansi-regex": "^6.2.2"
+        }
+      },
+      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
+    ],
+    "supports-preserve-symlinks-flag": [
+      "supports-preserve-symlinks-flag@1.0.0",
+      "",
+      {},
+      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
+    ],
+    "typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
+    "update-browserslist-db": [
+      "update-browserslist-db@1.4.0",
+      "",
+      {
+        "dependencies": {
+          "escalade": "^3.2.0",
+          "picocolors": "^1.1.1"
+        },
+        "peerDependencies": {
+          "browserslist": ">= 4.21.0"
+        },
+        "bin": {
+          "update-browserslist-db": "cli.js"
+        }
+      },
+      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
+    ],
+    "web-tree-sitter": [
+      "web-tree-sitter@0.25.10",
+      "",
+      {
+        "peerDependencies": {
+          "@types/emscripten": "^1.40.0"
+        },
+        "optionalPeers": [
+          "@types/emscripten"
+        ]
+      },
+      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
+    ],
+    "yallist": [
+      "yallist@3.1.1",
+      "",
+      {},
+      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
+    ],
+    "@babel/core/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-compilation-targets/lru-cache": [
+      "lru-cache@5.1.1",
+      "",
+      {
+        "dependencies": {
+          "yallist": "^3.0.2"
+        }
+      },
+      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
+    ],
+    "@babel/helper-compilation-targets/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-create-class-features-plugin/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.18.6",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.18.6"
+        }
+      },
+      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
+    ],
+    "babel-plugin-jsx-dom-expressions/html-entities": [
+      "html-entities@2.3.3",
+      "",
+      {},
+      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
+    ],
+    "glob/minimatch": [
+      "minimatch@8.0.7",
+      "",
+      {
+        "dependencies": {
+          "brace-expansion": "^2.0.1"
+        }
+      },
+      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
+    ],
+    "parse5/entities": [
+      "entities@6.0.1",
+      "",
+      {},
+      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
+    ],
+    "path-scurry/lru-cache": [
+      "lru-cache@10.4.3",
+      "",
+      {},
+      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
+    ],
+    "path-scurry/minipass": [
+      "minipass@7.1.3",
+      "",
+      {},
+      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
+    ],
+    "pkg-up/find-up": [
+      "find-up@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "locate-path": "^3.0.0"
+        }
+      },
+      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
+    ],
+    "glob/minimatch/brace-expansion": [
+      "brace-expansion@2.1.8",
+      "",
+      {
+        "dependencies": {
+          "balanced-match": "^1.0.0"
+        }
+      },
+      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
+    ],
+    "pkg-up/find-up/locate-path": [
+      "locate-path@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-locate": "^3.0.0",
+          "path-exists": "^3.0.0"
+        }
+      },
+      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
+    ],
+    "glob/minimatch/brace-expansion/balanced-match": [
+      "balanced-match@1.0.2",
+      "",
+      {},
+      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate": [
+      "p-locate@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-limit": "^2.0.0"
+        }
+      },
+      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
+    ],
+    "pkg-up/find-up/locate-path/path-exists": [
+      "path-exists@3.0.0",
+      "",
+      {},
+      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate/p-limit": [
+      "p-limit@2.3.0",
+      "",
+      {
+        "dependencies": {
+          "p-try": "^2.0.0"
+        }
+      },
+      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
+    ]
+  }
+}
+`;
+
+class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+  get message() {
+    return this.reason;
+  }
+}
+var pathModule = (platform) => platform === "win32" ? win324 : posix4;
+var cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory2(env);
+  const { join } = pathModule(platform);
+  if (platform === "win32")
+    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
+  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
+};
+var guardedFolders = (env, platform) => {
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+};
+var lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8);
+var tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
+  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
+  lockHash(lock)
+].join("_"));
+var INSTALLED_MARKER = ".holyagent-installed";
+var markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
+`;
+var oneLine4 = (text) => plain(text.trim().split(`
+`)[0] ?? "").trim();
+var failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => plain(line).trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+};
+var unavailable = (what, cause) => new TuiUnavailable({
+  reason: plain(`${what}: ${oneLine4(cause instanceof Error ? cause.message : String(cause))}`)
+});
+var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
+  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
+`;
+  for (const [file, text] of [
+    ["package.json", manifest],
+    ["bun.lock", lock]
+  ])
+    yield* tryPromise2({
+      try: () => Bun.write(join32(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join32(directory, file)}`, cause)
+    });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", [
+    "--no-env-file",
+    `--config=${EMPTY_BUNFIG}`,
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+});
+var importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+});
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join32(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+}));
+var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join32(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+  return;
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
+var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
+var importPackagedTui = (bundle) => gen2(function* () {
+  const preload = yield* try_2({
+    try: () => Bun.resolveSync("@opentui/solid/preload", dirname14(bundle)),
+    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
+  });
+  yield* importFile(preload);
+  return yield* importFile(bundle);
+});
+var loadPackagedSetupTui = (bundle = join32(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+  const loaded = yield* importPackagedTui(bundle);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
+  return loaded;
+});
+var fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) });
+var STICKY = 512;
+var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
+var privateFolder = (folder, uid, create, home) => gen2(function* () {
+  if (create)
+    yield* fileSystem2(`cannot create ${folder}`, () => mkdir12(folder, { recursive: true, mode: 448 }));
+  const found = yield* tryPromise2({
+    try: () => lstat11(folder),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
+  if (found === undefined || uid === undefined)
+    return;
+  const refuse = (why) => new TuiUnavailable({
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+  });
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat6(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
+    return yield* refuse("is not a plain directory");
+  if (target.uid !== uid)
+    return yield* refuse("belongs to another user");
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+});
+var namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+};
+var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo2().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile7(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename8(temporary, target)))), (temporary) => promise2(() => rm11(temporary, { force: true })));
+var remove = (path) => promise2(() => rm11(path, { recursive: true, force: true }));
+var promote = (temporary, directory, packages, lock) => gen2(function* () {
+  for (let attempt = 0;attempt < 3; attempt += 1) {
+    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename8(temporary, directory)));
+    if (moved._tag === "Success")
+      return;
+    if (yield* installed(directory, packages, lock))
+      return;
+    yield* remove(directory);
+  }
+  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
+});
+var STALE_AFTER_MS = 60 * 60 * 1000;
+var newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat11(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir6(folder)).pipe(map4((names) => names.map((name) => join32(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join32(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+});
+var sweepStale = (directory, uid) => gen2(function* () {
+  const parent = dirname14(directory);
+  const prefix = `.${basename9(directory)}-`;
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  const names = yield* tryPromise2(() => readdir6(parent));
+  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
+    const path = join32(parent, name);
+    const found = yield* tryPromise2(() => lstat11(path));
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
+      yield* remove(path);
+  }).pipe(ignore2));
+}).pipe(ignore2);
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp5(join32(dirname14(directory), `.${basename9(directory)}-`))))), (temporary) => gen2(function* () {
+  yield* install(temporary, packages, lock);
+  if (!(yield* hasPackages(temporary, packages)))
+    return yield* new TuiUnavailable({
+      reason: `the install finished but ${directory} does not hold the expected package versions`
+    });
+  yield* writeFresh(join32(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* promote(temporary, directory, packages, lock);
+}), remove);
+var loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const lock = options.lock ?? TUI_LOCK;
+  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
+  const source = options.bundle ?? join32(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const uid = options.uid ?? process.getuid?.();
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (options.directory === undefined)
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname14(directory)])
+    yield* privateFolder(folder, uid, true);
+  yield* privateFolder(directory, uid, false);
+  if (!(yield* installed(directory, packages, lock))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* installAtomically(directory, packages, lock, install, uid);
+  }
+  const target = join32(directory, TUI_BUNDLE);
+  yield* writeFresh(target, text);
+  yield* importModule(join32(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+
 var NAME = "OpenCode Browse";
 var PACKAGE = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var Receipt2 = Struct({ version: String5.check(isPattern2(/^\d+\.\d+\.\d+$/)) });
@@ -30196,7 +30613,7 @@ var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = proce
   const command = browseRunnerCommand(runner, "pair")?.join(" ");
   return yield* gen2(function* () {
     const pairing = yield* readBrowsePairing(env);
-    const profiles = pairing.state === "paired" ? [] : yield* findBrowseProfiles(env, platform);
+    const profiles = (yield* findBrowseProfiles(env, platform)).map((profile) => ({ ...profile, profile: plain(profile.profile) })).sort((a, b) => Number(b.extension === "enabled") - Number(a.extension === "enabled"));
     const installs = profiles.flatMap(({ browser, profile, extension }) => extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }]);
     const state = pairing.state === "paired" ? pairing : installs.length > 0 ? { state: "installed", installs } : { state: "missing", scanned: browserDirectories(env, platform).map(({ name }) => name) };
     const status = describeBrowseState(state, runner);
@@ -30207,13 +30624,17 @@ var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = proce
       return {
         state: `${status.text}; ${PACKAGE} verified`,
         runner,
-        next: "none"
+        next: "none",
+        alreadyPaired: true,
+        profiles
       };
     if (command === undefined)
       return {
         state: `${status.text}; the HolyAgent runner could not be identified`,
         runner,
-        next: "none"
+        next: "none",
+        alreadyPaired: pairing.state === "paired",
+        profiles
       };
     const update = receipt !== undefined && receipt.version !== BROWSE_VERSION;
     return {
@@ -30222,12 +30643,14 @@ var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = proce
       command,
       runner,
       next,
-      profiles: profiles.map((profile) => ({ ...profile, profile: plain(profile.profile) })).sort((a, b) => Number(b.extension === "enabled") - Number(a.extension === "enabled")),
+      alreadyPaired: pairing.state === "paired",
+      profiles,
       receipt: { text: snapshot.text }
     };
   }).pipe(catchTag2("SetupFailure", (error) => succeed6({ state: error.message, runner, next: "none" })));
 });
 var browseProfileLabel = ({ browser, profile }) => `${browser}, ${profile}`;
+var targetNeeds = ({ target, guidance }) => `${NAME}: ${target}: ${guidance ?? "verify the browser and its extension manually"}`;
 var browseForProfile = (plan, index) => {
   if (plan.next === "none" || plan.next === "paired")
     return plan;
@@ -30248,12 +30671,13 @@ var browseReview = (plan, selected, dryRun = false) => [
   ],
   ...plan.action === undefined ? [] : !selected ? [skipped(`${NAME}: Skip Browser Use setup; no Browse command will run`)] : [
     added(`${NAME}: ${plan.action} ${PACKAGE} with ${plan.runner}; keep existing pairing`),
-    ...plan.next === "pair" ? [
+    ...plan.targets !== undefined ? [] : plan.next === "pair" ? [
       hint(`${NAME}: setup ${dryRun ? "would run" : "runs"} ${plan.command ?? "the official pair command"} after you close the screen. Enter its code in the extension Options of ${plan.target ?? "your chosen browser profile"}`)
     ] : plan.next === "extension" ? [
       hint(`${NAME}: ${plan.guidance ?? "add or enable the extension before pairing"}, then rerun setup to pair`)
     ] : []
-  ]
+  ],
+  ...(plan.targets ?? []).map((target) => target.next === "pair" ? hint(`${NAME}: ${target.target}: ${selected && plan.action !== undefined ? dryRun ? "would ask for its own one-time code" : "enter its own one-time code after closing this screen" : "no pairing command will run"}`) : hint(targetNeeds(target)))
 ];
 var pairBrowseOnTerminal = (command, args, options) => {
   const bunBin = pathWithBunBin({ ...options.env }, {
@@ -30261,11 +30685,11 @@ var pairBrowseOnTerminal = (command, args, options) => {
     bunInstall: options.env.BUN_INSTALL
   });
   return tryPromise2({
-    try: () => $2`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...options.env, [bunBin.key]: bunBin.value })).nothrow().then(({ exitCode }) => exitCode),
+    try: () => $2`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...options.env, [bunBin.key]: bunBin.value })).nothrow().then(({ exitCode }) => exitCode),
     catch: () => 127
   }).pipe(orElseSucceed2(() => 127));
 };
-var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair) {
+var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify = () => void_3) {
   const failure = (detail) => ({ ok: false, lines: [`! ${NAME}: ${detail}`] });
   const version = browseRunnerCommand(plan.runner, "--version");
   const pairCommand = browseRunnerCommand(plan.runner, "pair");
@@ -30285,7 +30709,48 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair) {
     return failure(`the ${runner} command did not resolve the exact CLI version ${BROWSE_VERSION}`);
   const versionLine = present(`${NAME}: verified CLI ${PACKAGE} with ${runner}`);
   const prior = yield* readBrowsePairing(env);
-  if (prior.state === "unpaired") {
+  const targetLines = [];
+  if (plan.targets !== undefined) {
+    const ready = plan.targets.filter(({ next }) => next === "pair");
+    if (prior.state === "paired" && ready.length > 0)
+      return failure("a browser was paired since review. Existing pairings were kept; review again");
+    let previous = prior;
+    for (const target of plan.targets) {
+      if (target.next !== "pair") {
+        targetLines.push(hint(targetNeeds(target)));
+        continue;
+      }
+      yield* notify(`${NAME}: ${target.target}. Enter this one-time code in that profile only.`);
+      const exit = yield* pair(runner, pairCommand.slice(1), {
+        cwd,
+        env: { ...env, ...browseEnv }
+      });
+      if (exit !== 0)
+        return {
+          ok: false,
+          lines: [
+            versionLine,
+            ...targetLines,
+            `! ${NAME}: ${target.target}: pairing was not confirmed (exit ${exit}). Previously connected profiles were kept.`
+          ]
+        };
+      const after = yield* readBrowsePairing(env);
+      const old = previous.state === "paired" ? new Set(previous.browsers.map(({ key }) => key)) : new Set;
+      if (after.state !== "paired" || !after.browsers.some(({ key, lastSeen }) => !old.has(key) && lastSeen !== undefined))
+        return {
+          ok: false,
+          lines: [
+            versionLine,
+            ...targetLines,
+            `! ${NAME}: ${target.target}: no new connected profile was confirmed. Existing pairings were kept.`
+          ]
+        };
+      previous = after;
+      targetLines.push(present(`${NAME}: a new connected profile was confirmed for the ${target.target} handoff`));
+    }
+    if (ready.length === 0 && prior.state === "unpaired")
+      return { ok: true, lines: [versionLine, ...targetLines] };
+  } else if (prior.state === "unpaired") {
     if (plan.next !== "pair")
       return {
         ok: true,
@@ -30315,12 +30780,166 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair) {
     return failure("the HolyAgent Browse receipt changed; review setup again");
   return {
     ok: true,
-    lines: [versionLine, present(`${NAME}: ${describeBrowseState(pairing, plan.runner).text}`)]
+    lines: [
+      versionLine,
+      ...targetLines,
+      present(`${NAME}: ${describeBrowseState(pairing, plan.runner).text}`)
+    ]
   };
 }, catchTag2("SetupFailure", ({ message }) => succeed6({
   ok: false,
   lines: [`! ${NAME}: ${message}`]
 })));
+
+import { posix as posix5, win32 as win325 } from "path";
+var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
+var browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"];
+var desktopPlatforms = ["darwin", "win32", "linux"];
+var decodeBrowser = decodeUnknownOption2(Literals(browserIds));
+var decodePlatform = decodeUnknownOption2(Literals(desktopPlatforms));
+var labels = {
+  chrome: "Google Chrome",
+  edge: "Microsoft Edge",
+  brave: "Brave",
+  opera: "Opera",
+  vivaldi: "Vivaldi"
+};
+var windowsDesktop = "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | " + "Where-Object PackageFamilyName -CEQ 'OpenAI.Codex_2p2nqsd0c76g0' | " + "Select-Object -First 1 | ForEach-Object { $_.Version.ToString() }";
+var windowsDrivePath = /^[a-z]:[\\/]/i;
+var powershell = (env) => {
+  const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
+  return root !== undefined && windowsDrivePath.test(root) ? win325.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
+};
+var powershellArgs = (command) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command];
+var versionText = decodeUnknownOption2(String5.check(isPattern2(/^\d[\w.+:~-]{0,63}$/)));
+var versionOf = (output) => getOrUndefined(versionText(output.trim()));
+var desktopEvidence = (platform, version) => ({
+  platform,
+  name: "ChatGPT desktop app",
+  ...version === undefined ? {} : { version }
+});
+var detectDesktop = fn2("detectCodexDesktop")(function* (env, platform, cwd) {
+  const shell = yield* Shell;
+  const home = homeDirectory2(env);
+  const input = { cwd: home };
+  if (platform === "win32") {
+    const command = powershell(env);
+    if (command === undefined)
+      return;
+    const result = yield* shell.run(command, powershellArgs(windowsDesktop), input);
+    const version = versionOf(result.stdout);
+    return result.exitCode === 0 && version !== undefined ? desktopEvidence(platform, version) : undefined;
+  }
+  if (platform === "darwin") {
+    for (const directory of ["/Applications", posix5.join(home, "Applications")]) {
+      for (const app of ["ChatGPT.app", "Codex.app"]) {
+        const plist = posix5.join(directory, app, "Contents", "Info.plist");
+        const read = (key) => shell.run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], input);
+        const id = yield* read("CFBundleIdentifier");
+        if (id.exitCode !== 0 || id.stdout.trim() !== "com.openai.codex")
+          continue;
+        const version = yield* read("CFBundleShortVersionString");
+        return desktopEvidence(platform, version.exitCode === 0 ? versionOf(version.stdout) : undefined);
+      }
+    }
+    return;
+  }
+  const app = yield* shell.which("chatgpt", { strict: { cwd, platform } });
+  if (isNone2(app))
+    return;
+  for (const [command, args, installed] of [
+    ["/usr/bin/dpkg-query", ["-W", "-f=${db:Status-Status} ${Version}", "chatgpt"], "installed "],
+    ["/usr/bin/rpm", ["-q", "--qf", "chatgpt %{VERSION}-%{RELEASE}", "chatgpt"], "chatgpt "],
+    ["/usr/bin/pacman", ["-Q", "chatgpt"], "chatgpt "]
+  ]) {
+    const result = yield* shell.run(command, args, input);
+    if (result.exitCode === 0 && result.stdout.startsWith(installed))
+      return desktopEvidence(platform, versionOf(result.stdout.slice(installed.length)));
+  }
+});
+var nonlocal = (env, platform) => {
+  if (inCi(env) || inCloudSession(env) || firstNonEmpty2(env["CODEX_CAAS_SESSION_ID"], env["SSH_CONNECTION"], env["SSH_TTY"]) !== undefined)
+    return "The extension needs a local ChatGPT desktop session.";
+  if (platform === "linux" && firstNonEmpty2(env["WSL_DISTRO_NAME"], env["WSL_INTEROP"]) !== undefined)
+    return "Use the native desktop outside WSL to connect your browser.";
+  return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
+};
+var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix5.isAbsolute(executable));
+var steps = [
+  "Update the ChatGPT desktop app. Find your browser in Settings > Computer Use, under More browsers if needed.",
+  "Follow any plugin prompt. Use Install to open the extension store and review the permission prompts there.",
+  "Check for Manage in Computer Use. In a new Work or Codex chat, @-mention the browser using the profile where you installed the extension."
+];
+var detectCodexBrowserHandoff = fn2("detectCodexBrowserHandoff")(function* (env, browsers, options) {
+  const platform = getOrUndefined(decodePlatform(options.platform ?? process.platform));
+  if (platform === undefined)
+    return {
+      status: "unavailable",
+      reason: "The local desktop app was not verified on this platform."
+    };
+  const reason = nonlocal(env, platform);
+  if (reason !== undefined)
+    return { status: "unavailable", reason };
+  const desktop = yield* detectDesktop(env, platform, options.cwd);
+  if (desktop === undefined)
+    return {
+      status: "unavailable",
+      reason: "No supported local ChatGPT desktop installation was detected."
+    };
+  const choices = [];
+  for (const browser of browsers) {
+    const id = getOrUndefined(decodeBrowser(browser.id));
+    if (id === undefined || platform === "linux" && id !== "chrome" || !browserPath(browser.executable, platform) || choices.some((choice) => choice.id === id))
+      continue;
+    choices.push({ id, name: labels[id], executable: browser.executable });
+  }
+  if (choices.length === 0)
+    return {
+      status: "unavailable",
+      desktop,
+      reason: platform === "linux" ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions." : "No documented local browser installation was detected."
+    };
+  return {
+    status: "candidate",
+    desktop,
+    browsers: choices,
+    url: CODEX_BROWSER_GUIDE,
+    detail: "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
+    steps
+  };
+});
+var detachedGuide = 'test -x "$1" || exit 126; "$1" "$2" </dev/null >/dev/null 2>&1 &';
+var windowsGuide = `Start-Process -FilePath $env:HOLYAGENT_SETUP_BROWSER_EXE -ArgumentList '${CODEX_BROWSER_GUIDE}' -ErrorAction Stop`;
+var openCodexBrowserHandoff = fn2("openCodexBrowserHandoff")(function* (env, offer, selected, options) {
+  if (selected === undefined)
+    return { ok: true, lines: [] };
+  const platform = options.platform ?? process.platform;
+  if (offer.status !== "candidate" || offer.desktop.platform !== platform || nonlocal(env, platform) !== undefined)
+    return { ok: false, lines: ["! browser extension: the local desktop handoff is unavailable"] };
+  const target = offer.browsers.find((browser) => browser.id === selected);
+  if (target === undefined || !browserPath(target.executable, platform))
+    return { ok: false, lines: ["! browser extension: choose a detected browser"] };
+  const shell = yield* Shell;
+  const cwd = homeDirectory2(env);
+  const command = platform === "win32" ? powershell(env) : "/bin/sh";
+  if (command === undefined)
+    return { ok: false, lines: [`! browser extension: open ${CODEX_BROWSER_GUIDE} manually`] };
+  const result = platform === "win32" ? yield* shell.run(command, powershellArgs(windowsGuide), {
+    cwd,
+    env: { HOLYAGENT_SETUP_BROWSER_EXE: target.executable }
+  }) : yield* shell.run(command, ["-c", detachedGuide, "holyagent-browser", target.executable, CODEX_BROWSER_GUIDE], { cwd });
+  return result.exitCode === 0 ? {
+    ok: true,
+    lines: [
+      `~ browser extension: requested the setup guide in ${labels[selected]}. Finish in ChatGPT desktop.`
+    ]
+  } : {
+    ok: false,
+    lines: [
+      `! browser extension: could not open the setup guide (exit ${result.exitCode}). Open ${CODEX_BROWSER_GUIDE} manually.`
+    ]
+  };
+});
 var AppliedSchema = Struct({
   ok: Boolean3,
   lines: ArraySchema(String5)
@@ -30422,7 +31041,7 @@ var reviewOf = (preview, choices, capabilities = []) => {
     choices: [
       ...pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })],
       ...preview.device === undefined ? [] : [
-        choiceLine("Agent device access", choices.deviceAccess ? unit("deviceAccess") : undefined)
+        choiceLine("T3 Device Simulator", choices.deviceAccess ? unit("deviceAccess") : undefined)
       ],
       ...preview.worktreesAllowed ? [
         choiceLine("New threads in worktrees", choices.worktrees ? unit("worktrees") : undefined)
@@ -30447,16 +31066,18 @@ var stopped = (reason, applyStarted = false) => ({
 });
 var decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
 var BROWSE_HANDOFF = "OpenCode Browse: close this screen to ";
+var CODEX_BROWSER_HANDOFF = "ChatGPT browser extension: close this screen to open ";
 var runInteractive = fn2("runInteractive")(function* (options) {
   const line = { kind: "line", notes: [] };
   if (options.undo || inCloudSession(options.env))
     return line;
   const fallbackReason = tuiFallbackReason(options);
   const combined = fallbackReason === undefined ? options.combined : undefined;
-  const piUsed = yield* piInUse(options.env);
+  const onlyCodex = options.combined?.onlyCodex === true;
+  const piUsed = onlyCodex ? false : yield* piInUse(options.env);
   if (!piUsed && combined === undefined)
     return line;
-  const source = yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(orElseSucceed2(() => {
+  const source = onlyCodex ? undefined : yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(orElseSucceed2(() => {
     return;
   }));
   const config = source?.config;
@@ -30467,15 +31088,67 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     return line;
   if (fallbackReason !== undefined)
     return preview === undefined ? line : fallback(fallbackReason);
+  const initialSwitches = features === undefined ? {} : features;
+  const piAvailable = piUsed && config?.pi.enable === true;
+  const browse = options.browse !== undefined && piAvailable && config.pi.features.mcp === true && options.form.form === "normal" && offers.some(({ feature }) => feature === "browserUse") ? yield* planBrowse(options.env, options.browse.packageRoot) : undefined;
+  const desktopOptions = { cwd: options.cwd };
+  const detectDesktop = combined?.codexHome !== undefined && options.form.form === "normal";
+  const detected = browse === undefined && !detectDesktop ? [] : yield* discoverBrowsers(options.env);
+  const explicit = options.browse?.executable;
+  const manual = browse === undefined || explicit === undefined ? undefined : yield* checkBrowserExecutable(options.env, explicit);
+  const browsers = manual === undefined ? detected : [...detected.filter(({ id }) => id !== manual.id), manual];
+  const codexHandoff = detectDesktop ? yield* detectCodexBrowserHandoff(options.env, detected, desktopOptions) : undefined;
+  const desktop = codexHandoff?.desktop;
+  if (onlyCodex && desktop === undefined)
+    return line;
   const load = options.load ?? (options.t3Workflow ? () => loadPackagedSetupTui() : (env, notify) => loadSetupTui(env, { notify }));
   const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
   const fail = options.t3Workflow ? stopped : fallback;
   if (loaded instanceof TuiUnavailable)
     return fail(`unavailable (${loaded.reason})`);
-  const initialSwitches = features === undefined ? {} : features;
-  const piAvailable = piUsed && config?.pi.enable === true;
-  const browse = options.browse !== undefined && piAvailable && config.pi.features.mcp === true && options.form.form === "normal" && offers.some(({ feature }) => feature === "browserUse") ? yield* planBrowse(options.env, options.browse.packageRoot) : undefined;
-  const browseFor = (choices) => browse !== undefined && choices.harnesses?.pi !== false && choices.capabilities["browserUse"] === true ? browseForProfile(browse, choices.browseProfile ?? 0) : undefined;
+  const requestedHandoff = (choices) => choices.harnesses?.codex === true && codexHandoff?.status === "candidate" ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff) : undefined;
+  const browserOptions = browsers.map(({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }));
+  const selectedBrowsers = (choices) => browserOptions.filter(({ id }) => choices.browseBrowserIds?.includes(id));
+  const browseFor = (choices) => {
+    if (browse === undefined || choices.harnesses?.pi === false || choices.capabilities["browserUse"] !== true)
+      return;
+    if (choices.browseBrowserIds === undefined)
+      return browseForProfile(browse, choices.browseProfile ?? 0);
+    const selected = selectedBrowsers(choices);
+    if (selected.length === 0)
+      return;
+    const requested = browse.profiles?.[choices.browseProfile ?? -1];
+    const targets = selected.map(({ name, browseCompatibility }) => {
+      if (browseCompatibility !== "supported")
+        return {
+          target: name,
+          next: "manual",
+          guidance: "compatibility is unverified; nothing will be started"
+        };
+      const profile = requested?.browser === name ? requested : browse.profiles?.find(({ browser }) => browser === name);
+      const target = profile === undefined ? name : `${name}, ${profile.profile}`;
+      if (profile?.extension === "enabled") {
+        if (browse.alreadyPaired === true)
+          return {
+            target,
+            next: "manual",
+            guidance: `keep existing pairings. Check browse pair --list, then run ${browse.command ?? "the official browse pair command"} only for a profile not yet paired`
+          };
+        return { target, next: "pair" };
+      }
+      return {
+        target,
+        next: "extension",
+        guidance: profile?.extension === "disabled" ? "enable the existing Browse extension in this profile, then review setup again" : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`
+      };
+    });
+    const ready = targets.find(({ next }) => next === "pair");
+    return {
+      ...browse,
+      targets,
+      ...ready === undefined ? {} : { next: "pair", target: ready.target }
+    };
+  };
   const providerChoices = piAvailable && config !== undefined && (combined !== undefined || options.previewPi !== undefined) ? {
     providers: source?.written.pi?.provider === undefined && source?.written.pi?.providers === undefined ? [
       ...new Set(Object.values(source?.written.pi?.routes ?? {}).flatMap((route) => route.provider === undefined ? [] : [route.provider]))
@@ -30483,14 +31156,11 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   } : undefined;
   const withProviderChanges = (choices) => {
     const selection = choices.piProviders;
-    return selection !== undefined && providerChoices !== undefined && selection.providers.length === providerChoices.providers.length && selection.providers.every((provider) => providerChoices.providers.includes(provider)) ? {
-      worktrees: choices.worktrees,
-      deviceAccess: choices.deviceAccess,
-      capabilities: choices.capabilities,
-      ...choices.harnesses === undefined ? {} : { harnesses: choices.harnesses },
-      ...choices.browseSetup === undefined ? {} : { browseSetup: choices.browseSetup },
-      ...choices.browseProfile === undefined ? {} : { browseProfile: choices.browseProfile }
-    } : choices;
+    if (selection !== undefined && providerChoices !== undefined && selection.providers.length === providerChoices.providers.length && selection.providers.every((provider) => providerChoices.providers.includes(provider))) {
+      const { piProviders: _unchanged, ...rest } = choices;
+      return rest;
+    }
+    return choices;
   };
   const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
   const selectionOf = (choices) => ["pi", "claude", "codex"].filter((target) => choices.harnesses?.[target] === true);
@@ -30502,6 +31172,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   let reviewSequence = 0;
   let reviewedReplacement;
   let stagedBrowse;
+  let stagedHandoff;
   const replacementOf = (report) => report.lines.find((line) => line.startsWith("+ pi package: replace "));
   const input = {
     env: options.env,
@@ -30509,9 +31180,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       ...offerOf(preview, offers, options.form),
       ...browse === undefined ? {} : {
         browse: {
-          state: plain(browse.state),
+          state: plain(explicit !== undefined && manual === undefined ? `${browse.state}. The supplied browser executable could not be verified.` : browse.state),
           ...browse.action === undefined ? {} : { action: browse.action },
-          ...browse.profiles === undefined ? {} : { profiles: browse.profiles }
+          ...browse.profiles === undefined ? {} : { profiles: browse.profiles },
+          browsers: browserOptions
         }
       },
       ...providerChoices === undefined ? {} : { providers: PiProvider.literals },
@@ -30519,19 +31191,33 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         harnesses: {
           piAvailable,
           scope: options.scope,
-          ...combined.codexHome === undefined ? {} : { codexHome: combined.codexHome }
+          ...combined.codexHome === undefined ? {} : { codexHome: combined.codexHome },
+          ...onlyCodex ? { onlyCodex: true } : {},
+          ...desktop === undefined ? {} : {
+            codexDesktop: {
+              name: desktop.name,
+              ...desktop.version === undefined ? {} : { version: desktop.version },
+              ...codexHandoff?.status === "candidate" ? {
+                extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
+                  id,
+                  name
+                }))
+              } : {}
+            }
+          }
         }
       }
     },
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
+      ...browse?.action === undefined || initialSwitches["browserUse"] !== true ? {} : { browseSetup: true },
       ...providerChoices === undefined ? {} : { piProviders: providerChoices },
       ...combined === undefined ? {} : {
         harnesses: {
           pi: piAvailable,
           claude: false,
-          ...combined.codexHome === undefined ? {} : { codex: false }
+          ...combined.codexHome === undefined ? {} : { codex: onlyCodex }
         }
       }
     },
@@ -30543,8 +31229,16 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         return yield* fail5(noProvider());
       }
       const plan = browseFor(choices);
-      const browserReview = plan === undefined ? {} : {
-        browse: browseReview(plan, choices.browseSetup === true, options.dryRun).map(plain)
+      const selection = selectedBrowsers(choices);
+      const selectedNotes = browse === undefined || choices.harnesses?.pi === false || choices.browseBrowserIds === undefined ? [] : [
+        hint(`Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name, browseCompatibility }) => browseCompatibility === "supported" ? name : `${name} (compatibility unverified)`).join(", ")}`),
+        ...plan === undefined ? [hint("OpenCode Browse: no compatible selected profile will be paired")] : []
+      ];
+      const browserReview = plan === undefined && selectedNotes.length === 0 ? {} : {
+        browse: [
+          ...selectedNotes,
+          ...plan === undefined ? [] : browseReview(plan, choices.browseSetup === true, options.dryRun)
+        ].map(plain)
       };
       if (combined !== undefined) {
         const sequence = ++reviewSequence;
@@ -30556,8 +31250,18 @@ var runInteractive = fn2("runInteractive")(function* (options) {
           return yield* fail5(new Error("Pi is not available for setup here."));
         if (targets.includes("codex") && combined.codexHome === undefined)
           return yield* fail5(new Error("Codex setup is not available here."));
+        const handoff = requestedHandoff(choices);
         const changed = changedSwitches(initialSwitches, choices.capabilities);
-        const plans = yield* forEach2(targets, (target, index) => combined.run(target, withProviderChanges(choices), changed, true, index > 0, true).pipe(map4((report) => ({ name: label(target), ...report }))));
+        const plans = yield* forEach2(targets, (target, index) => combined.run(target, withProviderChanges(choices), changed, true, index > 0, true).pipe(map4((report) => ({
+          name: label(target),
+          ok: report.ok,
+          lines: [
+            ...report.lines,
+            ...target !== "codex" || handoff === undefined ? [] : [
+              hint(`ChatGPT browser extension: ${options.dryRun ? "would open" : "open"} OpenAI's setup guide in ${handoff.name} after closing. No extension or approval is applied by setup.`)
+            ]
+          ]
+        }))));
         const error = plans.find((plan) => !plan.ok);
         if (error !== undefined)
           return yield* fail5(new Error(`${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`));
@@ -30614,6 +31318,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       const chosen = withProviderChanges(choices);
       const plan = browseFor(choices);
       const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true;
+      const handoff = requestedHandoff(choices);
       if ((combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) && reviewedChoices !== choices)
         return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
       const replacement = reviewedChoices === choices ? reviewedReplacement : undefined;
@@ -30638,14 +31343,22 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         ok: reports.length > 0 && reports.every(({ ok }) => ok),
         lines: reports.flatMap(({ lines }) => lines)
       })))).pipe(map4((report) => {
+        if (report.ok && handoff !== undefined && !options.dryRun)
+          stagedHandoff = handoff;
+        const lines = [
+          ...report.lines,
+          ...handoff === undefined || !report.ok ? [] : [
+            hint(options.dryRun ? `ChatGPT browser extension: would open OpenAI's guide in ${handoff.name}` : `${CODEX_BROWSER_HANDOFF}OpenAI's guide in ${handoff.name}`)
+          ]
+        ];
         if (plan === undefined || plan.action === undefined)
-          return report;
+          return { ok: report.ok, lines };
         if (report.ok && wantsBrowse && !options.dryRun)
           stagedBrowse = plan;
         return {
           ok: report.ok,
           lines: [
-            ...report.lines,
+            ...lines,
             ...options.dryRun ? browseReview(plan, wantsBrowse, true) : !wantsBrowse ? [hint("OpenCode Browse: setup skipped; no Browse command ran")] : report.ok ? [
               hint(plan.next === "pair" ? `${BROWSE_HANDOFF}start the official pairing command` : `${BROWSE_HANDOFF}verify the pinned CLI`)
             ] : []
@@ -30660,15 +31373,17 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   }).pipe(flatMap2(decodeOutcome), flatMap2((outcome) => gen2(function* () {
     if (outcome._tag === "Applied") {
       const applied = outcome.applied;
-      const finishedBrowse = applied.ok && stagedBrowse !== undefined ? yield* options.notify(plain(stagedBrowse.next === "pair" ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.` : "OpenCode Browse: verifying the pinned CLI.")).pipe(andThen2(configureBrowse(options.env, stagedBrowse, options.browse?.pair ?? pairBrowseOnTerminal))) : { ok: true, lines: [] };
+      const finishedBrowse = applied.ok && stagedBrowse !== undefined ? yield* options.notify(plain(stagedBrowse.targets !== undefined && stagedBrowse.next === "pair" ? "OpenCode Browse: verifying the pinned CLI, then pairing the reviewed profiles one at a time." : stagedBrowse.next === "pair" ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.` : "OpenCode Browse: verifying the pinned CLI.")).pipe(andThen2(configureBrowse(options.env, stagedBrowse, options.browse?.pair ?? pairBrowseOnTerminal, options.notify))) : { ok: true, lines: [] };
+      const finishedHandoff = applied.ok && codexHandoff !== undefined && stagedHandoff !== undefined ? yield* openCodexBrowserHandoff(options.env, codexHandoff, stagedHandoff.id, desktopOptions) : { ok: true, lines: [] };
       return {
         kind: options.t3Workflow === true ? "applied" : "done",
         report: {
           lines: [
-            ...applied.lines.filter((line) => !line.startsWith(hint(BROWSE_HANDOFF))),
-            ...finishedBrowse.lines
+            ...applied.lines.filter((line) => !line.startsWith(hint(BROWSE_HANDOFF)) && !line.startsWith(hint(CODEX_BROWSER_HANDOFF))),
+            ...finishedBrowse.lines,
+            ...finishedHandoff.lines
           ],
-          ok: applied.ok && finishedBrowse.ok
+          ok: applied.ok && finishedBrowse.ok && finishedHandoff.ok
         }
       };
     }
@@ -30715,7 +31430,7 @@ var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) 
 var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]";
 var CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]";
 var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive]");
-var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]";
+var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]";
 var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
 var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
@@ -30730,6 +31445,17 @@ var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan) => gen2(
     ...expectedPlan === undefined ? {} : { expectedPlan }
   });
 }).pipe(provide3(shellLive(env)), catch_2((error) => succeed6({ ok: false, lines: [`! Codex setup: ${error.detail}`] })));
+var reviewedCodexPlan = (args, env, installedPackageRoot) => {
+  let fingerprint;
+  return (dryRun) => gen2(function* () {
+    if (!dryRun && fingerprint === undefined)
+      return { ok: false, lines: ["! Review the Codex setup plan before applying."] };
+    const plan = yield* codexPlan(args, env, installedPackageRoot, dryRun, dryRun ? undefined : fingerprint);
+    if (dryRun)
+      fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined;
+    return plan;
+  });
+};
 var codexCommand = {
   path: ["setup", "codex"],
   usage: CODEX_USAGE,
@@ -30739,18 +31465,52 @@ var codexCommand = {
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
     "The verified Codex 0.172.0 runtime must already be on PATH. Setup never changes a running session.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
-    "--dry-run never installs or writes. Explicit Codex setup is always non-interactive."
+    "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
+    "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide."
   ],
   flags: {
     "codex-home": "string",
     "root-only-catalog": "string",
+    form: "string",
     "dry-run": "boolean",
     "non-interactive": "boolean",
     "no-tui": "boolean"
   },
   stateless: true,
   positionals: 0,
-  run: ({ args, env, installedPackageRoot }) => codexPlan(args, env, installedPackageRoot, booleanFlag(args, "dry-run")).pipe(map4(printed))
+  run: ({ args, env, cwd, installedPackageRoot, terminal, setupTui, emit }) => gen2(function* () {
+    const dryRun = booleanFlag(args, "dry-run");
+    const form = yield* formOf(args, env, CODEX_USAGE);
+    const direct = () => codexPlan(args, env, installedPackageRoot, dryRun).pipe(map4(printed));
+    if (dryRun || booleanFlag(args, "no-tui") || booleanFlag(args, "non-interactive") || form.form === "headless")
+      return yield* direct();
+    const plan = reviewedCodexPlan(args, env, installedPackageRoot);
+    const interactive = yield* runInteractive({
+      env,
+      cwd,
+      scope: "user",
+      terminal,
+      undo: false,
+      dryRun: false,
+      t3Workflow: true,
+      noTui: false,
+      choiceFlag: false,
+      form,
+      ...setupTui === undefined ? {} : { load: setupTui },
+      notify: emit,
+      apply: () => plan(false),
+      combined: {
+        codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
+        onlyCodex: true,
+        run: (_target, _choices, _capabilities, preview) => plan(preview)
+      }
+    });
+    if (interactive.kind === "done")
+      return printed(interactive.report);
+    if (interactive.kind === "applied")
+      return yield* saveSetupResult(interactive.report, false, env);
+    return yield* direct();
+  }).pipe(provide3(shellLive(env)))
 };
 var CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ");
 var switchFlag = fn2("switchFlag")(function* (args, name, usage) {
@@ -30789,7 +31549,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup with Browser Use enabled can configure or update OpenCode Browse after review; Skip is the default. Setup runs only the pinned Browse CLI with the HolyAgent package runner after closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
     ],
     flags: {
@@ -30862,7 +31622,8 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       }).pipe(provide3(shellLive(env)), catch_2((error) => succeed6({ lines: [`! setup: ${error.message}`], ok: false })));
       if (target === "claude")
         return printed(yield* apply(flagged, capabilities));
-      let reviewedCodex;
+      const reviewedCodex = reviewedCodexPlan(args, env, installedPackageRoot);
+      const browserExecutable = stringFlag(args, "browser-executable");
       const interactive = yield* runInteractive({
         env,
         cwd,
@@ -30874,7 +31635,12 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         noTui: booleanFlag(args, "no-tui") || booleanFlag(args, "non-interactive"),
         choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined || Object.keys(capabilities).length > 0,
         form,
-        ...surface === "public" ? { browse: { packageRoot: installedPackageRoot } } : {},
+        ...surface === "public" ? {
+          browse: {
+            packageRoot: installedPackageRoot,
+            ...browserExecutable === undefined ? {} : { executable: browserExecutable }
+          }
+        } : {},
         ...setupTui === undefined ? {} : { load: setupTui },
         notify: emit,
         apply: (choices, chosen, replacePiRegistration) => target === "pi" ? apply(choices, chosen, [], {
@@ -30894,17 +31660,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         ...surface === "public" && target === undefined ? {
           combined: {
             codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
-            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? gen2(function* () {
-              if (!dryRun && reviewedCodex === undefined)
-                return {
-                  ok: false,
-                  lines: ["! Review the Codex setup plan before applying."]
-                };
-              const plan = yield* codexPlan(args, env, installedPackageRoot, dryRun, dryRun ? undefined : reviewedCodex);
-              if (dryRun)
-                reviewedCodex = "fingerprint" in plan ? plan.fingerprint : undefined;
-              return plan;
-            }) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? reviewedCodex(dryRun) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
               target: harness,
               dryRun,
               skipSharedPrerequisites,
@@ -30994,6 +31750,7 @@ var publicPiSetup = (target) => {
     flags: {
       ...flags,
       "non-interactive": "boolean",
+      "browser-executable": "string",
       ...target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}
     },
     notes: [
@@ -31001,6 +31758,7 @@ var publicPiSetup = (target) => {
         "In a terminal, bare setup opens one review for selected Pi, Claude Code, and native Codex harnesses. Unattended bare setup still targets Pi. See holyagent setup codex --help for the dedicated native startup profile."
       ] : [],
       ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
+      "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
       "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
     ]
   };
@@ -31024,7 +31782,8 @@ var PUBLIC_SETUP_COMMANDS = [
       "Install the Claude Code plugin separately. Setup adds missing settings and keeps existing values.",
       "--scope defaults to local when untracked local settings enable the plugin, and user otherwise. --subagent-cache-ttl defaults to 1h. Context7 is installed if needed unless you pass --skip-ctx7 or setup runs on claude.ai.",
       "--undo removes only values recorded by setup that are still unchanged. --dry-run previews without writing. Both are off by default.",
-      "Claude Code setup runs without a TUI or stdin prompts. --non-interactive and --no-tui are accepted for scripts."
+      "Claude Code setup runs without a TUI or stdin prompts. --non-interactive and --no-tui are accepted for scripts.",
+      "Manage native browser access with Claude Code's /chrome and macOS computer-use with /mcp. Setup never selects a browser, grants OS permissions, or registers OpenCode Browse for Claude Code."
     ]
   },
   publicPiSetup()
@@ -31126,7 +31885,7 @@ var runTool = (options) => gen2(function* () {
   if (isNone2(found))
     return yield* new ToolMissing({ tool: options.tool });
   const path = found.value;
-  const env = { ...definedEnv(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
+  const env = { ...definedEnv2(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
   if (options.agent) {
     const args = options.tool === "rg" ? ["--no-config", ...options.args] : options.args;
     const result = yield* spawn(path, args, { cwd: options.cwd, env });
@@ -31425,7 +32184,7 @@ var readAgentReport = (path) => gen2(function* () {
   if (!file.isFile() || (yield* aliasesStdin(file)))
     return yield* fail();
   return yield* acquireUseRelease2(tryPromise2({
-    try: () => open8(path, constants6.O_RDONLY | constants6.O_NONBLOCK),
+    try: () => open8(path, constants7.O_RDONLY | constants7.O_NONBLOCK),
     catch: fail
   }), (handle) => gen2(function* () {
     const opened = yield* tryPromise2({ try: () => handle.stat(), catch: fail });
@@ -31582,9 +32341,10 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
   if (surface === "public" && output instanceof SetupResult)
     return {
-      stdout: renderSetupResult(output, host.env, host.terminal?.stdout === true),
+      stdout: renderSetupResult(output),
       stderr: "",
-      code: output.code
+      code: output.code,
+      setupResult: output
     };
   if (surface === "agent") {
     const stdout = emitted.join("");
@@ -31642,24 +32402,30 @@ for (const stream of [process.stdout, process.stderr])
     throw error;
   });
 var write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
-var main = (interactiveSetup = false, surface = "host", installedPackageRoot) => runPromise2(gen2(function* () {
-  const result = yield* run2(Bun.argv.slice(2), {
+var plainOutput = (text) => succeed6(text);
+var main = (interactiveSetup = false, surface = "host", installedPackageRoot, present = plainOutput) => runPromise2(gen2(function* () {
+  const argv = Bun.argv.slice(2);
+  const terminal = {
+    stdin: Boolean(process.stdin.isTTY),
+    stdout: Boolean(process.stdout.isTTY)
+  };
+  const emit = (text) => present(text, "progress", terminal.stdout).pipe(flatMap2((output) => write2(process.stdout, output)));
+  const result = yield* run2(argv, {
     cwd: process.cwd(),
     env: process.env,
     stdin: surface === "agent" ? fail5(new StdinMissing({ reason: "stdin is unavailable" })) : stdin,
-    ...surface === "agent" ? {} : { emit: (text) => write2(process.stdout, text) },
+    ...surface === "agent" ? {} : { emit },
     ...surface === "public" && installedPackageRoot !== undefined ? { installedPackageRoot } : {},
     ...surface === "host" ? {} : { packageManifest: new URL("../package.json", import.meta.url) },
     ...interactiveSetup ? {
       t3Workflow: true,
-      terminal: {
-        stdin: Boolean(process.stdin.isTTY),
-        stdout: Boolean(process.stdout.isTTY)
-      }
+      terminal
     } : {}
   }, surface);
-  yield* write2(process.stdout, result.stdout);
-  yield* write2(process.stderr, result.stderr);
+  const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result.setupResult);
+  const stderr = yield* present(result.stderr, "stderr", Boolean(process.stderr.isTTY));
+  yield* write2(process.stdout, stdout);
+  yield* write2(process.stderr, stderr);
   process.exitCode = result.code;
 }));
 

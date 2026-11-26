@@ -10,7 +10,7 @@ import {
 } from "../config/capabilities.ts"
 import type { Config, PiProviderSelection } from "../config/schema.ts"
 import { FFF_RETIRED_SETTINGS } from "../pi/fff/settings.ts"
-import { PROVIDERS, ROOT_MODEL_PAIR } from "../pi/provider.ts"
+import { PROVIDERS, ROOT_MODEL_KEYS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
   PI_FFF_FILE,
@@ -26,7 +26,9 @@ import {
   isJsonObject,
   type JsonObject,
   readJsonObject,
+  readJsonObjectSnapshot,
   writeJsonObject,
+  writeJsonObjectIfUnchanged,
 } from "./json-file.ts"
 import { type CapabilityChoices, loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
@@ -99,6 +101,21 @@ const KNOWN_FILES: ReadonlyArray<string> = [
 
 const AGENT_PREFIX = "~/.pi/agent/"
 const PI_PREFIX = "~/.pi/"
+const KIMI_SETTINGS = PROVIDERS["kimi-coding-global"].toolsFile
+
+// The Kimi extension captures its environment while modules load, before HolyAgent can apply
+// providerEnv in a session. Use the provider's own settings for a new global user configuration.
+const kimiRegionDefault = (env: Env, scope: Scope, config: Config) =>
+  scope === "user" &&
+  config.pi.enable &&
+  config.pi.providers?.includes("kimi-coding-global") === true &&
+  firstNonEmpty(
+    env["KIMI_CODE_REGION"],
+    env["KIMI_CODE_BASE_URL"],
+    env["KIMI_BASE_URL"],
+    env["KIMI_CODE_OAUTH_HOST"],
+    env["KIMI_OAUTH_HOST"],
+  ) === undefined
 
 /**
  * Where a settings file of {@link toolSettings} lives at a scope, or `undefined` when it has no
@@ -143,6 +160,7 @@ interface Target {
   readonly global: string | undefined
   readonly all: ReadonlyArray<Default>
   readonly defaults: JsonObject | undefined
+  readonly startupModel: ReadonlyArray<Default>
 }
 
 /** The settings key of a leaf as a dotted name. */
@@ -168,6 +186,12 @@ const planFor = (
   for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...(byFile.get(patch.file) ?? []), ...leaves(patch.content)])
   }
+  if (KIMI_SETTINGS !== undefined && kimiRegionDefault(env, scope, config))
+    byFile.set(KIMI_SETTINGS, [
+      ...(byFile.get(KIMI_SETTINGS) ?? []),
+      ...leaves({ region: "global" }),
+    ])
+  const startupModel = leaves(rootModelSettings(config) ?? {})
   const targets: Array<Target> = []
   const unplaced: Array<string> = []
   for (const [logical, all] of byFile) {
@@ -181,6 +205,7 @@ const planFor = (
       global: scope === "user" ? undefined : locate(env, cwd, "user", logical),
       all,
       defaults: PACKAGE_DEFAULTS.get(logical),
+      startupModel: logical === PI_SETTINGS_FILE ? startupModel : [],
     })
   }
   return { targets, unplaced }
@@ -191,9 +216,11 @@ interface Resolved {
   readonly file: string
   /** What the file holds now, read once for the layering and for the merge or check after it. */
   readonly existing: JsonObject
+  readonly unchangedSince: string | undefined
   readonly keys: ReadonlyArray<Default>
   readonly atDefault: ReadonlyArray<string>
   readonly atGlobal: ReadonlyArray<string>
+  readonly startupNote: string | undefined
 }
 
 /**
@@ -203,21 +230,35 @@ interface Resolved {
  * left out rather than freezing today's default. Skipping such a key cannot hide a global value.
  * Fails with SetupFailure when either settings file is not a JSON object.
  */
-const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: Target) {
+const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (env: Env, target: Target) {
   const global = target.global === undefined ? undefined : yield* readJsonObject(target.global)
-  const existing = yield* readJsonObject(target.file)
+  const { value: existing, text: unchangedSince } = yield* readJsonObjectSnapshot(target.file)
   const setIn = (content: JsonObject | undefined, key: Default) =>
     content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added"
   const setGlobally = (key: Default) => setIn(global, key)
   const isDefault = ({ path, value }: Default) =>
     target.defaults !== undefined && Equal.equals(valueAt(target.defaults, path), value)
   const free = target.all.filter((key) => !setGlobally(key))
+  const startupNote =
+    target.startupModel.length === 0
+      ? undefined
+      : ROOT_MODEL_KEYS.some((key) => global?.[key] !== undefined)
+        ? "kept the startup model preferences in your global file"
+        : ROOT_MODEL_KEYS.some((key) => existing[key] !== undefined)
+          ? "kept the existing startup model preferences"
+          : (yield* readRecorded(env, target.file)).some(({ path }) =>
+                ROOT_MODEL_KEYS.includes(path.join(".")),
+              )
+            ? "kept the startup model reset"
+            : undefined
   return {
     file: target.file,
     existing,
-    keys: free.filter((key) => !isDefault(key)),
+    unchangedSince,
+    keys: [...free.filter((key) => !isDefault(key)), ...(startupNote ? [] : target.startupModel)],
     atDefault: free.filter(isDefault).map(keyName),
     atGlobal: target.all.filter(setGlobally).map(keyName),
+    startupNote,
   } satisfies Resolved
 })
 
@@ -257,7 +298,7 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   const { dryRun } = options
   const { file } = planned
   yield* refuseLinks(options.cwd, options.scope, file, "write")
-  const target = yield* resolveTarget(planned)
+  const target = yield* resolveTarget(env, planned)
   const { merged, entries } = applyDefaults(target.existing, target.keys)
   const added = entries.filter((entry) => entry.status === "added")
   const kept = entries.filter((entry) => entry.status === "kept")
@@ -266,7 +307,11 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
     const names = new Set(added.map((entry) => entry.path))
     // Read the record first, so one that cannot be decoded stops the run before the file changes.
     yield* readRecorded(env, file)
-    yield* writeJsonObject(file, merged)
+    if (planned.startupModel.length === 0) yield* writeJsonObject(file, merged)
+    else if (!(yield* writeJsonObjectIfUnchanged(file, merged, target.unchangedSince)))
+      return yield* new SetupFailure({
+        message: `${file} changed while setup was working on it, so nothing was written. Run setup again`,
+      })
     // The keys are in the file now, so a record that fails here is named: `--undo` would skip them.
     yield* addRecorded(
       env,
@@ -300,6 +345,7 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
     ...(target.atDefault.length === 0
       ? []
       : [`left out, the package default: ${target.atDefault.join(", ")}`]),
+    ...(target.startupNote === undefined ? [] : [target.startupNote]),
   ]
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "="
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`
@@ -409,18 +455,18 @@ const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
  * the HolyAgent config of the scope into the files the Pi packages read them from, one report line
  * per file. A key is written only where it is unset in the file and its value differs from the
  * package's own default ({@link PACKAGE_DEFAULTS}); a value the user set stays, whatever it is, so
- * a user's `off` wins for the risky settings too. Pi's startup provider, model and thinking
- * preferences are outside this plan. At project and local scope a key the user's global file sets
- * is not written either ({@link resolveTarget}), and a symlinked `.pi` folder or file is a `!` line
- * with nothing written ({@link refuseLinks}). Keys the file already holds are never touched. The
- * keys it adds are recorded outside the project, which is what {@link undoPiToolSettings} removes.
- * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (the
- * files of Billion Context and `@ff-labs/pi-fff`, which have no project location, are skipped with
- * a `-` line). A file that is not a JSON object is a `!` line and stays as it is, and the other
- * files are still written. Each write goes through a temporary file renamed over the target. With
- * `dryRun` nothing is written or recorded. With `pi.enable` off nothing is written, but the keys of
- * a revertable setting that setup recorded are still taken back out; a config that cannot be loaded
- * gives no lines.
+ * a user's `off` wins for the risky settings too. The startup provider, model and thinking are
+ * seeded together only if none is set or was written by setup earlier. At project and local scope a
+ * key the user's global file sets is not written either ({@link resolveTarget}), and a symlinked
+ * `.pi` folder or file is a `!` line with nothing written ({@link refuseLinks}). Keys the file
+ * already holds are never touched. The keys it adds are recorded outside the project, which is what
+ * {@link undoPiToolSettings} removes. Scope `user` writes Pi's global files, `project` and `local`
+ * the project's `.pi` folder (the files of Billion Context and `@ff-labs/pi-fff`, which have no
+ * project location, are skipped with a `-` line). A file that is not a JSON object is a `!` line
+ * and stays as it is, and the other files are still written. Each write goes through a temporary
+ * file renamed over the target. With `dryRun` nothing is written or recorded. With `pi.enable` off
+ * nothing is written, but the keys of a revertable setting that setup recorded are still taken back
+ * out; a config that cannot be loaded gives no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
@@ -557,7 +603,7 @@ export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope, form?: 
       lines.push(
         ...(yield* Effect.gen(function* () {
           yield* refuseLinks(cwd, scope, planned.file, "write")
-          const target = yield* resolveTarget(planned)
+          const target = yield* resolveTarget(env, planned)
           const missing = applyDefaults(target.existing, target.keys)
             .entries.filter((entry) => entry.status === "added")
             .map((entry) => entry.path)

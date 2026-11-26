@@ -62,7 +62,9 @@ export const SetupApp = (props: SetupAppProps) => {
   const dimensions = useTerminalDimensions()
   const look = lookFor(props.input.env, props.background)
   const palette = paletteOf(look)
-  const [state, setState] = createSignal<State>(initialState(props.input.initial))
+  const [state, setState] = createSignal<State>(
+    initialState(props.input.initial, props.input.offer.harnesses?.onlyCodex === true),
+  )
   const [progress, setProgress] = createSignal<SetupDisplayProgress>()
   const [elapsedSeconds, setElapsedSeconds] = createSignal(0)
   const abort = new AbortController()
@@ -154,16 +156,7 @@ export const SetupApp = (props: SetupAppProps) => {
   const keypress = (key: Key) => {
     const before = state()
     const current = context()
-    advance(
-      before,
-      press(
-        before,
-        current.rows,
-        key,
-        scrollOf(before, current),
-        current.offer.browse?.profiles?.length,
-      ),
-    )
+    advance(before, press(before, current.rows, key, scrollOf(before, current), current.offer))
   }
   useKeyboard((event) => keypress({ name: event.name, ctrl: event.ctrl }))
 
@@ -209,7 +202,7 @@ export const SetupApp = (props: SetupAppProps) => {
                     context().rows,
                     down.control,
                     scrollOf(before, context()),
-                    props.input.offer.browse?.profiles?.length,
+                    props.input.offer,
                   ),
                 )
             }}>
