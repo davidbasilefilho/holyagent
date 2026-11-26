@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import type { SetupProgressUpdate } from "../../../../core/src/setup/progress.ts"
+import type { ManagedSetupConflict } from "../../../../core/src/setup/report.ts"
 import type { PiProvider, PiProviderSelection } from "../../config/schema.ts"
 import type { BrowsePlan } from "../browse-setup.ts"
 import type { Tone } from "./theme.ts"
@@ -20,6 +21,8 @@ export interface Choices {
   readonly browseBrowserIds?: ReadonlyArray<string>
   /** Explicitly chosen desktop browser for opening the official ChatGPT extension guide. */
   readonly codexBrowserHandoff?: string
+  /** Keep the conflicting files by skipping only their affected harnesses. */
+  readonly keepManagedConflicts?: boolean
   /** Selected public harnesses in the combined setup. */
   readonly harnesses?: { readonly pi: boolean; readonly claude: boolean; readonly codex?: boolean }
 }
@@ -94,6 +97,8 @@ export interface Review {
   readonly browse?: ReadonlyArray<string>
   /** The Apply action will replace one previous Pi registration that the review lists. */
   readonly replacePiRegistration?: boolean
+  /** The conflicts still shown in a review, including conflicts the person chose to keep. */
+  readonly conflicts?: ReadonlyArray<ManagedSetupConflict & { readonly harness: string }>
   /** The T3 settings file setup writes; `undefined` when the T3 part has no work. */
   readonly file: string | undefined
   /**

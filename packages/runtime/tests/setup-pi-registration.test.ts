@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, test } from "bun:test"
 import { readFileSync, writeFileSync } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, relative } from "node:path"
 
 import { Effect } from "effect"
 
 import release from "../../../package.json" with { type: "json" }
 import { piPackages } from "../../core/src/config/packages.ts"
-import { installPiPackages } from "../../core/src/setup/pi-install.ts"
+import { installPiPackages, PiRegistrationReview } from "../../core/src/setup/pi-install.ts"
 import { loadPiConfig } from "../src/setup/pi-check.ts"
 import type { Scope } from "../src/setup/scope.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
@@ -39,6 +39,7 @@ const fixture = (respond?: Parameters<typeof fakeShell>[0]["respond"]) => {
     dryRun = false,
     packageRoot = installedPackageRoot,
     replacePiRegistration = false,
+    review?: typeof PiRegistrationReview.Service,
   ) =>
     Effect.runPromise(
       installPiPackages(env, {
@@ -48,7 +49,7 @@ const fixture = (respond?: Parameters<typeof fakeShell>[0]["respond"]) => {
         form: "headless",
         installedPackageRoot: packageRoot,
         replacePiRegistration,
-      }).pipe(Effect.provide(shell.layer)),
+      }).pipe(Effect.provide(shell.layer), Effect.provideService(PiRegistrationReview, review)),
     )
   const seed = async (file: string, sources: ReadonlyArray<unknown> = []) => {
     const config = await Effect.runPromise(loadPiConfig(env, cwd, "user"))
@@ -200,9 +201,9 @@ test("disabled Pi configuration never validates or registers the supplied path",
   expect(shell.calls).toEqual([])
 })
 
-test.each([false, true])(
-  "the Windows Bunx Git migration keeps the previous entry until a successful install (failure: %s)",
-  async (fail) => {
+test.each(["success", "unavailable", "partial failure", "ambiguous failure"])(
+  "the Windows Bunx Git migration keeps or backs up the previous entry (%s)",
+  async (outcome) => {
     const version = `${release.version}-dev.2026-11-25.18-15-00.g1e379bf`
     const source = `npm:holyagent@${version}`
     const sink = fixture((line) => {
@@ -211,7 +212,23 @@ test.each([false, true])(
       expect(existing.packages.some((p: { source?: string }) => p.source === previous.source)).toBe(
         true,
       )
-      if (fail) return { exitCode: 1, stderr: "registry unavailable" }
+      if (outcome === "unavailable") return { exitCode: 1, stderr: "registry unavailable" }
+      if (outcome === "partial failure" || outcome === "ambiguous failure") {
+        writeFileSync(
+          sink.global,
+          JSON.stringify({
+            ...existing,
+            hideThinkingBlock: false,
+            packages: [
+              ...existing.packages.filter(
+                (entry: { source?: string }) => entry.source !== previous.source,
+              ),
+              ...(outcome === "ambiguous failure" ? ["npm:added@2.0.0"] : []),
+            ],
+          }),
+        )
+        return { exitCode: 1, stderr: "registry unavailable" }
+      }
       writeFileSync(
         sink.global,
         JSON.stringify({ ...existing, packages: [...existing.packages, source] }),
@@ -237,17 +254,64 @@ test.each([false, true])(
     await writeJson(sink.global, { ...initial, hideThinkingBlock: true })
     const original = await readFile(sink.global, "utf8")
     await expect(sink.run("user", false, root)).rejects.toThrow("interactive setup")
-    const plan = await sink.run("user", true, root, true)
+    let fingerprint = ""
+    const plan = await sink.run("user", true, root, true, {
+      preview: (conflict) => {
+        fingerprint = conflict.fingerprint
+      },
+    })
     expect(plan.join("\n")).toContain(`replace "${previous.source}" with "${source}"`)
     expect(plan.join("\n")).not.toContain(root)
     expect(sink.shell.calls).toHaveLength(0)
     expect(await readFile(sink.global, "utf8")).toBe(original)
-    const applied = await sink.run("user", false, root, true)
+    expect(fingerprint).toMatch(/^[a-f0-9]{64}$/)
+    await writeJson(sink.global, {
+      ...initial,
+      packages: initial.packages.map((p: { source?: string }) =>
+        p.source === previous.source ? { ...p, extensions: ["my-own-filter"] } : p,
+      ),
+    })
+    const changed = await readFile(sink.global, "utf8")
+    await expect(sink.run("user", false, root, true, { expected: fingerprint })).rejects.toThrow(
+      "changed after review",
+    )
+    expect(sink.shell.calls).toEqual([])
+    expect(await readFile(sink.global, "utf8")).toBe(changed)
+    await writeFile(sink.global, original)
+    const applied = await sink.run("user", false, root, true, { expected: fingerprint })
     expect(sink.shell.lines()).toEqual([`pi install ${source}`])
-    if (fail) {
+    const backups = (await readdir(dirname(sink.global))).filter((name) => name.endsWith(".bak"))
+    if (outcome === "unavailable") {
       expect(applied.some((line) => line.includes("registry unavailable"))).toBe(true)
       expect(await readFile(sink.global, "utf8")).toBe(original)
+      expect(backups).toEqual([])
     } else {
+      expect(backups).toHaveLength(1)
+      expect(await Bun.file(join(dirname(sink.global), backups[0] ?? "")).json()).toEqual({
+        source,
+        entry: previous,
+      })
+      if (outcome === "partial failure" || outcome === "ambiguous failure") {
+        expect(applied.join("\n")).toContain(backups[0] ?? "missing backup")
+        expect(applied.join("\n")).toContain("registry unavailable")
+        expect(applied.join("\n").includes("the package files were not verified")).toBe(
+          outcome === "partial failure",
+        )
+        expect(await Bun.file(sink.global).json()).toEqual({
+          ...initial,
+          hideThinkingBlock: false,
+          packages:
+            outcome === "partial failure"
+              ? initial.packages
+              : [
+                  ...initial.packages.filter(
+                    (entry: { source?: string }) => entry.source !== previous.source,
+                  ),
+                  "npm:added@2.0.0",
+                ],
+        })
+        return
+      }
       const saved = await Bun.file(sink.global).json()
       expect(saved).toEqual({
         ...initial,

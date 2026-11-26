@@ -5,6 +5,10 @@ import {
   checkBrowserExecutable,
   discoverBrowsers,
 } from "../../../../core/src/setup/browser-discovery.ts"
+import {
+  type PiRegistrationConflict,
+  PiRegistrationReview,
+} from "../../../../core/src/setup/pi-install.ts"
 import { SetupProgress } from "../../../../core/src/setup/progress.ts"
 import {
   CAPABILITIES,
@@ -311,6 +315,7 @@ export interface InteractiveOptions {
       dryRun: boolean,
       skipSharedPrerequisites: boolean,
       replacePiRegistration: boolean,
+      checkReviewedPlan?: boolean,
     ) => Effect.Effect<Report>
   }
 }
@@ -527,11 +532,31 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   let applyStarted = false
   let reviewedChoices: Choices | undefined
   let reviewSequence = 0
-  let reviewedReplacement: string | undefined
+  let reviewedPi: PiRegistrationConflict | undefined
+  let reviewedCodexConflict = false
   let stagedBrowse: BrowsePlan | undefined
   let stagedHandoff: CodexBrowserChoice | undefined
-  const replacementOf = (report: Report) =>
-    report.lines.find((line) => line.startsWith("+ pi package: replace "))
+  const previewRegistration = (run: Effect.Effect<Report>) =>
+    Effect.gen(function* () {
+      let registration: PiRegistrationConflict | undefined
+      const report = yield* run.pipe(
+        Effect.provideService(PiRegistrationReview, {
+          preview: (conflict) => {
+            registration = conflict
+          },
+        }),
+      )
+      return { report, registration }
+    })
+  const piConflict = ({ file, prior, source }: PiRegistrationConflict) => ({
+    harness: label("pi"),
+    file: plain(file),
+    detail: plain(
+      `Replace ${JSON.stringify(prior)} with ${JSON.stringify(source)} and save the previous package entry.`,
+    ),
+  })
+  const skippedConflicts = (target: "pi" | "codex") =>
+    hint(`setup harness: ${label(target)} setup skipped to keep the current files and settings.`)
   const input: TuiInput = {
     env: options.env,
     offer: {
@@ -643,24 +668,34 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             const handoff = requestedHandoff(choices)
             const changed = changedSwitches(initialSwitches, choices.capabilities)
             const plans = yield* Effect.forEach(targets, (target, index) =>
-              combined
-                .run(target, withProviderChanges(choices), changed, true, index > 0, true)
-                .pipe(
-                  Effect.map((report) => ({
-                    name: label(target),
-                    ok: report.ok,
-                    lines: [
-                      ...report.lines,
-                      ...(target !== "codex" || handoff === undefined
-                        ? []
-                        : [
-                            hint(
-                              `ChatGPT browser extension: ${options.dryRun ? "would open" : "open"} OpenAI's setup guide in ${handoff.name} after closing. No extension or approval is applied by setup.`,
-                            ),
-                          ]),
-                    ],
-                  })),
-                ),
+              previewRegistration(
+                combined.run(target, withProviderChanges(choices), changed, true, index > 0, true),
+              ).pipe(
+                Effect.map(({ report, registration }) => ({
+                  target,
+                  registration,
+                  conflicts: [
+                    ...(registration === undefined ? [] : [piConflict(registration)]),
+                    ...(report.managedConflicts ?? []).map(({ file, detail }) => ({
+                      harness: label(target),
+                      file: plain(file),
+                      detail: plain(detail),
+                    })),
+                  ],
+                  name: label(target),
+                  ok: report.ok,
+                  lines: [
+                    ...report.lines,
+                    ...(target !== "codex" || handoff === undefined
+                      ? []
+                      : [
+                          hint(
+                            `ChatGPT browser extension: ${options.dryRun ? "would open" : "open"} OpenAI's setup guide in ${handoff.name} after closing. No extension or approval is applied by setup.`,
+                          ),
+                        ]),
+                  ],
+                })),
+              ),
             )
             const error = plans.find((plan) => !plan.ok)
             if (error !== undefined)
@@ -669,42 +704,64 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                   `${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`,
                 ),
               )
-            const replacement = plans.flatMap((plan) => replacementOf(plan) ?? [])[0]
+            const registration = plans.find(({ target }) => target === "pi")?.registration
+            const conflicts = plans.flatMap((plan) => plan.conflicts)
             if (sequence === reviewSequence) {
               reviewedChoices = choices
-              reviewedReplacement = replacement
+              reviewedPi = registration
+              reviewedCodexConflict = plans.some(
+                ({ target, conflicts }) => target === "codex" && conflicts.length > 0,
+              )
             }
             return {
-              replacePiRegistration: replacement !== undefined,
               file: undefined,
               choices: [],
               always: [],
-              ...browserReview,
-              harnesses: plans.map(({ name, lines }) => ({ name, lines })),
+              conflicts,
+              ...(choices.keepManagedConflicts === true && registration !== undefined
+                ? {}
+                : browserReview),
+              harnesses: plans.map(({ target, conflicts, name, lines }) => ({
+                name,
+                lines:
+                  choices.keepManagedConflicts === true &&
+                  target !== "claude" &&
+                  conflicts.length > 0
+                    ? [skippedConflicts(target)]
+                    : lines,
+              })),
             } satisfies Review
           }
           const chosen = withProviderChanges(choices)
           if (options.previewPi !== undefined) {
             const sequence = ++reviewSequence
             reviewedChoices = undefined
-            const report = yield* options.previewPi(
-              chosen,
-              changedSwitches(initialSwitches, choices.capabilities),
+            const { report, registration } = yield* previewRegistration(
+              options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities)),
             )
             if (!report.ok) return yield* Effect.fail(failedReport(report))
-            const replacement = replacementOf(report)
             if (sequence === reviewSequence) {
               reviewedChoices = choices
-              reviewedReplacement = replacement
+              reviewedPi = registration
             }
-            if (replacement !== undefined || chosen.piProviders !== undefined)
+            if (registration !== undefined || chosen.piProviders !== undefined)
               return {
-                replacePiRegistration: replacement !== undefined,
                 file: undefined,
                 choices: [],
                 always: [],
-                ...browserReview,
-                harnesses: [{ name: label("pi"), lines: report.lines }],
+                conflicts: registration === undefined ? [] : [piConflict(registration)],
+                ...(choices.keepManagedConflicts === true && registration !== undefined
+                  ? {}
+                  : browserReview),
+                harnesses: [
+                  {
+                    name: label("pi"),
+                    lines:
+                      choices.keepManagedConflicts === true && registration !== undefined
+                        ? [skippedConflicts("pi")]
+                        : report.lines,
+                  },
+                ],
               } satisfies Review
           }
           const next =
@@ -729,28 +786,63 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     apply: (choices, signal, reportProgress) => {
       if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
-      const plan = browseFor(choices)
-      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true
-      const handoff = requestedHandoff(choices)
       if (
-        (combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) &&
+        (combined !== undefined ||
+          options.previewPi !== undefined ||
+          chosen.piProviders !== undefined ||
+          (choices.browseSetup === true && browseFor(choices)?.action !== undefined)) &&
         reviewedChoices !== choices
       )
         return Effect.runPromise(
           Effect.fail(new Error("Review the current harness selection before applying.")),
         )
-      const replacement = reviewedChoices === choices ? reviewedReplacement : undefined
+      const registration = reviewedChoices === choices ? reviewedPi : undefined
+      const codexConflict = reviewedChoices === choices && reviewedCodexConflict
+      const keepPi = registration !== undefined && choices.keepManagedConflicts === true
+      const keepCodex = codexConflict && choices.keepManagedConflicts === true
+      const replacement = keepPi ? undefined : registration
+      const plan = keepPi ? undefined : browseFor(choices)
+      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true
+      const handoff = keepCodex ? undefined : requestedHandoff(choices)
       reviewedChoices = undefined
-      reviewedReplacement = undefined
+      reviewedPi = undefined
+      reviewedCodexConflict = false
       applyStarted = true
       const changed = changedSwitches(initialSwitches, choices.capabilities)
-      const confirmReplacement = (report: Report) =>
-        report.ok && replacementOf(report) === replacement
-          ? Effect.void
-          : Effect.fail(
-              new Error(
-                "The Pi package plan changed. Review it again before replacing the previous registration.",
-              ),
+      const targets = selectionOf(choices).filter(
+        (target) => !(target === "pi" && keepPi) && !(target === "codex" && keepCodex),
+      )
+      const validate = Effect.gen(function* () {
+        if (!keepPi) {
+          const preview =
+            combined === undefined
+              ? options.previewPi?.(chosen, changed)
+              : targets.includes("pi")
+                ? combined.run("pi", chosen, changed, true, false, true)
+                : undefined
+          if (preview !== undefined) {
+            const current = yield* previewRegistration(preview)
+            if (!current.report.ok) return yield* Effect.fail(failedReport(current.report))
+            if (current.registration?.fingerprint !== replacement?.fingerprint)
+              return yield* Effect.fail(
+                new Error("The Pi package plan changed. Review it again before applying."),
+              )
+          }
+        }
+        if (
+          combined !== undefined &&
+          targets.includes("codex") &&
+          (codexConflict || targets.length > 1)
+        ) {
+          const current = yield* combined.run("codex", chosen, changed, true, false, false, true)
+          if (!current.ok) return yield* Effect.fail(failedReport(current))
+        }
+      })
+      const authorizedPi = (run: Effect.Effect<Report>) =>
+        replacement === undefined
+          ? run
+          : run.pipe(
+              Effect.provideService(PiRegistrationReview, { expected: replacement.fingerprint }),
             )
       const observed = (run: Effect.Effect<Report>, harness?: SetupDisplayProgress["harness"]) =>
         reportProgress === undefined
@@ -766,35 +858,40 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 }),
               ),
             )
-      const applySingle = observed(options.apply(chosen, changed, replacement !== undefined))
-      const targets = selectionOf(choices)
+      const applySingle = keepPi
+        ? Effect.succeed({ ok: true, lines: [skippedConflicts("pi")] })
+        : observed(authorizedPi(options.apply(chosen, changed, replacement !== undefined)))
       return Effect.runPromise(
-        (combined === undefined
-          ? replacement === undefined || options.previewPi === undefined
-            ? applySingle
-            : options
-                .previewPi(chosen, changed)
-                .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(applySingle))
-          : Effect.forEach(targets, (target, index) => {
-              const harness = { index: index + 1, total: targets.length, label: label(target) }
-              const replace = target === "pi" && replacement !== undefined
-              const perform = observed(
-                combined.run(target, chosen, changed, options.dryRun, index > 0, replace),
-                harness,
-              )
-              const run = replace
-                ? combined
-                    .run(target, chosen, changed, true, index > 0, true)
-                    .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(perform))
-                : perform
-              return Effect.sync(() => reportProgress?.({ harness })).pipe(Effect.andThen(run))
-            }).pipe(
-              Effect.map((reports) => ({
-                ok: reports.length > 0 && reports.every(({ ok }) => ok),
-                lines: reports.flatMap(({ lines }) => lines),
-              })),
-            )
-        ).pipe(
+        validate.pipe(
+          Effect.andThen(
+            combined === undefined
+              ? applySingle
+              : Effect.forEach(targets, (target, index) => {
+                  const harness = { index: index + 1, total: targets.length, label: label(target) }
+                  const replace = target === "pi" && replacement !== undefined
+                  const run = combined.run(
+                    target,
+                    chosen,
+                    changed,
+                    options.dryRun,
+                    index > 0,
+                    replace,
+                  )
+                  const perform = observed(replace ? authorizedPi(run) : run, harness)
+                  return Effect.sync(() => reportProgress?.({ harness })).pipe(
+                    Effect.andThen(perform),
+                  )
+                }).pipe(
+                  Effect.map((reports) => ({
+                    ok: reports.every(({ ok }) => ok),
+                    lines: [
+                      ...(keepPi ? [skippedConflicts("pi")] : []),
+                      ...(keepCodex ? [skippedConflicts("codex")] : []),
+                      ...reports.flatMap(({ lines }) => lines),
+                    ],
+                  })),
+                ),
+          ),
           Effect.map((report): Applied => {
             if (report.ok && handoff !== undefined && !options.dryRun) stagedHandoff = handoff
             const lines = [
