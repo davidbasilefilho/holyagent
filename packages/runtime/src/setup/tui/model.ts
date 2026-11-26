@@ -96,7 +96,7 @@ export interface Key {
 }
 
 /** An action of the review screen. */
-export type ReviewAction = "apply" | "back" | "cancel"
+export type ReviewAction = "apply" | "keep-conflicts" | "replace-conflicts" | "back" | "cancel"
 
 /** A visible control on the choose, review or result screen. */
 export type Control =
@@ -194,8 +194,16 @@ export const initialState = (choices: Choices, onlyCodex = false): State => ({
 })
 
 /** The actions the review screen offers: Apply only once the review was read. */
-export const reviewActions = (state: State): ReadonlyArray<ReviewAction> =>
-  state.review === undefined ? ["back", "cancel"] : ["apply", "back", "cancel"]
+export const reviewActions = (state: State): ReadonlyArray<ReviewAction> => {
+  if (state.review === undefined) return ["back", "cancel"]
+  if ((state.review.conflicts?.length ?? 0) === 0) return ["apply", "back", "cancel"]
+  return [
+    "apply",
+    state.choices.keepManagedConflicts === true ? "replace-conflicts" : "keep-conflicts",
+    "back",
+    "cancel",
+  ]
+}
 
 const isCancel = (key: Key) => key.name === "escape" || (key.ctrl && key.name === "c")
 const isQuit = (key: Key) => isCancel(key) || (!key.ctrl && key.name === "q")
@@ -481,6 +489,18 @@ export const press = (
     if (isEnter(key)) {
       const action = actions[state.action]
       if (action === "apply") return { state: { ...state, screen: "applying" }, command: "apply" }
+      if (action === "keep-conflicts" || action === "replace-conflicts")
+        return {
+          state: {
+            ...state,
+            action: 0,
+            scroll: 0,
+            review: undefined,
+            failure: undefined,
+            choices: { ...state.choices, keepManagedConflicts: action === "keep-conflicts" },
+          },
+          command: "review",
+        }
       if (action === "back")
         return {
           state: { ...state, screen: "choose", scroll: 0, review: undefined, failure: undefined },
@@ -992,12 +1012,19 @@ const reviewLayout = (state: State, context: Context): Layout => {
         action === "apply"
           ? context.dryRun
             ? "Apply (dry run)"
-            : state.review?.replacePiRegistration === true
-              ? "Apply and replace Pi package"
-              : "Apply"
-          : action === "back"
-            ? "Back"
-            : "Cancel"
+            : (state.review?.conflicts?.length ?? 0) > 0
+              ? state.choices.keepManagedConflicts === true
+                ? "Apply and keep current files"
+                : "Apply and replace conflicts"
+              : state.review?.replacePiRegistration === true
+                ? "Apply and replace Pi package"
+                : "Apply"
+          : {
+              "keep-conflicts": "Keep current files",
+              "replace-conflicts": "Replace conflicts",
+              back: "Back",
+              cancel: "Cancel",
+            }[action]
       if (index === state.action)
         return [{ text: `${g.focus} ${text}`, tone: "focus", click: { action } }]
       const tone: Tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument"
@@ -1069,6 +1096,10 @@ const reviewLayout = (state: State, context: Context): Layout => {
   }
   const { review } = state
   const bodyOf = (width: number) => {
+    const conflicts = (review.conflicts ?? []).flatMap(({ harness, file, detail }) => [
+      ...hintLines(`  ${harness} — ${file}`, width),
+      ...hintLines(`    ${detail}`, width),
+    ])
     const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
       ...heading(name, width),
       ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
@@ -1094,6 +1125,9 @@ const reviewLayout = (state: State, context: Context): Layout => {
       ...section("Always applied", review.always),
     ]
     return [
+      ...(conflicts.length === 0
+        ? []
+        : [...heading("Managed conflicts", width), ...conflicts, blank]),
       ...(browse.length === 0 ? [] : [...heading("Browser Use setup", width), ...browse, blank]),
       ...harnesses,
       ...section("Capabilities", capabilities),

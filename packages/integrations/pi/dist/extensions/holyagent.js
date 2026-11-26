@@ -16254,6 +16254,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
+import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
 import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
@@ -16336,6 +16337,39 @@ var registration = fn2("planPiPackageRegistration")(function* (env, path, settin
   return listedIn === undefined ? { source } : { listedIn };
 });
 var entrySource = (entry) => isJsonObject(entry) ? entry.source : entry;
+var PiRegistrationReview = Reference("holyagent/setup/PiRegistrationReview", { defaultValue: () => {
+  return;
+} });
+var registrationEntry = (settings, source) => {
+  if (!Array.isArray(settings.packages))
+    return;
+  const matching = settings.packages.filter((entry) => entrySource(entry) === source);
+  return matching.length === 1 ? matching[0] : undefined;
+};
+var backupRegistration = fn2("backupPiRegistration")(function* (file, source, entry) {
+  const path = `${file}.holyagent-package.${randomUUID4()}.bak`;
+  const fs = yield* fileSystem;
+  yield* tryPromise2({
+    try: () => fs.writeFile(path, `${JSON.stringify({ source, entry }, undefined, 2)}
+`, {
+      flag: "wx",
+      mode: 384
+    }),
+    catch: (cause) => new SetupFailure({
+      message: `Could not back up the Pi registration to ${path}: ${String(cause)}`
+    })
+  });
+  return path;
+});
+var restoreRegistration = fn2("restorePiRegistration")(function* (file, prior, before) {
+  const current = yield* readJsonObjectSnapshot(file);
+  if (current.text === undefined || !Array.isArray(before.packages))
+    return false;
+  const withoutPrior = before.packages.filter((entry) => entrySource(entry) !== prior);
+  if (JSON.stringify(current.value.packages) !== JSON.stringify(withoutPrior))
+    return false;
+  return yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: before.packages }, current.text);
+});
 var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, source, previousEntry) {
   const current = yield* readJsonObjectSnapshot(file);
   const packages = Array.isArray(current.value.packages) ? current.value.packages : [];
@@ -16353,11 +16387,10 @@ var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, sou
       return old.length === 0 ? [replacement] : [];
     return [entry];
   });
-  if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text))) {
+  if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text)))
     return yield* new SetupFailure({
       message: `${file}: settings changed while replacing the package; did not remove the previous source`
     });
-  }
 });
 var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const shell = yield* Shell;
@@ -16385,6 +16418,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   });
   if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
     lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
+  const review = yield* PiRegistrationReview;
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
@@ -16392,12 +16426,25 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
     else {
       if (match.prior !== undefined) {
-        replacement = { source: match.source, prior: match.prior };
+        const { source, prior } = match;
+        const entry = registrationEntry(yield* readJsonObject(file), prior);
+        const fingerprint = createHash7("sha256").update(JSON.stringify([file, prior, source, entry])).digest("hex");
+        if (entry === undefined || !options.dryRun && review !== undefined && review.expected !== fingerprint)
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`
+          });
+        if (options.dryRun && review?.preview !== undefined)
+          yield* sync2(() => review.preview?.({ file, prior, source, fingerprint }));
+        replacement = { source, prior, entry };
         lines.unshift(added(`pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`));
       }
       installs.unshift(match.source);
     }
   }
+  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registration changed after review; review it again`
+    });
   if (installs.length === 0 && removals.length === 0)
     return lines;
   if (isNone2(yield* shell.which("pi"))) {
@@ -16416,25 +16463,59 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       continue;
     }
     const commit = replacement?.source === source ? replacement : undefined;
-    const before = commit === undefined ? undefined : yield* readJsonObject(file);
-    const entries = Array.isArray(before?.packages) ? before.packages : [];
-    const previousEntry = entries.find((entry) => commit !== undefined && entrySource(entry) === commit.prior);
-    if (commit !== undefined && previousEntry === undefined)
+    yield* reportSetupActivity(`Installing ${source}`);
+    const install = shell.run("pi", args, {
+      cwd,
+      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+    });
+    if (commit === undefined) {
+      const result = yield* install;
+      lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+      continue;
+    }
+    const priorIsUnchanged = (state) => JSON.stringify(registrationEntry(state, commit.prior)) === JSON.stringify(commit.entry);
+    const readRegistration = readJsonObject(file).pipe(orElseSucceed2(() => ({})));
+    if (!priorIsUnchanged(yield* readRegistration))
       return [
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`
       ];
-    yield* reportSetupActivity(`Installing ${source}`);
-    const result = yield* shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+    const backup = yield* backupRegistration(file, source, commit.entry);
+    const discardBackupIfOriginalRemains = gen2(function* () {
+      if (!priorIsUnchanged(yield* readRegistration))
+        return false;
+      const fs = yield* fileSystem;
+      return yield* tryPromise2(() => fs.rm(backup, { force: true })).pipe(as2(true), orElseSucceed2(() => false));
     });
-    if (commit !== undefined) {
-      if (result.exitCode !== 0)
-        return [...lines, failed2(command, result)];
-      yield* retireRegistration(file, commit.prior, source, previousEntry);
+    const backupHint = added(`pi package: saved the previous registration in ${backup}`);
+    const beforeInstall = yield* readRegistration;
+    if (!priorIsUnchanged(beforeInstall) || Array.isArray(beforeInstall.packages) && beforeInstall.packages.some((entry) => entrySource(entry) === source))
+      return [
+        ...lines,
+        backupHint,
+        `! pi package: ${file} changed before install; the previous registration was not replaced`
+      ];
+    const result = yield* install;
+    if (result.exitCode !== 0) {
+      const discardedBackup = yield* discardBackupIfOriginalRemains;
+      const restored = discardedBackup ? false : yield* restoreRegistration(file, commit.prior, beforeInstall).pipe(orElseSucceed2(() => false));
+      return [
+        ...lines,
+        ...discardedBackup ? [] : [backupHint],
+        ...restored ? [
+          hint(`pi package: restored the previous registration in ${file}; the package files were not verified`)
+        ] : [],
+        failed2(command, result)
+      ];
     }
-    lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(result2);
+    if (retirement._tag === "Failure")
+      return [
+        ...lines,
+        ...(yield* discardBackupIfOriginalRemains) ? [] : [backupHint],
+        `! pi package: ${retirement.failure.message}`
+      ];
+    lines.push(backupHint, added(`pi ${source}: installed with ${command}`));
   }
   for (const name of removals) {
     const args = withScope(["remove", `npm:${name}`]);

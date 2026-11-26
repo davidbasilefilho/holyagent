@@ -1,9 +1,16 @@
 import type { ShellResult } from "./shell.ts"
 
+/** One managed file that requires a separate decision before setup can replace it. */
+export interface ManagedSetupConflict {
+  readonly file: string
+  readonly detail: string
+}
+
 /** What a setup or doctor run did, as lines to print and whether every part succeeded. */
 export interface Report {
   readonly lines: ReadonlyArray<string>
   readonly ok: boolean
+  readonly managedConflicts?: ReadonlyArray<ManagedSetupConflict>
 }
 
 /** A report line for something that was added or would be. */

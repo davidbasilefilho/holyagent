@@ -1,6 +1,7 @@
+import { createHash, randomUUID } from "node:crypto"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
-import { Effect, Option } from "effect"
+import { Context, Effect, Option } from "effect"
 
 import release from "../../../../package.json" with { type: "json" }
 import { type CapabilityForm, managedCapabilityPackages } from "../config/capabilities.ts"
@@ -30,7 +31,7 @@ import {
   piSettingsSources,
 } from "./pi-check.ts"
 import { reportSetupActivity } from "./progress.ts"
-import { added, failed, present, skipped } from "./report.ts"
+import { added, failed, hint, present, skipped } from "./report.ts"
 import { refuseLinks, type Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
 
@@ -176,6 +177,68 @@ const registration = Effect.fn("planPiPackageRegistration")(function* (
 
 const entrySource = (entry: unknown): unknown => (isJsonObject(entry) ? entry.source : entry)
 
+/** A replacement of one recognized registration and the exact entry inspected in preview. */
+export interface PiRegistrationConflict {
+  readonly file: string
+  readonly prior: string
+  readonly source: string
+  readonly fingerprint: string
+}
+
+/** Carries the interactive preview and approval without changing the unattended setup input. */
+export const PiRegistrationReview = Context.Reference<
+  | { readonly preview?: (conflict: PiRegistrationConflict) => void; readonly expected?: string }
+  | undefined
+>("holyagent/setup/PiRegistrationReview", { defaultValue: () => undefined })
+
+const registrationEntry = (settings: Readonly<Record<string, unknown>>, source: string) => {
+  if (!Array.isArray(settings.packages)) return undefined
+  const matching = (settings.packages as ReadonlyArray<unknown>).filter(
+    (entry) => entrySource(entry) === source,
+  )
+  return matching.length === 1 ? matching[0] : undefined
+}
+
+const backupRegistration = Effect.fn("backupPiRegistration")(function* (
+  file: string,
+  source: string,
+  entry: unknown,
+) {
+  const path = `${file}.holyagent-package.${randomUUID()}.bak`
+  const fs = yield* fileSystem
+  yield* Effect.tryPromise({
+    try: () =>
+      fs.writeFile(path, `${JSON.stringify({ source, entry }, undefined, 2)}\n`, {
+        flag: "wx",
+        mode: 0o600,
+      }),
+    catch: (cause) =>
+      new SetupFailure({
+        message: `Could not back up the Pi registration to ${path}: ${String(cause)}`,
+      }),
+  })
+  return path
+})
+
+/** On a failed native install, only reverse the exact removal of the reviewed entry. */
+const restoreRegistration = Effect.fn("restorePiRegistration")(function* (
+  file: string,
+  prior: string,
+  before: Readonly<Record<string, unknown>>,
+) {
+  const current = yield* readJsonObjectSnapshot(file)
+  if (current.text === undefined || !Array.isArray(before.packages)) return false
+  const withoutPrior = (before.packages as ReadonlyArray<unknown>).filter(
+    (entry) => entrySource(entry) !== prior,
+  )
+  if (JSON.stringify(current.value.packages) !== JSON.stringify(withoutPrior)) return false
+  return yield* writeJsonObjectIfUnchanged(
+    file,
+    { ...current.value, packages: before.packages },
+    current.text,
+  )
+})
+
 /** Keep the old source until Pi has installed the new one. Preserve its package filters in place. */
 const retireRegistration = Effect.fn("retirePiRegistration")(function* (
   file: string,
@@ -206,11 +269,10 @@ const retireRegistration = Effect.fn("retirePiRegistration")(function* (
   })
   if (
     !(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text))
-  ) {
+  )
     return yield* new SetupFailure({
       message: `${file}: settings changed while replacing the package; did not remove the previous source`,
     })
-  }
 })
 
 /** What the Pi step of `holyagent setup` was asked to do. */
@@ -306,7 +368,10 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
         "pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead",
       ),
     )
-  let replacement: { readonly source: string; readonly prior: string } | undefined
+  const review = yield* PiRegistrationReview
+  let replacement:
+    | { readonly source: string; readonly prior: string; readonly entry: unknown }
+    | undefined
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(
       env,
@@ -318,7 +383,21 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`))
     else {
       if (match.prior !== undefined) {
-        replacement = { source: match.source, prior: match.prior }
+        const { source, prior } = match
+        const entry = registrationEntry(yield* readJsonObject(file), prior)
+        const fingerprint = createHash("sha256")
+          .update(JSON.stringify([file, prior, source, entry]))
+          .digest("hex")
+        if (
+          entry === undefined ||
+          (!options.dryRun && review !== undefined && review.expected !== fingerprint)
+        )
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`,
+          })
+        if (options.dryRun && review?.preview !== undefined)
+          yield* Effect.sync(() => review.preview?.({ file, prior, source, fingerprint }))
+        replacement = { source, prior, entry }
         lines.unshift(
           added(
             `pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`,
@@ -328,6 +407,10 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       installs.unshift(match.source)
     }
   }
+  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registration changed after review; review it again`,
+    })
   if (installs.length === 0 && removals.length === 0) return lines
 
   if (Option.isNone(yield* shell.which("pi"))) {
@@ -350,30 +433,82 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       continue
     }
     const commit = replacement?.source === source ? replacement : undefined
-    const before = commit === undefined ? undefined : yield* readJsonObject(file)
-    const entries: ReadonlyArray<unknown> = Array.isArray(before?.packages) ? before.packages : []
-    const previousEntry = entries.find(
-      (entry) => commit !== undefined && entrySource(entry) === commit.prior,
+    yield* reportSetupActivity(`Installing ${source}`)
+    const install = shell.run("pi", args, {
+      cwd,
+      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
+    })
+    if (commit === undefined) {
+      const result = yield* install
+      lines.push(
+        result.exitCode === 0
+          ? added(`pi ${source}: installed with ${command}`)
+          : failed(command, result),
+      )
+      continue
+    }
+    const priorIsUnchanged = (state: Readonly<Record<string, unknown>>) =>
+      JSON.stringify(registrationEntry(state, commit.prior)) === JSON.stringify(commit.entry)
+    const readRegistration = readJsonObject(file).pipe(
+      Effect.orElseSucceed((): Readonly<Record<string, unknown>> => ({})),
     )
-    if (commit !== undefined && previousEntry === undefined)
+    if (!priorIsUnchanged(yield* readRegistration))
       return [
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`,
       ]
-    yield* reportSetupActivity(`Installing ${source}`)
-    const result = yield* shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
+    const backup = yield* backupRegistration(file, source, commit.entry)
+    const discardBackupIfOriginalRemains = Effect.gen(function* () {
+      if (!priorIsUnchanged(yield* readRegistration)) return false
+      const fs = yield* fileSystem
+      return yield* Effect.tryPromise(() => fs.rm(backup, { force: true })).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      )
     })
-    if (commit !== undefined) {
-      if (result.exitCode !== 0) return [...lines, failed(command, result)]
-      yield* retireRegistration(file, commit.prior, source, previousEntry)
-    }
-    lines.push(
-      result.exitCode === 0
-        ? added(`pi ${source}: installed with ${command}`)
-        : failed(command, result),
+    const backupHint = added(`pi package: saved the previous registration in ${backup}`)
+    const beforeInstall = yield* readRegistration
+    if (
+      !priorIsUnchanged(beforeInstall) ||
+      (Array.isArray(beforeInstall.packages) &&
+        beforeInstall.packages.some((entry) => entrySource(entry) === source))
     )
+      return [
+        ...lines,
+        backupHint,
+        `! pi package: ${file} changed before install; the previous registration was not replaced`,
+      ]
+    const result = yield* install
+    if (result.exitCode !== 0) {
+      const discardedBackup = yield* discardBackupIfOriginalRemains
+      const restored = discardedBackup
+        ? false
+        : yield* restoreRegistration(file, commit.prior, beforeInstall).pipe(
+            Effect.orElseSucceed(() => false),
+          )
+      return [
+        ...lines,
+        ...(discardedBackup ? [] : [backupHint]),
+        ...(restored
+          ? [
+              hint(
+                `pi package: restored the previous registration in ${file}; the package files were not verified`,
+              ),
+            ]
+          : []),
+        failed(command, result),
+      ]
+    }
+    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(
+      Effect.result,
+    )
+    if (retirement._tag === "Failure")
+      return [
+        ...lines,
+        ...((yield* discardBackupIfOriginalRemains) ? [] : [backupHint]),
+        `! pi package: ${retirement.failure.message}`,
+      ]
+    lines.push(backupHint, added(`pi ${source}: installed with ${command}`))
   }
   for (const name of removals) {
     const args = withScope(["remove", `npm:${name}`])

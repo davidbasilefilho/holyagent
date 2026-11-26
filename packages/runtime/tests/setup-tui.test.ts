@@ -93,6 +93,58 @@ describe("the setup interface, choose screen", () => {
 })
 
 describe("the setup interface, review and apply", () => {
+  test("a long mixed conflict review keeps Replace focused without applying and supports both scroll controls", async () => {
+    const width = 54
+    const conflicts = Array.from({ length: 18 }, (_, index) => ({
+      harness: index === 0 ? "Pi" : "Codex",
+      file: `/isolated/managed-${index}.md`,
+      detail: "Save the existing copy before replacing it.",
+    }))
+    const screen = await shown({
+      width,
+      height: 20,
+      review: async () => ({ file: undefined, choices: [], always: [], conflicts }),
+    })
+    await clickText(screen, "Review choices")
+    expect(screen.lines().join("\n")).toContain("❯ Apply and replace conflicts")
+    expect(screen.lines().join("\n")).toContain("managed-0.md")
+    expect(screen.applies).toEqual([])
+    await screen.keys("pagedown")
+    expect(screen.lines().join("\n")).not.toContain("managed-0.md")
+    const rail = screen.lines().flatMap((line, row) => (/[█│]$/.test(line) ? [row] : []))
+    expect(rail.length).toBeGreaterThan(0)
+    await screen.click(width - 1, rail.at(-1) ?? -1)
+    expect(screen.lines().join("\n")).toContain("managed-17.md")
+    expect(screen.applies).toEqual([])
+    await clickText(screen, "Keep current files", true)
+    expect(screen.reviews.at(-1)?.keepManagedConflicts).toBe(true)
+    expect(screen.lines().join("\n")).toContain("❯ Apply and keep current files")
+    expect(screen.applies).toEqual([])
+    await screen.keys("escape")
+    expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
+  })
+
+  test("only confirming the Replace action calls apply with the reviewed choice", async () => {
+    const screen = await shown({
+      width: 80,
+      height: 24,
+      review: async () => ({
+        file: undefined,
+        choices: [],
+        always: [],
+        conflicts: [
+          { harness: "Pi", file: "/isolated/pi.json", detail: "One managed registration" },
+        ],
+      }),
+    })
+    await screen.keys("end", "enter")
+    expect(screen.applies).toEqual([])
+    const [reviewed] = screen.reviews
+    if (reviewed === undefined) throw new Error("Expected reviewed choices")
+    await screen.keys("enter")
+    expect(screen.applies).toEqual([reviewed])
+  })
+
   test("verified Codex desktop shows two distinct browser paths and the external guide is opt-in", async () => {
     const screen = await shown({
       width: 88,

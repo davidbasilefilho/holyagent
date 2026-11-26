@@ -4640,6 +4640,7 @@ var fromResult2 = fromResult;
 var flatMap2 = flatMap;
 var andThen2 = andThen;
 var tap2 = tap;
+var result2 = result;
 var option2 = option;
 var exit2 = exit;
 var map4 = map2;
@@ -17508,6 +17509,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
+import { createHash as createHash7, randomUUID as randomUUID4 } from "crypto";
 import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute9, join as join23, relative as relative5, resolve as resolve13 } from "path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
@@ -17590,6 +17592,39 @@ var registration = fn2("planPiPackageRegistration")(function* (env, path, settin
   return listedIn === undefined ? { source } : { listedIn };
 });
 var entrySource = (entry) => isJsonObject2(entry) ? entry.source : entry;
+var PiRegistrationReview = Reference("holyagent/setup/PiRegistrationReview", { defaultValue: () => {
+  return;
+} });
+var registrationEntry = (settings, source) => {
+  if (!Array.isArray(settings.packages))
+    return;
+  const matching = settings.packages.filter((entry) => entrySource(entry) === source);
+  return matching.length === 1 ? matching[0] : undefined;
+};
+var backupRegistration = fn2("backupPiRegistration")(function* (file, source, entry) {
+  const path = `${file}.holyagent-package.${randomUUID4()}.bak`;
+  const fs = yield* fileSystem;
+  yield* tryPromise2({
+    try: () => fs.writeFile(path, `${JSON.stringify({ source, entry }, undefined, 2)}
+`, {
+      flag: "wx",
+      mode: 384
+    }),
+    catch: (cause) => new SetupFailure({
+      message: `Could not back up the Pi registration to ${path}: ${String(cause)}`
+    })
+  });
+  return path;
+});
+var restoreRegistration = fn2("restorePiRegistration")(function* (file, prior, before) {
+  const current = yield* readJsonObjectSnapshot(file);
+  if (current.text === undefined || !Array.isArray(before.packages))
+    return false;
+  const withoutPrior = before.packages.filter((entry) => entrySource(entry) !== prior);
+  if (JSON.stringify(current.value.packages) !== JSON.stringify(withoutPrior))
+    return false;
+  return yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: before.packages }, current.text);
+});
 var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, source, previousEntry) {
   const current = yield* readJsonObjectSnapshot(file);
   const packages = Array.isArray(current.value.packages) ? current.value.packages : [];
@@ -17607,11 +17642,10 @@ var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, sou
       return old.length === 0 ? [replacement] : [];
     return [entry];
   });
-  if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text))) {
+  if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text)))
     return yield* new SetupFailure({
       message: `${file}: settings changed while replacing the package; did not remove the previous source`
     });
-  }
 });
 var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const shell = yield* Shell;
@@ -17639,6 +17673,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   });
   if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
     lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
+  const review = yield* PiRegistrationReview;
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
@@ -17646,12 +17681,25 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
     else {
       if (match.prior !== undefined) {
-        replacement = { source: match.source, prior: match.prior };
+        const { source, prior } = match;
+        const entry = registrationEntry(yield* readJsonObject(file), prior);
+        const fingerprint = createHash7("sha256").update(JSON.stringify([file, prior, source, entry])).digest("hex");
+        if (entry === undefined || !options.dryRun && review !== undefined && review.expected !== fingerprint)
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`
+          });
+        if (options.dryRun && review?.preview !== undefined)
+          yield* sync2(() => review.preview?.({ file, prior, source, fingerprint }));
+        replacement = { source, prior, entry };
         lines.unshift(added(`pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`));
       }
       installs.unshift(match.source);
     }
   }
+  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registration changed after review; review it again`
+    });
   if (installs.length === 0 && removals.length === 0)
     return lines;
   if (isNone2(yield* shell.which("pi"))) {
@@ -17670,25 +17718,59 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       continue;
     }
     const commit = replacement?.source === source ? replacement : undefined;
-    const before = commit === undefined ? undefined : yield* readJsonObject(file);
-    const entries = Array.isArray(before?.packages) ? before.packages : [];
-    const previousEntry = entries.find((entry) => commit !== undefined && entrySource(entry) === commit.prior);
-    if (commit !== undefined && previousEntry === undefined)
+    yield* reportSetupActivity(`Installing ${source}`);
+    const install = shell.run("pi", args, {
+      cwd,
+      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+    });
+    if (commit === undefined) {
+      const result = yield* install;
+      lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+      continue;
+    }
+    const priorIsUnchanged = (state) => JSON.stringify(registrationEntry(state, commit.prior)) === JSON.stringify(commit.entry);
+    const readRegistration = readJsonObject(file).pipe(orElseSucceed2(() => ({})));
+    if (!priorIsUnchanged(yield* readRegistration))
       return [
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`
       ];
-    yield* reportSetupActivity(`Installing ${source}`);
-    const result = yield* shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+    const backup = yield* backupRegistration(file, source, commit.entry);
+    const discardBackupIfOriginalRemains = gen2(function* () {
+      if (!priorIsUnchanged(yield* readRegistration))
+        return false;
+      const fs = yield* fileSystem;
+      return yield* tryPromise2(() => fs.rm(backup, { force: true })).pipe(as2(true), orElseSucceed2(() => false));
     });
-    if (commit !== undefined) {
-      if (result.exitCode !== 0)
-        return [...lines, failed2(command, result)];
-      yield* retireRegistration(file, commit.prior, source, previousEntry);
+    const backupHint = added(`pi package: saved the previous registration in ${backup}`);
+    const beforeInstall = yield* readRegistration;
+    if (!priorIsUnchanged(beforeInstall) || Array.isArray(beforeInstall.packages) && beforeInstall.packages.some((entry) => entrySource(entry) === source))
+      return [
+        ...lines,
+        backupHint,
+        `! pi package: ${file} changed before install; the previous registration was not replaced`
+      ];
+    const result = yield* install;
+    if (result.exitCode !== 0) {
+      const discardedBackup = yield* discardBackupIfOriginalRemains;
+      const restored = discardedBackup ? false : yield* restoreRegistration(file, commit.prior, beforeInstall).pipe(orElseSucceed2(() => false));
+      return [
+        ...lines,
+        ...discardedBackup ? [] : [backupHint],
+        ...restored ? [
+          hint(`pi package: restored the previous registration in ${file}; the package files were not verified`)
+        ] : [],
+        failed2(command, result)
+      ];
     }
-    lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(result2);
+    if (retirement._tag === "Failure")
+      return [
+        ...lines,
+        ...(yield* discardBackupIfOriginalRemains) ? [] : [backupHint],
+        `! pi package: ${retirement.failure.message}`
+      ];
+    lines.push(backupHint, added(`pi ${source}: installed with ${command}`));
   }
   for (const name of removals) {
     const args = withScope(["remove", `npm:${name}`]);
@@ -28514,7 +28596,7 @@ var MIGRATE_COMMANDS = [
 
 import { join as join34 } from "path";
 
-import { randomUUID as randomUUID4 } from "crypto";
+import { randomUUID as randomUUID5 } from "crypto";
 import { lstat as lstat10, mkdir as mkdir11, readdir as readdir5, readFile as readFile6, realpath as realpath7, rename as rename7, rm as rm10, writeFile as writeFile6 } from "fs/promises";
 import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, resolve as resolve14 } from "path";
 
@@ -28829,6 +28911,15 @@ var parseToml = (content) => try_2({
   catch: () => fail9("Invalid Codex config.toml; left it unchanged")
 });
 var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+var developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m;
+var ownedInstruction = (asset, before) => {
+  if (asset.path === "AGENTS.md")
+    return true;
+  if (asset.path === join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
+    return true;
+  const line = asset.content.match(developerLine)?.[0];
+  return asset.path.startsWith("agents/holyagent-") && asset.path.endsWith(".toml") && line !== undefined && before.replace(developerLine, () => line) === asset.content;
+};
 var checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
   const currentAgents = record4(current.agents);
   const wantedAgents = record4(wanted.agents);
@@ -28851,7 +28942,7 @@ var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expe
     yield* io2(path, () => writeFile6(path, content, { flag: "wx", mode: 384 }));
     return;
   }
-  const next = `${path}.${randomUUID4()}.tmp`;
+  const next = `${path}.${randomUUID5()}.tmp`;
   yield* io2(path, () => writeFile6(next, content, { flag: "wx", mode: 384 }));
   yield* gen2(function* () {
     if ((yield* read2(home, relativePath)) !== expected)
@@ -28903,9 +28994,12 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   const receipt = beforeReceipt === undefined ? { files: {} } : yield* decodeUnknownEffect2(Receipt, { onExcessProperty: "error" })(beforeReceipt).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed")));
   const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
     const before = yield* read2(home, asset.path);
-    if (before !== undefined && before !== asset.content && digest(before) !== receipt.files[asset.path] && before !== legacy.find(({ path }) => path === asset.path)?.content)
+    const previousDigest = receipt.files[asset.path];
+    const edited = before !== undefined && before !== asset.content && digest(before) !== previousDigest && before !== legacy.find(({ path }) => path === asset.path)?.content;
+    const conflict = edited && previousDigest !== undefined && /^[a-f0-9]{64}$/.test(previousDigest) && ownedInstruction(asset, before);
+    if (edited && !(conflict && (options.dryRun ? options.managedInstructions === "review" : options.managedInstructions === "replace" && options.expectedPlan !== undefined)))
       return yield* fail9(`Kept modified or unowned Codex setup file: ${join31(home, asset.path)}`);
-    return { ...asset, before };
+    return { ...asset, before, conflict };
   }));
   const sourceRoot = join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
   const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
@@ -28949,8 +29043,19 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     ] : [],
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
   ];
+  const managedConflicts = assets.filter(({ conflict }) => conflict).map(({ path }) => ({
+    file: join31(home, path),
+    detail: "Edited since setup. Replace with the bundled instructions and save a copy of the current file."
+  }));
   if (options.dryRun)
-    return { ok: true, lines, fingerprint };
+    return {
+      ok: true,
+      lines,
+      fingerprint,
+      ...managedConflicts.length > 0 ? { managedConflicts } : {}
+    };
+  const backups = [];
+  const backupRoot = join31("holyagent", "setup-backups", randomUUID5());
   const steps = [
     {
       label: "Codex runtime",
@@ -28963,13 +29068,34 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     {
       label: "Codex profile files",
       run: gen2(function* () {
-        if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride)
+        if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile)) !== beforeReceipt)
           return yield* fail9(`Profile changed during setup: ${join31(home, "config.toml")}`);
+        if (options.expectedPlan !== undefined) {
+          for (const asset of assets)
+            if ((yield* read2(home, asset.path)) !== asset.before)
+              return yield* fail9(`Profile changed during setup: ${join31(home, asset.path)}. Review it again.`);
+        }
         yield* io2(home, () => mkdir11(home, { recursive: true, mode: 448 }));
         if (beforeConfig === undefined)
           yield* store2(home, "config.toml", undefined, config);
-        for (const asset of assets)
-          yield* store2(home, asset.path, asset.before, asset.content);
+        for (const asset of assets) {
+          const replace = store2(home, asset.path, asset.before, asset.content);
+          if (!asset.conflict || asset.before === undefined) {
+            yield* replace;
+            continue;
+          }
+          const backup = join31(backupRoot, asset.path);
+          yield* store2(home, backup, undefined, asset.before);
+          const backupFile = join31(home, backup);
+          backups.push(backupFile);
+          yield* replace.pipe(uninterruptible2, onError2(() => gen2(function* () {
+            if ((yield* read2(home, asset.path)) !== asset.before)
+              return;
+            yield* io2(backupFile, () => rm10(backupFile, { force: true }));
+            backups.pop();
+          }).pipe(ignore2)));
+          lines.push(`+ Codex instructions: backup saved in ${backupFile}`);
+        }
         yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
         yield* store2(home, receiptFile, beforeReceipt, nextReceipt);
       })
@@ -29000,7 +29126,8 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     }
   ];
   for (const [index, { label, run }] of steps.entries())
-    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run);
+    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run).pipe(mapError2((error) => backups.length === 0 ? error : fail9(`${error.detail}
+Backups: ${backups.join(", ")}`)));
   return { ok: true, lines, fingerprint };
 });
 import { constants as constants6 } from "fs";
@@ -31224,10 +31351,25 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   let applyStarted = false;
   let reviewedChoices;
   let reviewSequence = 0;
-  let reviewedReplacement;
+  let reviewedPi;
+  let reviewedCodexConflict = false;
   let stagedBrowse;
   let stagedHandoff;
-  const replacementOf = (report) => report.lines.find((line) => line.startsWith("+ pi package: replace "));
+  const previewRegistration = (run) => gen2(function* () {
+    let registration;
+    const report = yield* run.pipe(provideService2(PiRegistrationReview, {
+      preview: (conflict) => {
+        registration = conflict;
+      }
+    }));
+    return { report, registration };
+  });
+  const piConflict = ({ file, prior, source }) => ({
+    harness: label("pi"),
+    file: plain(file),
+    detail: plain(`Replace ${JSON.stringify(prior)} with ${JSON.stringify(source)} and save the previous package entry.`)
+  });
+  const skippedConflicts = (target) => hint(`setup harness: ${label(target)} setup skipped to keep the current files and settings.`);
   const input = {
     env: options.env,
     offer: {
@@ -31306,7 +31448,17 @@ var runInteractive = fn2("runInteractive")(function* (options) {
           return yield* fail5(new Error("Codex setup is not available here."));
         const handoff = requestedHandoff(choices);
         const changed = changedSwitches(initialSwitches, choices.capabilities);
-        const plans = yield* forEach2(targets, (target, index) => combined.run(target, withProviderChanges(choices), changed, true, index > 0, true).pipe(map4((report) => ({
+        const plans = yield* forEach2(targets, (target, index) => previewRegistration(combined.run(target, withProviderChanges(choices), changed, true, index > 0, true)).pipe(map4(({ report, registration }) => ({
+          target,
+          registration,
+          conflicts: [
+            ...registration === undefined ? [] : [piConflict(registration)],
+            ...(report.managedConflicts ?? []).map(({ file, detail }) => ({
+              harness: label(target),
+              file: plain(file),
+              detail: plain(detail)
+            }))
+          ],
           name: label(target),
           ok: report.ok,
           lines: [
@@ -31319,40 +31471,49 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         const error = plans.find((plan) => !plan.ok);
         if (error !== undefined)
           return yield* fail5(new Error(`${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`));
-        const replacement = plans.flatMap((plan) => replacementOf(plan) ?? [])[0];
+        const registration = plans.find(({ target }) => target === "pi")?.registration;
+        const conflicts = plans.flatMap((plan) => plan.conflicts);
         if (sequence === reviewSequence) {
           reviewedChoices = choices;
-          reviewedReplacement = replacement;
+          reviewedPi = registration;
+          reviewedCodexConflict = plans.some(({ target, conflicts }) => target === "codex" && conflicts.length > 0);
         }
         return {
-          replacePiRegistration: replacement !== undefined,
           file: undefined,
           choices: [],
           always: [],
-          ...browserReview,
-          harnesses: plans.map(({ name, lines }) => ({ name, lines }))
+          conflicts,
+          ...choices.keepManagedConflicts === true && registration !== undefined ? {} : browserReview,
+          harnesses: plans.map(({ target, conflicts, name, lines }) => ({
+            name,
+            lines: choices.keepManagedConflicts === true && target !== "claude" && conflicts.length > 0 ? [skippedConflicts(target)] : lines
+          }))
         };
       }
       const chosen = withProviderChanges(choices);
       if (options.previewPi !== undefined) {
         const sequence = ++reviewSequence;
         reviewedChoices = undefined;
-        const report = yield* options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities));
+        const { report, registration } = yield* previewRegistration(options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities)));
         if (!report.ok)
           return yield* fail5(failedReport(report));
-        const replacement = replacementOf(report);
         if (sequence === reviewSequence) {
           reviewedChoices = choices;
-          reviewedReplacement = replacement;
+          reviewedPi = registration;
         }
-        if (replacement !== undefined || chosen.piProviders !== undefined)
+        if (registration !== undefined || chosen.piProviders !== undefined)
           return {
-            replacePiRegistration: replacement !== undefined,
             file: undefined,
             choices: [],
             always: [],
-            ...browserReview,
-            harnesses: [{ name: label("pi"), lines: report.lines }]
+            conflicts: registration === undefined ? [] : [piConflict(registration)],
+            ...choices.keepManagedConflicts === true && registration !== undefined ? {} : browserReview,
+            harnesses: [
+              {
+                name: label("pi"),
+                lines: choices.keepManagedConflicts === true && registration !== undefined ? [skippedConflicts("pi")] : report.lines
+              }
+            ]
           };
       }
       const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, {
@@ -31370,33 +31531,59 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       if (needsProvider(choices))
         return runPromise2(fail5(noProvider()));
       const chosen = withProviderChanges(choices);
-      const plan = browseFor(choices);
-      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true;
-      const handoff = requestedHandoff(choices);
-      if ((combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) && reviewedChoices !== choices)
+      if ((combined !== undefined || options.previewPi !== undefined || chosen.piProviders !== undefined || choices.browseSetup === true && browseFor(choices)?.action !== undefined) && reviewedChoices !== choices)
         return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
-      const replacement = reviewedChoices === choices ? reviewedReplacement : undefined;
+      const registration = reviewedChoices === choices ? reviewedPi : undefined;
+      const codexConflict = reviewedChoices === choices && reviewedCodexConflict;
+      const keepPi = registration !== undefined && choices.keepManagedConflicts === true;
+      const keepCodex = codexConflict && choices.keepManagedConflicts === true;
+      const replacement = keepPi ? undefined : registration;
+      const plan = keepPi ? undefined : browseFor(choices);
+      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true;
+      const handoff = keepCodex ? undefined : requestedHandoff(choices);
       reviewedChoices = undefined;
-      reviewedReplacement = undefined;
+      reviewedPi = undefined;
+      reviewedCodexConflict = false;
       applyStarted = true;
       const changed = changedSwitches(initialSwitches, choices.capabilities);
-      const confirmReplacement = (report) => report.ok && replacementOf(report) === replacement ? void_3 : fail5(new Error("The Pi package plan changed. Review it again before replacing the previous registration."));
+      const targets = selectionOf(choices).filter((target) => !(target === "pi" && keepPi) && !(target === "codex" && keepCodex));
+      const validate = gen2(function* () {
+        if (!keepPi) {
+          const preview = combined === undefined ? options.previewPi?.(chosen, changed) : targets.includes("pi") ? combined.run("pi", chosen, changed, true, false, true) : undefined;
+          if (preview !== undefined) {
+            const current = yield* previewRegistration(preview);
+            if (!current.report.ok)
+              return yield* fail5(failedReport(current.report));
+            if (current.registration?.fingerprint !== replacement?.fingerprint)
+              return yield* fail5(new Error("The Pi package plan changed. Review it again before applying."));
+          }
+        }
+        if (combined !== undefined && targets.includes("codex") && (codexConflict || targets.length > 1)) {
+          const current = yield* combined.run("codex", chosen, changed, true, false, false, true);
+          if (!current.ok)
+            return yield* fail5(failedReport(current));
+        }
+      });
+      const authorizedPi = (run) => replacement === undefined ? run : run.pipe(provideService2(PiRegistrationReview, { expected: replacement.fingerprint }));
       const observed = (run, harness) => reportProgress === undefined ? run : run.pipe(provideService2(SetupProgress, (phase) => reportProgress({
         ...harness === undefined ? {} : { harness },
         phase: phase.activity === undefined ? phase : { ...phase, activity: plain(phase.activity) }
       })));
-      const applySingle = observed(options.apply(chosen, changed, replacement !== undefined));
-      const targets = selectionOf(choices);
-      return runPromise2((combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(targets, (target, index) => {
+      const applySingle = keepPi ? succeed6({ ok: true, lines: [skippedConflicts("pi")] }) : observed(authorizedPi(options.apply(chosen, changed, replacement !== undefined)));
+      return runPromise2(validate.pipe(andThen2(combined === undefined ? applySingle : forEach2(targets, (target, index) => {
         const harness = { index: index + 1, total: targets.length, label: label(target) };
         const replace = target === "pi" && replacement !== undefined;
-        const perform = observed(combined.run(target, chosen, changed, options.dryRun, index > 0, replace), harness);
-        const run = replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
-        return sync2(() => reportProgress?.({ harness })).pipe(andThen2(run));
+        const run = combined.run(target, chosen, changed, options.dryRun, index > 0, replace);
+        const perform = observed(replace ? authorizedPi(run) : run, harness);
+        return sync2(() => reportProgress?.({ harness })).pipe(andThen2(perform));
       }).pipe(map4((reports) => ({
-        ok: reports.length > 0 && reports.every(({ ok }) => ok),
-        lines: reports.flatMap(({ lines }) => lines)
-      })))).pipe(map4((report) => {
+        ok: reports.every(({ ok }) => ok),
+        lines: [
+          ...keepPi ? [skippedConflicts("pi")] : [],
+          ...keepCodex ? [skippedConflicts("codex")] : [],
+          ...reports.flatMap(({ lines }) => lines)
+        ]
+      })))), map4((report) => {
         if (report.ok && handoff !== undefined && !options.dryRun)
           stagedHandoff = handoff;
         const lines = [
@@ -31486,7 +31673,7 @@ var CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-ru
 var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive]");
 var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]";
 var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
-var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan) => gen2(function* () {
+var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
   const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join34(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
     return;
@@ -31496,16 +31683,20 @@ var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan) => gen2(
     dryRun,
     ...catalog === undefined ? {} : { catalog },
     ...version === undefined ? {} : { version },
-    ...expectedPlan === undefined ? {} : { expectedPlan }
+    ...expectedPlan === undefined ? {} : { expectedPlan },
+    ...managedInstructions === undefined ? {} : { managedInstructions }
   });
 }).pipe(provide3(shellLive(env)), catch_2((error) => succeed6({ ok: false, lines: [`! Codex setup: ${error.detail}`] })));
 var reviewedCodexPlan = (args, env, installedPackageRoot) => {
   let fingerprint;
-  return (dryRun) => gen2(function* () {
-    if (!dryRun && fingerprint === undefined)
+  let generation = 0;
+  return (dryRun, checkReviewedPlan = false) => gen2(function* () {
+    const review = dryRun && !checkReviewedPlan;
+    const current = review ? ++generation : generation;
+    if ((!dryRun || checkReviewedPlan) && fingerprint === undefined)
       return { ok: false, lines: ["! Review the Codex setup plan before applying."] };
-    const plan = yield* codexPlan(args, env, installedPackageRoot, dryRun, dryRun ? undefined : fingerprint);
-    if (dryRun)
+    const plan = yield* codexPlan(args, env, installedPackageRoot, dryRun, review ? undefined : fingerprint, dryRun ? "review" : "replace");
+    if (review && current === generation)
       fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined;
     return plan;
   });
@@ -31557,7 +31748,7 @@ var codexCommand = {
       combined: {
         codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
         onlyCodex: true,
-        run: (_target, _choices, _capabilities, preview) => plan(preview)
+        run: (_target, _choices, _capabilities, preview, _skipShared, _replacePi, check) => plan(preview, check)
       }
     });
     if (interactive.kind === "done")
@@ -31715,7 +31906,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         ...surface === "public" && target === undefined ? {
           combined: {
             codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
-            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? reviewedCodex(dryRun) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration, checkReviewedPlan) => harness === "codex" ? reviewedCodex(dryRun, checkReviewedPlan) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
               target: harness,
               dryRun,
               skipSharedPrerequisites,

@@ -3962,7 +3962,18 @@ var initialState = (choices, onlyCodex = false) => ({
   applied: undefined,
   details: false
 });
-var reviewActions = (state) => state.review === undefined ? ["back", "cancel"] : ["apply", "back", "cancel"];
+var reviewActions = (state) => {
+  if (state.review === undefined)
+    return ["back", "cancel"];
+  if ((state.review.conflicts?.length ?? 0) === 0)
+    return ["apply", "back", "cancel"];
+  return [
+    "apply",
+    state.choices.keepManagedConflicts === true ? "replace-conflicts" : "keep-conflicts",
+    "back",
+    "cancel"
+  ];
+};
 var isCancel = (key) => key.name === "escape" || key.ctrl && key.name === "c";
 var isQuit = (key) => isCancel(key) || !key.ctrl && key.name === "q";
 var isEnter = (key) => key.name === "return" || key.name === "enter";
@@ -4195,6 +4206,18 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, offer) => {
       const action = actions[state.action];
       if (action === "apply")
         return { state: { ...state, screen: "applying" }, command: "apply" };
+      if (action === "keep-conflicts" || action === "replace-conflicts")
+        return {
+          state: {
+            ...state,
+            action: 0,
+            scroll: 0,
+            review: undefined,
+            failure: undefined,
+            choices: { ...state.choices, keepManagedConflicts: action === "keep-conflicts" }
+          },
+          command: "review"
+        };
       if (action === "back")
         return {
           state: { ...state, screen: "choose", scroll: 0, review: undefined, failure: undefined }
@@ -4518,7 +4541,12 @@ var reviewLayout = (state, context) => {
   const g = glyphs(look);
   const heading_ = heading(context.dryRun ? "Review (dry run: would change, nothing is written)" : "Review", width);
   const actionLines = () => reviewActions(state).map((action, index) => {
-    const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : state.review?.replacePiRegistration === true ? "Apply and replace Pi package" : "Apply" : action === "back" ? "Back" : "Cancel";
+    const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : (state.review?.conflicts?.length ?? 0) > 0 ? state.choices.keepManagedConflicts === true ? "Apply and keep current files" : "Apply and replace conflicts" : state.review?.replacePiRegistration === true ? "Apply and replace Pi package" : "Apply" : {
+      "keep-conflicts": "Keep current files",
+      "replace-conflicts": "Replace conflicts",
+      back: "Back",
+      cancel: "Cancel"
+    }[action];
     if (index === state.action)
       return [{ text: `${g.focus} ${text}`, tone: "focus", click: { action } }];
     const tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument";
@@ -4577,6 +4605,10 @@ var reviewLayout = (state, context) => {
   }
   const { review } = state;
   const bodyOf = (width) => {
+    const conflicts = (review.conflicts ?? []).flatMap(({ harness, file, detail }) => [
+      ...hintLines(`  ${harness} \u2014 ${file}`, width),
+      ...hintLines(`    ${detail}`, width)
+    ]);
     const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
       ...heading(name, width),
       ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
@@ -4596,6 +4628,7 @@ var reviewLayout = (state, context) => {
       ...section("Always applied", review.always)
     ];
     return [
+      ...conflicts.length === 0 ? [] : [...heading("Managed conflicts", width), ...conflicts, blank],
       ...browse.length === 0 ? [] : [...heading("Browser Use setup", width), ...browse, blank],
       ...harnesses,
       ...section("Capabilities", capabilities),

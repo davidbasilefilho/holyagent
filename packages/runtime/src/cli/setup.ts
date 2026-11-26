@@ -93,6 +93,7 @@ const codexPlan = (
   installedPackageRoot: string | undefined,
   dryRun: boolean,
   expectedPlan?: string,
+  managedInstructions?: "review" | "replace",
 ) =>
   Effect.gen(function* () {
     const catalog = stringFlag(args, "root-only-catalog")
@@ -116,6 +117,7 @@ const codexPlan = (
       ...(catalog === undefined ? {} : { catalog }),
       ...(version === undefined ? {} : { version }),
       ...(expectedPlan === undefined ? {} : { expectedPlan }),
+      ...(managedInstructions === undefined ? {} : { managedInstructions }),
     })
   }).pipe(
     Effect.provide(shellLive(env)),
@@ -130,18 +132,23 @@ const reviewedCodexPlan = (
   installedPackageRoot: string | undefined,
 ) => {
   let fingerprint: string | undefined
-  return (dryRun: boolean) =>
+  let generation = 0
+  return (dryRun: boolean, checkReviewedPlan = false) =>
     Effect.gen(function* () {
-      if (!dryRun && fingerprint === undefined)
+      const review = dryRun && !checkReviewedPlan
+      const current = review ? ++generation : generation
+      if ((!dryRun || checkReviewedPlan) && fingerprint === undefined)
         return { ok: false, lines: ["! Review the Codex setup plan before applying."] }
       const plan = yield* codexPlan(
         args,
         env,
         installedPackageRoot,
         dryRun,
-        dryRun ? undefined : fingerprint,
+        review ? undefined : fingerprint,
+        dryRun ? "review" : "replace",
       )
-      if (dryRun) fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined
+      if (review && current === generation)
+        fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined
       return plan
     })
 }
@@ -200,7 +207,8 @@ const codexCommand: Command = {
         combined: {
           codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
           onlyCodex: true,
-          run: (_target, _choices, _capabilities, preview) => plan(preview),
+          run: (_target, _choices, _capabilities, preview, _skipShared, _replacePi, check) =>
+            plan(preview, check),
         },
       })
       if (interactive.kind === "done") return printed(interactive.report)
@@ -448,9 +456,10 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                     dryRun,
                     skipSharedPrerequisites,
                     replacePiRegistration,
+                    checkReviewedPlan,
                   ) =>
                     harness === "codex"
-                      ? reviewedCodex(dryRun)
+                      ? reviewedCodex(dryRun, checkReviewedPlan)
                       : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
                           target: harness,
                           dryRun,

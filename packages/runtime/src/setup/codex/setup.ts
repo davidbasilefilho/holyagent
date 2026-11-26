@@ -6,6 +6,7 @@ import { Effect, Option, Schema } from "effect"
 
 import { type Env, homeDirectory } from "../../../../core/src/setup/environment.ts"
 import { reportSetupActivity, withSetupPhase } from "../../../../core/src/setup/progress.ts"
+import type { ManagedSetupConflict } from "../../../../core/src/setup/report.ts"
 import { Shell } from "../../../../core/src/setup/shell.ts"
 import {
   type CodexAsset,
@@ -51,6 +52,8 @@ export interface CodexSetupOptions {
   readonly catalog?: string
   readonly version?: string
   readonly expectedPlan?: string
+  /** Internal TUI resolution for receipt-backed instruction edits. */
+  readonly managedInstructions?: "review" | "replace"
 }
 
 const io = <A>(path: string, perform: () => Promise<A>) =>
@@ -150,6 +153,31 @@ const parseToml = (content: string) =>
   })
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+const developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m
+
+const ownedInstruction = (asset: CodexAsset, before: string): boolean => {
+  if (asset.path === "AGENTS.md") return true
+  if (
+    asset.path ===
+    join(
+      CODEX_STARTUP_MARKETPLACE,
+      "plugins",
+      "holyagent",
+      "skills",
+      "holyagent-workflow",
+      "SKILL.md",
+    )
+  )
+    return true
+  const line = asset.content.match(developerLine)?.[0]
+  return (
+    asset.path.startsWith("agents/holyagent-") &&
+    asset.path.endsWith(".toml") &&
+    line !== undefined &&
+    before.replace(developerLine, () => line) === asset.content
+  )
+}
 
 const checkPolicy = Effect.fn("checkCodexSetupPolicy")(function* (
   current: Readonly<Record<string, unknown>>,
@@ -284,14 +312,28 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     (asset) =>
       Effect.gen(function* () {
         const before = yield* read(home, asset.path)
-        if (
+        const previousDigest = receipt.files[asset.path]
+        const edited =
           before !== undefined &&
           before !== asset.content &&
-          digest(before) !== receipt.files[asset.path] &&
+          digest(before) !== previousDigest &&
           before !== legacy.find(({ path }) => path === asset.path)?.content
+        const conflict =
+          edited &&
+          previousDigest !== undefined &&
+          /^[a-f0-9]{64}$/.test(previousDigest) &&
+          ownedInstruction(asset, before)
+        if (
+          edited &&
+          !(
+            conflict &&
+            (options.dryRun
+              ? options.managedInstructions === "review"
+              : options.managedInstructions === "replace" && options.expectedPlan !== undefined)
+          )
         )
           return yield* fail(`Kept modified or unowned Codex setup file: ${join(home, asset.path)}`)
-        return { ...asset, before }
+        return { ...asset, before, conflict }
       }),
   )
   const sourceRoot = join(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent")
@@ -348,7 +390,22 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       : []),
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session.",
   ]
-  if (options.dryRun) return { ok: true, lines, fingerprint }
+  const managedConflicts: ReadonlyArray<ManagedSetupConflict> = assets
+    .filter(({ conflict }) => conflict)
+    .map(({ path }) => ({
+      file: join(home, path),
+      detail:
+        "Edited since setup. Replace with the bundled instructions and save a copy of the current file.",
+    }))
+  if (options.dryRun)
+    return {
+      ok: true,
+      lines,
+      fingerprint,
+      ...(managedConflicts.length > 0 ? { managedConflicts } : {}),
+    }
+  const backups: string[] = []
+  const backupRoot = join("holyagent", "setup-backups", randomUUID())
   const steps = [
     {
       label: "Codex runtime",
@@ -366,12 +423,40 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
         if (
           (yield* canonicalProfile(options.home)) !== home ||
           (yield* read(home, "config.toml")) !== beforeConfig ||
-          (yield* read(home, "AGENTS.override.md")) !== beforeOverride
+          (yield* read(home, "AGENTS.override.md")) !== beforeOverride ||
+          (yield* read(home, receiptFile)) !== beforeReceipt
         )
           return yield* fail(`Profile changed during setup: ${join(home, "config.toml")}`)
+        if (options.expectedPlan !== undefined)
+          for (const asset of assets)
+            if ((yield* read(home, asset.path)) !== asset.before)
+              return yield* fail(
+                `Profile changed during setup: ${join(home, asset.path)}. Review it again.`,
+              )
         yield* io(home, () => mkdir(home, { recursive: true, mode: 0o700 }))
         if (beforeConfig === undefined) yield* store(home, "config.toml", undefined, config)
-        for (const asset of assets) yield* store(home, asset.path, asset.before, asset.content)
+        for (const asset of assets) {
+          const replace = store(home, asset.path, asset.before, asset.content)
+          if (!asset.conflict || asset.before === undefined) {
+            yield* replace
+            continue
+          }
+          const backup = join(backupRoot, asset.path)
+          yield* store(home, backup, undefined, asset.before)
+          const backupFile = join(home, backup)
+          backups.push(backupFile)
+          yield* replace.pipe(
+            Effect.uninterruptible,
+            Effect.onError(() =>
+              Effect.gen(function* () {
+                if ((yield* read(home, asset.path)) !== asset.before) return
+                yield* io(backupFile, () => rm(backupFile, { force: true }))
+                backups.pop()
+              }).pipe(Effect.ignore),
+            ),
+          )
+          lines.push(`+ Codex instructions: backup saved in ${backupFile}`)
+        }
         yield* checkPluginTree(home, sourceRoot, pluginAssets, true)
         yield* store(home, receiptFile, beforeReceipt, nextReceipt)
       }),
@@ -414,6 +499,10 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     },
   ]
   for (const [index, { label, run }] of steps.entries())
-    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run)
+    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run).pipe(
+      Effect.mapError((error) =>
+        backups.length === 0 ? error : fail(`${error.detail}\nBackups: ${backups.join(", ")}`),
+      ),
+    )
   return { ok: true, lines, fingerprint }
 })
