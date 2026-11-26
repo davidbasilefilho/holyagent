@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mwxoamho-dana",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.audit",
+  "slug": "audit-effective-pi-codex-and-claude",
+  "objective": "Audit effective PI Codex and Claude prompt loading and native precedence",
+  "state": "Ready",
+  "scope": [
+    "Live artifact loading, adapters, plugin hooks, tool availability, host-native boundaries"
+  ],
+  "constraints": [
+    "Read only and offline isolated host fixtures. Do not edit, spawn, or open hosted sessions."
+  ],
+  "criteria": [
+    {
+      "text": "Map what each host actually loads including root specialist skill and review overlays",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Identify provable duplicates or contradictions with host authority without weakening it",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:53:55.165Z"
+}
