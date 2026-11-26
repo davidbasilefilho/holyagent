@@ -433,6 +433,17 @@ const checkBasePackages = (
   )
 }
 
+// This extension is not a managed Pi package. Its global registration replaces Codex's provider,
+// and its all-providers mode replaces file/shell tools even on the Kimi route.
+const conversionRegistration = (sources: ReadonlyArray<string>) =>
+  sources.some((source) => parseNpmSource(source.trim())?.name === "@howaboua/pi-codex-conversion")
+    ? [
+        hint(
+          "pi-codex-conversion: a separate registration is listed; HolyAgent does not install or configure it. It can replace the Codex provider and change Pi's tool loadout. Check its scope in Pi before using it alongside HolyAgent.",
+        ),
+      ]
+    : []
+
 /**
  * The reason a system need is not met on this machine, or `undefined` when it is. The `platform`
  * (the machine's by default) decides the graphical-session need, which only a Unix desktop without
@@ -650,6 +661,7 @@ export const piChecks = (
                   node,
                   pkg,
                   ...checkBasePackages(files, scope, config, listed),
+                  ...conversionRegistration(listed),
                   ...(yield* checkCapabilities(env, cwd, scope, config, choice, listed, surface)),
                 ]
               })

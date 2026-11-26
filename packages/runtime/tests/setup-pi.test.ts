@@ -136,6 +136,26 @@ const lineNamed = (report: { readonly lines: ReadonlyArray<string> }, name: stri
   report.lines.find((line) => line.includes(`${name}:`))
 
 describe("holyagent doctor, Pi checks", () => {
+  test.each([
+    ["Codex", ["openai-codex"]],
+    ["Kimi", ["kimi-coding-global"]],
+    ["both", ["openai-codex", "kimi-coding-global"]],
+  ])(
+    "reports a separate conversion registration for %s without managing it",
+    async (_label, providers) => {
+      const conversion = "npm:@howaboua/pi-codex-conversion@5.1.0"
+      const settings = { ...FULL(), packages: [SOURCE, ...DEFAULT_SOURCES, { source: conversion }] }
+      await setConfig({ pi: { providers } })
+      await write(globalSettings(), settings)
+      const shell = shellWith()
+      const report = await check(shell)
+      expect(lineNamed(report, "pi-codex-conversion")).toContain("does not install or configure it")
+      expect(staleManagedNames([conversion], [])).toEqual([])
+      expect(shell.lines().every((line) => !line.includes(conversion))).toBe(true)
+      expect(await Bun.file(globalSettings()).json()).toEqual(settings)
+    },
+  )
+
   test("pass when pi, Node and the package are in place, and run only the version commands", async () => {
     await write(globalSettings(), { theme: "dark", ...FULL() })
     const shell = shellWith()

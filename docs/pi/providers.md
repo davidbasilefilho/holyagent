@@ -8,6 +8,14 @@ A first setup needs at least one checked provider before you can review or apply
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks a conclusion drawn here, not a stated fact.
 
+### `pi-codex-conversion` compatibility
+
+HolyAgent uses Pi's native `openai-codex` transport and the pinned `pi-provider-kimi-code` extension for `kimi-coding`. Setup does not install or configure `@howaboua/pi-codex-conversion`. `holyagent doctor` points out a separately registered npm copy without changing it. None of this applies to the separate `holyagent setup codex` path.
+
+The [upstream conversion package](https://pi.dev/packages/%40howaboua/pi-codex-conversion) changes more than caching. Its [registration](https://github.com/IgorWarzocha/howaboua-pi-stuff/blob/c4f48525475f278d41dc311f2707926216bfa35b/packages/pi-codex-conversion/src/extension/register.ts) replaces Pi's Codex provider, including its OAuth implementation. In 5.1.0, the newest release tested on Pi 1.5.0, the [default configuration](https://github.com/IgorWarzocha/howaboua-pi-stuff/blob/c4f48525475f278d41dc311f2707926216bfa35b/packages/pi-codex-conversion/src/adapter/activation/config-contract.ts) uses the normal Codex toolset, Pi compaction, and no extra providers. Fast mode, cache keepalive, prompt replacement and cache diagnostics are off. [Version 5.1.2](https://github.com/IgorWarzocha/howaboua-pi-stuff/blob/5b641f0a7c7c93c53f9e9cda6abef498fc1441ef/packages/pi-codex-conversion/package.json) requires Pi 1.6.1 or newer.
+
+The [extra-provider allowlist](https://github.com/IgorWarzocha/howaboua-pi-stuff/blob/c4f48525475f278d41dc311f2707926216bfa35b/packages/pi-codex-conversion/src/adapter/activation/runtime-plan.ts) applies only to Responses models. Kimi's shipped integration uses Chat Completions by default. The broad `allProviders` switch changes Kimi's file and shell tools, but does not give it Codex streaming or caching. HolyAgent does not enable that switch or change Kimi's protocol. In a standard HolyAgent profile without the conversion package, each provider keeps its own login, API destination and native caching. Codex server compaction remains a separate option described below.
+
 ## Kimi for Coding (global)
 
 Kimi for Coding (global) was the only provider in 0.3.0 and remains the legacy fallback when no provider list is configured; [Codex](#codex-openai-codex) is the second. Other providers are later work and are not documented as supported. The maintainer asked whether a maintained Pi extension already gives a full Kimi for Coding global integration; one does, so the plan installs it and builds no provider.
