@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mwxoalrh-hk7w",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.audit",
+  "slug": "map-and-review-requirements-guidance",
+  "objective": "Map and review requirements, guidance, specialist and review prompts across all model families",
+  "state": "Ready",
+  "scope": [
+    "Shared requirements and root/worker/reviewer/guidance text, repository overlays, generated equivalents"
+  ],
+  "constraints": [
+    "Read only. Do not edit or launch. Collect disjoint deduplicated findings with before/after recommendation."
+  ],
+  "criteria": [
+    {
+      "text": "Account for the complete shared instruction inventory and generated equivalents",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Identify concrete contradictions, gaps, and one canonical source per rule",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:53:54.222Z"
+}
