@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwxncgtw-z0ij",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "unify-human-facing-output-in-the-public",
+  "objective": "Unify human-facing output in the public CLI using the existing OpenTUI/Solid presentation in interactive terminals only",
+  "state": "Ready",
+  "scope": [
+    "public CLI, public setup presentation, and corresponding tests"
+  ],
+  "constraints": [
+    "Keep the agent CLI, structured output, stream semantics, and noninteractive execution unchanged; root owns version control"
+  ],
+  "criteria": [
+    {
+      "text": "Interactive public messages and static setup summary use the same presentation without an additional key",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Redirected or explicitly noninteractive output has no renderer initialization, ANSI, cursor control or prompt",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Exercise interactive static success and failures and redirected output through the public entry point",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/setup/tui",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:27:21.525Z"
+}
