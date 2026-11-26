@@ -1,4 +1,10 @@
-import type { ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent"
+import type {
+  ContextWithSystemEvent,
+  ExtensionContext,
+  ToolCallEventResult,
+  ToolResultEventResult,
+} from "@earendil-works/pi-coding-agent"
+import { Schema } from "effect"
 
 import { isDeactivatedT3Tool } from "../../../runtime/src/pi/tools.ts"
 
@@ -90,3 +96,62 @@ export const refuseDeactivatedT3Tool = (event: {
         reason: `The root may not use ${event.toolName}: HolyAgent keeps T3 Code's orchestration, thread and schedule tools off and delegates through its own specialists.`,
       }
     : undefined
+
+/**
+ * Keep disabled tool declarations out of every provider's transcript, including tool-state
+ * additions restored from a saved turn. Pi may already have snapshotted the tool state by the time
+ * an active-set change takes effect. Leave prompt text, other messages and their order alone.
+ */
+export const hideDeactivatedT3Declarations = (
+  messages: ContextWithSystemEvent["messages"],
+): ContextWithSystemEvent["messages"] | undefined => {
+  let changed = false
+  const kept = messages.map((message) => {
+    if (message.role !== "system") return message
+    const toolsAdded = message.toolsAdded?.filter(({ name }) => !isDeactivatedT3Tool(name))
+    const toolsRemoved = message.toolsRemoved?.filter(({ name }) => !isDeactivatedT3Tool(name))
+    if (
+      toolsAdded?.length === message.toolsAdded?.length &&
+      toolsRemoved?.length === message.toolsRemoved?.length
+    )
+      return message
+    changed = true
+    return {
+      ...message,
+      ...(toolsAdded === undefined ? {} : { toolsAdded }),
+      ...(toolsRemoved === undefined ? {} : { toolsRemoved }),
+    }
+  })
+  return changed ? kept : undefined
+}
+
+const decodeSearchDetails = Schema.decodeUnknownOption(
+  Schema.Struct({ loaded: Schema.Array(Schema.String) }),
+  { onExcessProperty: "error" },
+)
+
+/**
+ * Correct Pi's built-in search receipt when it selected a disabled tool. Keep allowed names and
+ * their one-line descriptions without announcing schema availability for a blocked call.
+ */
+export const hideDeactivatedT3SearchResults = (
+  details: unknown,
+  descriptions: ReadonlyArray<{ name: string; description: string }>,
+): ToolResultEventResult | undefined => {
+  const decoded = decodeSearchDetails(details)
+  if (decoded._tag === "None") return undefined
+  const original = decoded.value.loaded
+  const loaded = original.filter((name) => !isDeactivatedT3Tool(name))
+  if (loaded.length === original.length) return undefined
+  const text =
+    loaded.length === 0
+      ? "No matching tools found."
+      : [
+          `Loaded ${loaded.length} tool${loaded.length === 1 ? "" : "s"}. They are available from your next call:`,
+          ...loaded.map((name) => {
+            const description = descriptions.find((tool) => tool.name === name)?.description
+            return `- ${name}: ${description?.trim().split(/\r?\n/)[0] ?? ""}`
+          }),
+        ].join("\n")
+  return { content: [{ type: "text", text }], details: { loaded } }
+}

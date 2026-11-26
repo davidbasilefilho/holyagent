@@ -30564,6 +30564,43 @@ var refuseDeactivatedT3Tool = (event) => isDeactivatedT3Tool(event.toolName) ? {
   block: true,
   reason: `The root may not use ${event.toolName}: HolyAgent keeps T3 Code's orchestration, thread and schedule tools off and delegates through its own specialists.`
 } : undefined;
+var hideDeactivatedT3Declarations = (messages) => {
+  let changed = false;
+  const kept = messages.map((message) => {
+    if (message.role !== "system")
+      return message;
+    const toolsAdded = message.toolsAdded?.filter(({ name }) => !isDeactivatedT3Tool(name));
+    const toolsRemoved = message.toolsRemoved?.filter(({ name }) => !isDeactivatedT3Tool(name));
+    if (toolsAdded?.length === message.toolsAdded?.length && toolsRemoved?.length === message.toolsRemoved?.length)
+      return message;
+    changed = true;
+    return {
+      ...message,
+      ...toolsAdded === undefined ? {} : { toolsAdded },
+      ...toolsRemoved === undefined ? {} : { toolsRemoved }
+    };
+  });
+  return changed ? kept : undefined;
+};
+var decodeSearchDetails = decodeUnknownOption2(Struct({ loaded: ArraySchema(String5) }), { onExcessProperty: "error" });
+var hideDeactivatedT3SearchResults = (details, descriptions) => {
+  const decoded = decodeSearchDetails(details);
+  if (decoded._tag === "None")
+    return;
+  const original = decoded.value.loaded;
+  const loaded = original.filter((name) => !isDeactivatedT3Tool(name));
+  if (loaded.length === original.length)
+    return;
+  const text = loaded.length === 0 ? "No matching tools found." : [
+    `Loaded ${loaded.length} tool${loaded.length === 1 ? "" : "s"}. They are available from your next call:`,
+    ...loaded.map((name) => {
+      const description = descriptions.find((tool) => tool.name === name)?.description;
+      return `- ${name}: ${description?.trim().split(/\r?\n/)[0] ?? ""}`;
+    })
+  ].join(`
+`);
+  return { content: [{ type: "text", text }], details: { loaded } };
+};
 
 import { VERSION as VERSION3 } from "@earendil-works/pi-coding-agent";
 var PINNED_SOURCES = {
@@ -31630,6 +31667,23 @@ ${event.systemPrompt}` : undefined;
   });
   pi.on("session_tree", () => {
     holdT3ToolsOff();
+  });
+  pi.on("context_with_system", (event) => {
+    if (held?.t3Gate !== true)
+      return;
+    const messages = hideDeactivatedT3Declarations(event.messages);
+    return messages === undefined ? undefined : { messages };
+  });
+  pi.on("tool_result", (event) => {
+    if (held?.t3Gate !== true || event.toolName !== "tool_search")
+      return;
+    holdT3ToolsOff();
+    if (event.isError)
+      return;
+    const registered = pi.getAllTools();
+    if (!registered.some(({ name, sourceInfo }) => name === "tool_search" && sourceInfo?.path === "builtin:tool-search"))
+      return;
+    return hideDeactivatedT3SearchResults(event.details, registered);
   });
   pi.on("message_end", (event) => {
     if (!isChild())

@@ -555,6 +555,7 @@ describe("the factory", () => {
       "agent_start",
       "before_agent_start",
       "before_provider_request",
+      "context_with_system",
       "message_end",
       "provider_stream_event",
       "session_compact",
@@ -562,6 +563,7 @@ describe("the factory", () => {
       "session_start",
       "session_tree",
       "tool_call",
+      "tool_result",
     ])
     // The Codex module's one tool is registered inactive, so no other provider has it.
     expect(api.tools.map((tool) => tool.name)).toEqual(["apply_patch"])
@@ -3838,6 +3840,67 @@ describe("under T3 Code", () => {
     }
     for (const name of [...KEPT_T3, ...OTHERS, "codemode", "mcp__other__delegate_task"])
       expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+  })
+
+  test("a built-in search does not advertise blocked matches in the current turn or a restored transcript", async () => {
+    const allowed = "mcp__t3-code__preview_snapshot"
+    const blocked = "mcp__t3-code__list_thread_issues"
+    const alias = "mcp__t3_code__list_thread_issues"
+    const { api } = await t3("full-access", {
+      toolInfo: [
+        { name: "tool_search", sourceInfo: { path: "builtin:tool-search" } },
+        { name: allowed, description: "Take a snapshot.\nSecond line." },
+        { name: blocked },
+        { name: alias },
+      ],
+    })
+    api.pi.setActiveTools([...api.pi.getActiveTools(), allowed, blocked, alias])
+    expect(
+      await api.emit("tool_result", {
+        toolName: "tool_search",
+        details: { loaded: [allowed, blocked, alias] },
+      }),
+    ).toEqual([
+      {
+        content: [
+          { type: "text", text: expect.stringContaining(`- ${allowed}: Take a snapshot.`) },
+        ],
+        details: { loaded: [allowed] },
+      },
+    ])
+    expect(api.pi.getActiveTools()).toContain(allowed)
+    expect(api.pi.getActiveTools()).not.toContain(blocked)
+    expect(api.pi.getActiveTools()).not.toContain(alias)
+
+    const declaration = (name: string) => ({
+      name,
+      description: "",
+      parameters: { type: "object" },
+    })
+    const initial = {
+      role: "system",
+      content: "keep initial instructions",
+      toolsAdded: [declaration("read")],
+    }
+    const later = {
+      role: "system",
+      content: "keep later instructions",
+      toolsAdded: [declaration(allowed), declaration(blocked)],
+      toolsRemoved: [{ name: alias }, { name: "write" }],
+    }
+    const user = { role: "user", content: "keep the turn" }
+    expect(await api.emit("context_with_system", { messages: [initial, user, later] })).toEqual([
+      {
+        messages: [
+          initial,
+          user,
+          { ...later, toolsAdded: [declaration(allowed)], toolsRemoved: [{ name: "write" }] },
+        ],
+      },
+    ])
+    expect(await api.emit("context_with_system", { messages: [initial, user] })).toEqual([
+      undefined,
+    ])
   })
 
   test("a child keeps its tools and is not refused its calls", async () => {
