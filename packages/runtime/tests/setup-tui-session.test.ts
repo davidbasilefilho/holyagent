@@ -101,7 +101,8 @@ describe("the interface session", () => {
           terminal: TERMINAL,
           noTui: false,
           choiceFlag: false,
-          form: chooseForm({ DISPLAY: ":0" }, undefined, "linux"),
+          // Test the review without running the OS-specific desktop inventory.
+          form: chooseForm({}, "headless", "linux"),
           load: () =>
             Effect.succeed({
               runSetupTui: async (input) => {
