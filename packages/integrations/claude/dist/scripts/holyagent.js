@@ -17860,6 +17860,9 @@ var checkBasePackages = (files, scope, config, listed) => {
     return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
   return missing.map((source) => fail8(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
 };
+var conversionRegistration = (sources) => sources.some((source) => parseNpmSource(source.trim())?.name === "@howaboua/pi-codex-conversion") ? [
+  hint("pi-codex-conversion: a separate registration is listed; HolyAgent does not install or configure it. It can replace the Codex provider and change Pi's tool loadout. Check its scope in Pi before using it alongside HolyAgent.")
+] : [];
 var unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
     return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
@@ -17959,6 +17962,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE, surface = piExecu
         node,
         pkg,
         ...checkBasePackages(files, scope, config, listed),
+        ...conversionRegistration(listed),
         ...yield* checkCapabilities(env, cwd, scope, config, choice, listed, surface)
       ];
     }) : succeed6([])

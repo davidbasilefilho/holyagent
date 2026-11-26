@@ -20013,7 +20013,9 @@ ${result.stderr}`;
   if (missing.length === 0)
     return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
   return missing.map((source) => fail8(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
-}, unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
+}, conversionRegistration = (sources) => sources.some((source) => parseNpmSource(source.trim())?.name === "@howaboua/pi-codex-conversion") ? [
+  hint("pi-codex-conversion: a separate registration is listed; HolyAgent does not install or configure it. It can replace the Codex provider and change Pi's tool loadout. Check its scope in Pi before using it alongside HolyAgent.")
+] : [], unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
     return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
   if (need.kind === "chromium") {
@@ -20106,6 +20108,7 @@ ${result.stderr}`) : undefined;
         node,
         pkg,
         ...checkBasePackages(files, scope, config, listed),
+        ...conversionRegistration(listed),
         ...yield* checkCapabilities(env, cwd, scope, config, choice, listed, surface)
       ];
     }) : succeed6([])
