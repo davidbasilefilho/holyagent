@@ -103,6 +103,8 @@ import {
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
+  hideDeactivatedT3Declarations,
+  hideDeactivatedT3SearchResults,
   hostedByT3,
   refuseDeactivatedT3Tool,
   T3_ACCESS_NOTICE,
@@ -1808,6 +1810,31 @@ export const createExtension =
     })
     pi.on("session_tree", () => {
       holdT3ToolsOff()
+    })
+
+    // The bridge can re-add a tool after our startup handlers. Also filter Pi's final,
+    // provider-neutral tool declarations after the host restores the transcript's tool state.
+    pi.on("context_with_system", (event) => {
+      if (held?.t3Gate !== true) return undefined
+      const messages = hideDeactivatedT3Declarations(event.messages)
+      return messages === undefined ? undefined : { messages }
+    })
+    // A search happens within the agent loop, without another before_agent_start. Restore the
+    // active set now, and don't say the disabled matches are callable. Leave replacement search
+    // extensions and their results alone; the declaration and execution gates still apply.
+    pi.on("tool_result", (event) => {
+      if (held?.t3Gate !== true || event.toolName !== "tool_search") return undefined
+      holdT3ToolsOff()
+      if (event.isError) return undefined
+      const registered = pi.getAllTools()
+      if (
+        !registered.some(
+          ({ name, sourceInfo }) =>
+            name === "tool_search" && sourceInfo?.path === "builtin:tool-search",
+        )
+      )
+        return undefined
+      return hideDeactivatedT3SearchResults(event.details, registered)
     })
 
     // Only a specialist the package launched is held to a complete report.
