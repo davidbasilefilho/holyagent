@@ -104,7 +104,7 @@ const toolLines = (report: { readonly lines: ReadonlyArray<string> }) =>
   report.lines.filter((line) => /^[+=~!-] tool settings/.test(line))
 
 const CODEMODE = { codemode: { mode: "only" } }
-/** An older setup version wrote this native startup route and recorded those settings. */
+/** The native startup preferences for the default root route. */
 const MODEL = {
   defaultProvider: "kimi-coding",
   defaultModel: "k3.1-pro",
@@ -121,6 +121,67 @@ const BILLION_SUBAGENTS = { pi: { subagents: false } }
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
 
 describe("holyagent setup, Pi tool settings", () => {
+  test.each([
+    ["Kimi Global", ["kimi-coding-global"]],
+    ["both providers", ["openai-codex", "kimi-coding-global"]],
+  ])("prepares the native Global region for %s before Pi starts", async (_label, providers) => {
+    await installed()
+    await setConfig({ pi: { providers } })
+    await write(globalKimi(), { protocol: "anthropic", model: { reasoning: true } })
+    const before = await read(globalKimi())
+    const dryRun = await runSetup(withPi(), { dryRun: true })
+    expect(toolLines(dryRun).join("\n")).toContain('would add region "global"')
+    expect(await read(globalKimi())).toEqual(before)
+    const first = await runSetup(withPi())
+    expect(first.ok).toBe(true)
+    expect(await read(globalKimi())).toEqual({
+      protocol: "anthropic",
+      model: { reasoning: true },
+      region: "global",
+    })
+    const applied = await Bun.file(globalKimi()).text()
+    await runSetup(withPi())
+    expect(await Bun.file(globalKimi()).text()).toBe(applied)
+  })
+
+  test("leaves Kimi's file untouched for Codex only, project scope and explicit environment", async () => {
+    await installed()
+    await setConfig({ pi: { providers: ["openai-codex"] } })
+    await runSetup(withPi())
+    expect(await exists(globalKimi())).toBe(false)
+    await setConfig({ pi: { providers: ["kimi-coding-global"] } })
+    await runSetup(withPi(), { scope: "project" })
+    expect(await exists(globalKimi())).toBe(false)
+    expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
+    await runSetup(withPi(), { env: { KIMI_CODE_REGION: "mainland-cn" } })
+    expect(await exists(globalKimi())).toBe(false)
+    await runSetup(withPi(), { env: { KIMI_CODE_BASE_URL: "https://kimi.fixture.invalid" } })
+    expect(await exists(globalKimi())).toBe(false)
+  })
+
+  test("keeps an explicit or later Kimi region, and undo does not remove that choice", async () => {
+    await installed()
+    await setConfig({ pi: { providers: ["kimi-coding-global"] } })
+    await write(globalKimi(), {
+      region: "mainland-cn",
+      tools: { moonshot_search: { enabled: false } },
+    })
+    await runSetup(withPi())
+    expect(await read(globalKimi())).toEqual({
+      region: "mainland-cn",
+      tools: { moonshot_search: { enabled: false } },
+    })
+    await write(globalKimi(), { region: null })
+    await runSetup(withPi())
+    expect(await read(globalKimi())).toEqual({ region: null })
+    await write(globalKimi(), {})
+    await runSetup(withPi())
+    expect(await read(globalKimi())).toEqual({ region: "global" })
+    await write(globalKimi(), { region: "mainland-cn" })
+    await runSetup(withPi(), { undo: true })
+    expect(await read(globalKimi())).toEqual({ region: "mainland-cn" })
+  })
+
   test("removes only recorded desktop confirmation settings that still match", async () => {
     await write(globalSettings(), {
       "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: true, custom: "keep" },
@@ -147,6 +208,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       ...CODEMODE,
+      ...MODEL,
     })
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
     expect(await exists(globalKimi())).toBe(false)
@@ -194,6 +256,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(report.ok).toBe(true)
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
+      ...MODEL,
       codemode: { mode: "on", inlineBudget: 100 },
       "pi-computer-use": { confirmAppLaunch: true },
     })
@@ -222,13 +285,29 @@ describe("holyagent setup, Pi tool settings", () => {
     await setConfig({ pi: { codemode: { mode: "on" } } })
     await installed()
     const report = await runSetup(withPi())
-    expect(await read(globalSettings())).toEqual({ ...FULL() })
+    expect(await read(globalSettings())).toEqual({ ...FULL(), ...MODEL })
     expect(toolLines(report).join("\n")).toContain("left out, the package default: codemode.mode")
   })
 
-  test("never writes Pi's native startup choices, even with an explicit root route", async () => {
-    await setConfig({ pi: { routes: { root: { model: "kimi-for-coding", thinking: "max" } } } })
-    for (const prior of [{}, { defaultProvider: "mine" }, { defaultModel: "my-model" }, MODEL]) {
+  test("seeds an explicit root route without completing any existing startup selection", async () => {
+    await setConfig({
+      pi: {
+        providers: ["openai-codex", "kimi-coding-global"],
+        routes: {
+          root: {
+            provider: "kimi-coding-global",
+            model: "kimi-coding/kimi-for-coding",
+            thinking: "max",
+          },
+        },
+      },
+    })
+    for (const prior of [
+      { defaultProvider: "mine" },
+      { defaultModel: "my-model" },
+      { defaultThinkingLevel: "off" },
+      MODEL,
+    ]) {
       await write(globalSettings(), { ...FULL(), theme: "dark", ...prior })
       const report = await runSetup(withPi())
       expect(await read(globalSettings())).toEqual({
@@ -237,8 +316,55 @@ describe("holyagent setup, Pi tool settings", () => {
         theme: "dark",
         ...prior,
       })
-      expect(toolLines(report).join("\n")).not.toMatch(/default(?:Provider|Model|ThinkingLevel)/)
+      expect(toolLines(report).join("\n")).toContain("kept the existing startup model preferences")
     }
+    await write(globalSettings(), { ...FULL(), theme: "dark" })
+    const preview = await runSetup(withPi(), { dryRun: true })
+    expect(toolLines(preview).join("\n")).toContain('defaultModel "kimi-for-coding"')
+    expect(await read(globalSettings())).toEqual({ ...FULL(), theme: "dark" })
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toEqual({
+      ...FULL(),
+      ...CODEMODE,
+      theme: "dark",
+      defaultProvider: "kimi-coding",
+      defaultModel: "kimi-for-coding",
+      defaultThinkingLevel: "max",
+    })
+  })
+
+  test("uses the enabled provider's profile when an explicit root provider is disabled", async () => {
+    await setConfig({
+      pi: {
+        providers: ["openai-codex"],
+        profile: "fast",
+        routes: {
+          root: { provider: "kimi-coding-global", model: "kimi-for-coding", thinking: "max" },
+        },
+      },
+    })
+    await installed()
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toMatchObject({
+      defaultProvider: "openai-codex",
+      defaultModel: "gpt-6.1-terra",
+      defaultThinkingLevel: "high",
+    })
+  })
+
+  test("an upgrade or rerun preserves a later selection change and does not undo a later reset", async () => {
+    await installed()
+    await runSetup(withPi())
+    const preference = { ...MODEL, defaultThinkingLevel: "low" }
+    await write(globalSettings(), { ...FULL(), ...CODEMODE, ...preference })
+    await setConfig({ pi: { providers: ["openai-codex"] } })
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toMatchObject(preference)
+    await write(globalSettings(), { ...FULL(), ...CODEMODE })
+    const report = await runSetup(withPi())
+    expect(await read(globalSettings())).not.toHaveProperty("defaultModel")
+    expect(toolLines(report).join("\n")).toContain("kept the startup model reset")
+    expect(toolLines(await runDoctor(withPi())).join("\n")).not.toContain("defaultModel")
   })
 
   test("a file that is not a JSON object stays untouched with a failed line, and the others are written", async () => {
@@ -257,6 +383,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       ...CODEMODE,
+      ...MODEL,
     })
   })
 
@@ -309,7 +436,7 @@ describe("holyagent setup, Pi tool settings", () => {
     })
     await installed()
     await runSetup(withPi())
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE })
+    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE, ...MODEL })
     expect(await exists(globalSubagents())).toBe(false)
     expect(await exists(billion())).toBe(false)
     expect(await exists(globalKimi())).toBe(false)
@@ -656,6 +783,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(join(agent, "settings.json"))).toEqual({
       ...FULL(),
       ...CODEMODE,
+      ...MODEL,
     })
     expect(await read(join(agent, "subagents.json"))).toEqual(SUBAGENTS)
     expect(await read(bili)).toEqual(BILLION)
@@ -675,6 +803,7 @@ describe("holyagent setup, Pi tool settings", () => {
       const report = await runSetup(withPi(), { scope })
       expect(await read(projectPi("settings.json"))).toEqual({
         ...CODEMODE,
+        ...MODEL,
       })
       expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       expect(await exists(projectPi("subagents.json"))).toBe(false)
@@ -699,6 +828,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(report.ok).toBe(true)
       expect(await read(projectPi("settings.json"))).toEqual({
         ...CODEMODE,
+        ...MODEL,
       })
       expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       const lines = toolLines(report).join("\n")
@@ -819,7 +949,10 @@ describe("holyagent doctor, Pi tool settings", () => {
     const report = await runDoctor(withPi())
     expect(report.ok).toBe(true)
     expect(toolLines(report)).toEqual([
-      lacking(globalSettings(), "codemode.mode"),
+      lacking(
+        globalSettings(),
+        "codemode.mode, defaultProvider, defaultModel, defaultThinkingLevel",
+      ),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
       lacking(
         billion(),
@@ -862,7 +995,7 @@ describe("holyagent doctor, Pi tool settings", () => {
     })
     const lines = toolLines(await runDoctor(withPi(), { scope: "project" })).join("\n")
     expect(lines).toContain(projectPi("settings.json"))
-    expect(lines).toContain(`${projectPi("settings.json")} lacks codemode.mode;`)
+    expect(lines).toContain(`${projectPi("settings.json")} lacks codemode.mode, defaultProvider,`)
     expect(lines).not.toContain("pi-computer-use")
 
     const elsewhere = join(home, "elsewhere")

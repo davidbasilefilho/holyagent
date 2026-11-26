@@ -10,7 +10,10 @@ import { EMPTY_BUNFIG, Shell } from "../shell.ts"
 import { TUI_BUNDLE } from "./files.ts"
 import { TUI_MANIFEST_NAME } from "./lock.ts"
 import { TUI_LOCK, TUI_PACKAGES } from "./packages.ts"
-import type { SetupTuiModule } from "./types.ts"
+import { plain } from "./text.ts"
+import type { SetupTuiModule, TerminalOutputRenderer } from "./types.ts"
+
+export { plain } from "./text.ts"
 
 /** The setup interface could not be loaded. */
 export class TuiUnavailable extends Data.TaggedError("TuiUnavailable")<{
@@ -133,26 +136,6 @@ export interface LoaderOptions extends Partial<LoaderSteps> {
   readonly notify?: (text: string) => Effect.Effect<void>
 }
 
-// Unicode format characters (category Cf): the bidi controls (U+202A-U+202E, U+2066-U+2069, U+200E,
-// U+200F, U+061C) that reorder a line, zero-width characters (U+200B-U+200D) and the like, which
-// make a text read other than it is written.
-const FORMAT_CHARACTERS = /\p{Cf}/gu
-
-/**
- * Text with escape sequences, control characters (C0, DEL and C1, which include the line breaks),
- * the Unicode line and paragraph separators (U+2028, U+2029) and invisible format characters (bidi
- * controls, zero-width characters) removed: what a tool such as Bun, or a registry behind it,
- * printed is shown to the user only as plain characters, so it cannot recolour the terminal, move
- * the cursor or reorder what the line says.
- */
-export const plain = (text: string): string =>
-  Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, ""))
-    .filter((character) => {
-      const code = character.codePointAt(0) ?? 0
-      return code > 0x1f && (code < 0x7f || code > 0x9f) && code !== 0x2028 && code !== 0x2029
-    })
-    .join("")
-
 const oneLine = (text: string) => plain(text.trim().split("\n")[0] ?? "").trim()
 
 // Bun starts with progress lines ("Resolving dependencies"); the line that says why is the first
@@ -255,18 +238,37 @@ const isSetupTuiModule = (value: unknown): value is SetupTuiModule =>
   "runSetupTui" in value &&
   typeof value.runSetupTui === "function"
 
-/** Loads the renderer and Solid preload relative to the installed public CLI bundle. */
-export const loadPackagedSetupTui = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+const importPackagedTui = (bundle: string) =>
   Effect.gen(function* () {
     const preload = yield* Effect.try({
       try: () => Bun.resolveSync("@opentui/solid/preload", dirname(bundle)),
       catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause),
     })
     yield* importFile(preload)
-    const loaded = yield* importFile(bundle)
+    return yield* importFile(bundle)
+  })
+
+/** Loads the renderer and Solid preload relative to the installed public CLI bundle. */
+export const loadPackagedSetupTui = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+  Effect.gen(function* () {
+    const loaded = yield* importPackagedTui(bundle)
     if (!isSetupTuiModule(loaded))
       return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` })
     return loaded
+  })
+
+/** Loads the static formatter from the same installed OpenTUI/Solid bundle. */
+export const loadPackagedTerminalOutput = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+  Effect.gen(function* () {
+    const loaded = yield* importPackagedTui(bundle)
+    if (
+      typeof loaded !== "object" ||
+      loaded === null ||
+      !("renderTerminalOutput" in loaded) ||
+      typeof loaded.renderTerminalOutput !== "function"
+    )
+      return yield* new TuiUnavailable({ reason: `${bundle} does not export renderTerminalOutput` })
+    return loaded.renderTerminalOutput as TerminalOutputRenderer
   })
 
 const fileSystem = <A>(what: string, run: () => Promise<A>) =>

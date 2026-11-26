@@ -130,6 +130,13 @@ const installFailure = (options: T3SettingsOptions) =>
   )
 
 const PROVIDER = { providerInstances: { pi: { driver: "pi", enabled: true } } }
+const STARTUP_MODEL = {
+  defaultModelSelection: {
+    instanceId: "pi",
+    model: "kimi-coding/k3.1-pro",
+    options: [{ id: "thinking", value: "high" }],
+  },
+}
 const DEVICES = { enableDeviceSupport: true, enableAgentDeviceAccess: true }
 const WORKTREES = { defaultThreadEnvMode: "worktree" }
 const BACKGROUND = {
@@ -170,6 +177,7 @@ const CLEANUP = {
 }
 const ALL = {
   ...PROVIDER,
+  ...STARTUP_MODEL,
   ...DEVICES,
   ...WORKTREES,
   ...BACKGROUND,
@@ -190,13 +198,12 @@ describe("holyagent setup, T3 Code settings", () => {
     expect(t3Lines(report)[0]).toStartWith(`+ t3 settings ${settingsFile()}: added `)
   })
 
-  test("never writes the context meter, model choices, Pi launch settings, client settings or a default", async () => {
+  test("leaves the context meter, other model choices, Pi launch settings and client settings alone", async () => {
     await machine()
     await runSetup()
     const written = (await read(settingsFile())) as Record<string, unknown>
     for (const key of [
       "contextWindowMeterEnabled",
-      "defaultModelSelection",
       "textGenerationModelSelection",
       "fallbackModelSelection",
       "enableProviderUpdateChecks",
@@ -221,11 +228,82 @@ describe("holyagent setup, T3 Code settings", () => {
     expect(await exists(join(t3Home, "userdata", "client-settings.json"))).toBe(false)
   })
 
+  test("previews the selected Codex provider and writes the explicit root route as one choice", async () => {
+    await machine()
+    const preview = await install({ dryRun: true, providers: { providers: ["openai-codex"] } })
+    expect(preview.join("\n")).toContain("openai-codex/gpt-6.2-sol")
+    expect(await exists(settingsFile())).toBe(false)
+    await setConfig({
+      pi: {
+        providers: ["openai-codex", "kimi-coding-global"],
+        routes: { root: { provider: "openai-codex", model: "gpt-6.2-astra", thinking: "medium" } },
+      },
+    })
+    await install({ dryRun: false })
+    expect(await read(settingsFile())).toMatchObject({
+      defaultModelSelection: {
+        instanceId: "pi",
+        model: "openai-codex/gpt-6.2-astra",
+        options: [{ id: "thinking", value: "medium" }],
+      },
+    })
+  })
+
+  test("preserves the native selection on upgrade, after manual changes and after a reset", async () => {
+    await machine()
+    const preference = { instanceId: "other-pi", model: "kimi-coding/kimi-for-coding" }
+    await write(settingsFile(), { theme: "mine", defaultModelSelection: preference })
+    await install({ dryRun: false })
+    expect(await read(settingsFile())).toMatchObject({
+      theme: "mine",
+      defaultModelSelection: preference,
+    })
+    await write(settingsFile(), { theme: "mine", defaultModelSelection: null })
+    await install({ dryRun: false })
+    expect(await read(settingsFile())).toMatchObject({ defaultModelSelection: null })
+
+    await write(settingsFile(), { theme: "mine" })
+    await install({ dryRun: false })
+    await write(settingsFile(), { ...ALL, defaultModelSelection: preference })
+    await install({ dryRun: false })
+    expect(await read(settingsFile())).toMatchObject({ defaultModelSelection: preference })
+    await write(settingsFile(), { theme: "mine" })
+    const rerun = await install({ dryRun: false })
+    expect(rerun.join("\n")).toContain("kept the startup model reset")
+    expect(await read(settingsFile())).not.toHaveProperty("defaultModelSelection")
+    expect(t3Lines(await runDoctor()).join("\n")).not.toContain("defaultModelSelection")
+  })
+
+  test("does not pick a Pi model when T3's Pi instance was explicitly disabled", async () => {
+    await machine()
+    await write(settingsFile(), { providerInstances: { pi: { driver: "pi", enabled: false } } })
+    const report = await install({ dryRun: false })
+    expect(report.join("\n")).toContain("the Pi provider instance is disabled")
+    expect(await read(settingsFile())).not.toHaveProperty("defaultModelSelection")
+  })
+
   test("creates the file when T3 has a home folder but no settings yet", async () => {
     await machine()
     expect(await exists(settingsFile())).toBe(false)
     await runSetup()
     expect(await read(settingsFile())).toEqual(ALL)
+  })
+
+  test("leaves a startup selection that T3 saves during the first setup", async () => {
+    await machine()
+    const manual = {
+      defaultModelSelection: { instanceId: "pi", model: "kimi-coding/kimi-for-coding" },
+    }
+    const failure = await installFailure({
+      dryRun: false,
+      write: (file, value, since) =>
+        Effect.promise(() => write(file, manual)).pipe(
+          Effect.andThen(writeSettings(file, value, since)),
+        ),
+    })
+    expect(failure.message).toContain("changed while setup was working on it")
+    expect(await read(settingsFile())).toEqual(manual)
+    expect(await exists(recordPath(env()))).toBe(false)
   })
 
   test("a key the user set stays, whatever its value, and the rest is still written", async () => {

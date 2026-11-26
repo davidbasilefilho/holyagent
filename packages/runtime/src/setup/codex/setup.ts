@@ -250,6 +250,10 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       "This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.",
     )
   const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig)
+  if (record(settings.features).plugins === false)
+    return yield* fail(
+      "This profile disables Codex plugins ([features] plugins = false). No files changed.",
+    )
   if (beforeConfig !== undefined) yield* checkPolicy(settings, yield* parseToml(config))
   const market = join(home, CODEX_STARTUP_MARKETPLACE)
   const registered = record(record(settings.marketplaces)[CODEX_MARKETPLACE])
@@ -336,6 +340,11 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     ...(install
       ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`]
       : [`= Codex plugin: ${version} already present in the local cache`]),
+    ...(record(settings.skills).include_instructions === false
+      ? [
+          "~ Codex skills: this profile disables automatic skill listings. HolyAgent workflow will not be listed in the prompt under this setting.",
+        ]
+      : []),
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session.",
   ]
   if (options.dryRun) return { ok: true, lines, fingerprint }

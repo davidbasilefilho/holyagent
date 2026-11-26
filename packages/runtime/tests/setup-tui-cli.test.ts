@@ -235,7 +235,7 @@ describe("the public setup renderer", () => {
     expect(await Bun.file(join(home, ".holyagent", "config.json")).exists()).toBe(false)
   })
 
-  test("fresh public Pi setup enables two providers but writes no startup default", async () => {
+  test("fresh public Pi setup enables two providers and seeds the existing root policy", async () => {
     await machine()
     const pi = join(home, "pi")
     const config = join(home, ".holyagent", "config.json")
@@ -253,7 +253,8 @@ describe("the public setup renderer", () => {
       const review = await input.review(choices)
       const lines = review.harnesses?.flatMap((entry) => entry.lines) ?? []
       expect(lines.join("\n")).toContain("openai-codex, kimi-coding-global")
-      expect(lines.join("\n")).not.toMatch(/default openai|default kimi/)
+      expect(lines.join("\n")).toContain('defaultModel "k3.1-pro"')
+      expect(lines.join("\n")).toContain('"model":"kimi-coding/k3.1-pro"')
       return {
         _tag: "Applied",
         applied: await input.apply(choices, new AbortController().signal),
@@ -270,9 +271,18 @@ describe("the public setup renderer", () => {
       providers: ["openai-codex", "kimi-coding-global"],
     })
     const settings = await Bun.file(join(pi, "settings.json")).json()
-    expect(settings).not.toHaveProperty("defaultProvider")
-    expect(settings).not.toHaveProperty("defaultModel")
-    expect(settings).not.toHaveProperty("defaultThinkingLevel")
+    expect(settings).toMatchObject({
+      defaultProvider: "kimi-coding",
+      defaultModel: "k3.1-pro",
+      defaultThinkingLevel: "high",
+    })
+    expect(await t3Settings()).toMatchObject({
+      defaultModelSelection: {
+        instanceId: "pi",
+        model: "kimi-coding/k3.1-pro",
+        options: [{ id: "thinking", value: "high" }],
+      },
+    })
   })
 
   test("public Pi setup reviews and applies two providers without flattening routes", async () => {
@@ -453,7 +463,7 @@ describe("the public setup renderer", () => {
     expect(await Bun.file(file ?? "").text()).toContain(lines.join("\n"))
   })
 
-  test("styles the report link for a terminal and keeps dry runs free of writes", async () => {
+  test("keeps the command result plain and leaves dry runs free of writes", async () => {
     await machine()
     const shown = interface_(() =>
       Promise.resolve({ _tag: "Applied", applied: { ok: true, lines: ["+ pi setup: added"] } }),
@@ -470,8 +480,8 @@ describe("the public setup renderer", () => {
     const directory = join(home, ".holyagent", "setup-reports")
     expect(await readdir(directory).catch(() => [])).toEqual([])
     const actual = await cli([], options)
-    expect(actual.stdout).toContain("\x1b]8;;file://")
-    expect(Bun.stripANSI(actual.stdout)).toContain(`Full report: ${directory}`)
+    expect(actual.stdout).not.toContain("\x1b")
+    expect(actual.stdout).toContain(`Full report: ${directory}`)
     expect((await readdir(directory)).length).toBe(1)
   })
 
@@ -629,10 +639,11 @@ describe("setup with the interface", () => {
     expect(review?.file).toBe(t3File())
     expect(review?.choices.map((line) => [line.mark, line.name])).toEqual([
       ["+", "Pi provider"],
-      ["+", "Agent device access"],
+      ["+", "T3 Device Simulator"],
       ["-", "New threads in worktrees"],
     ])
     expect(review?.always.map((line) => line.name)).toEqual([
+      "Default model for new threads",
       "Background activity",
       "Source control writing",
       "Threads and git",

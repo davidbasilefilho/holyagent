@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 
+import type { SetupResult } from "../setup/tui/result-file.ts"
 import { hasCode } from "../state/files.ts"
 import { StdinMissing } from "./errors.ts"
 import { run } from "./program.ts"
@@ -31,16 +32,36 @@ const write = (stream: NodeJS.WriteStream, text: string) =>
     ),
   )
 
+/** The optional public boundary that presents the text written to each output stream. */
+export type OutputPresentation = (
+  text: string,
+  kind: "stdout" | "stderr" | "progress",
+  targetIsTty: boolean,
+  summary?: SetupResult,
+) => Effect.Effect<string>
+
+const plainOutput: OutputPresentation = (text) => Effect.succeed(text)
+
 /** Runs one CLI entry. Only the public entry can display the interactive setup screen. */
 export const main = (
   interactiveSetup = false,
   surface: CliSurface = "host",
   installedPackageRoot?: string,
+  present: OutputPresentation = plainOutput,
 ) =>
   Effect.runPromise(
     Effect.gen(function* () {
+      const argv = Bun.argv.slice(2)
+      const terminal = {
+        stdin: Boolean(process.stdin.isTTY),
+        stdout: Boolean(process.stdout.isTTY),
+      }
+      const emit = (text: string) =>
+        present(text, "progress", terminal.stdout).pipe(
+          Effect.flatMap((output) => write(process.stdout, output)),
+        )
       const result = yield* run(
-        Bun.argv.slice(2),
+        argv,
         {
           cwd: process.cwd(),
           env: process.env,
@@ -48,7 +69,7 @@ export const main = (
             surface === "agent"
               ? Effect.fail(new StdinMissing({ reason: "stdin is unavailable" }))
               : stdin,
-          ...(surface === "agent" ? {} : { emit: (text: string) => write(process.stdout, text) }),
+          ...(surface === "agent" ? {} : { emit }),
           ...(surface === "public" && installedPackageRoot !== undefined
             ? { installedPackageRoot }
             : {}),
@@ -58,17 +79,16 @@ export const main = (
           ...(interactiveSetup
             ? {
                 t3Workflow: true,
-                terminal: {
-                  stdin: Boolean(process.stdin.isTTY),
-                  stdout: Boolean(process.stdout.isTTY),
-                },
+                terminal,
               }
             : {}),
         },
         surface,
       )
-      yield* write(process.stdout, result.stdout)
-      yield* write(process.stderr, result.stderr)
+      const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result.setupResult)
+      const stderr = yield* present(result.stderr, "stderr", Boolean(process.stderr.isTTY))
+      yield* write(process.stdout, stdout)
+      yield* write(process.stderr, stderr)
       process.exitCode = result.code
     }),
   )

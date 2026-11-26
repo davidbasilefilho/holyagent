@@ -2,11 +2,30 @@ import type { PiProvider } from "../../config/schema.ts"
 import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
-import type { Applied, Choices, Offer, Review, ReviewLine, SetupDisplayProgress } from "./types.ts"
+import type {
+  Applied,
+  BrowserOption,
+  Choices,
+  Offer,
+  Review,
+  ReviewLine,
+  SetupDisplayProgress,
+} from "./types.ts"
 
 const CAPABILITY_ROW = "capability:"
-const BROWSE_ROW = "capability:browseSetup"
-const BROWSE_PROFILE = "capability:browseProfile"
+const BROWSER_USE = "capability:browserUse"
+type SettingsPage = "browser-use" | "browser-selection" | "codex-iab" | "codex-extension"
+type SettingsOption =
+  | "configure"
+  | "skip"
+  | "browsers"
+  | "profile"
+  | "capability"
+  | "confirm"
+  | "extension-skip"
+  | "back"
+  | `browser:${string}`
+  | `extension:${string}`
 
 /** One run of text in one tone; the screen draws it as a span. */
 export interface Segment {
@@ -27,6 +46,8 @@ export type RowId =
   | "enablePi"
   | "enableClaude"
   | "enableCodex"
+  | "codexInAppBrowser"
+  | "codexBrowserExtension"
   | `capability:${string}`
 
 const tabs = ["pi", "claude", "codex"] as const
@@ -34,7 +55,7 @@ type Tab = (typeof tabs)[number]
 const tabLabels: Record<Tab, string> = { pi: "Pi", claude: "Claude Code", codex: "Codex" }
 
 /** The screens, in the order a run goes through them. */
-export type Screen = "choose" | "review" | "applying" | "done"
+export type Screen = "choose" | "settings" | "review" | "applying" | "done"
 
 /** What the screens show and the keys change; every transition below is a pure function of it. */
 export interface State {
@@ -44,6 +65,10 @@ export interface State {
   readonly focus: number
   /** The focused action of the review screen, an index into {@link reviewActions}. */
   readonly action: number
+  /** The named configuration page, when one is open. The choose page keeps its row focus. */
+  readonly settings?: SettingsPage
+  /** The in-progress multi-selection, committed only by the browser picker's Done action. */
+  readonly browserDraft?: ReadonlyArray<string>
   /** The first line shown of a review or result longer than the screen; `view` clamps it. */
   readonly scroll: number
   readonly choices: Choices
@@ -80,16 +105,19 @@ export type Control =
   | "choose-review"
   | "choose-cancel"
   | { readonly row: RowId }
+  | { readonly settingsOption: SettingsOption }
   | { readonly action: ReviewAction }
   | { readonly tab: Tab }
   | { readonly scrollTo: number }
 
 const LABELS = {
-  deviceAccess: "Agent device access",
+  deviceAccess: "T3 Device Simulator",
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
   enableClaude: "Configure Claude Code",
   enableCodex: "Configure Codex",
+  codexInAppBrowser: "Codex In-App Browser",
+  codexBrowserExtension: "ChatGPT browser extension",
 } as const
 
 /** The capability a row switches, or `undefined` for a T3 row. */
@@ -109,8 +137,7 @@ const providerOf = (row: RowId, offer: Offer) =>
   offer.providers?.find((provider) => row === `provider:${provider}`)
 
 const labelOf = (row: RowId, offer: Offer): string => {
-  if (row === BROWSE_ROW) return "OpenCode Browse setup"
-  if (row === BROWSE_PROFILE) return "Browse browser profile"
+  if (row === BROWSER_USE && offer.browse !== undefined) return "Browser Use"
   const provider = providerOf(row, offer)
   if (provider !== undefined) return providerName[provider]
   return row.startsWith(CAPABILITY_ROW)
@@ -126,7 +153,19 @@ export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
   const selected = state?.choices.harnesses
   if (selected !== undefined && offer.harnesses !== undefined) {
     if (state?.tab === "codex")
-      return offer.harnesses.codexHome === undefined ? [] : ["enableCodex"]
+      return offer.harnesses.codexHome === undefined
+        ? []
+        : [
+            ...(offer.harnesses.onlyCodex === true ? [] : (["enableCodex"] as const)),
+            ...(selected.codex !== true || offer.harnesses.codexDesktop === undefined
+              ? []
+              : ([
+                  "codexInAppBrowser",
+                  ...((offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) > 0
+                    ? (["codexBrowserExtension"] as const)
+                    : []),
+                ] as const)),
+          ]
     if (state?.tab === "claude") return ["enableClaude"]
     if (!offer.harnesses.piAvailable) return []
     if (!selected.pi) return ["enablePi"]
@@ -136,27 +175,14 @@ export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
     ...(offer.providers ?? []).map((provider): RowId => `provider:${provider}`),
     ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
     ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
-    ...offer.capabilities.flatMap((capability): ReadonlyArray<RowId> => [
-      `${CAPABILITY_ROW}${capability.feature}` as const,
-      ...(capability.feature === "browserUse" &&
-      state?.choices.capabilities["browserUse"] === true &&
-      offer.browse?.action !== undefined
-        ? ([BROWSE_ROW] as const)
-        : []),
-      ...(capability.feature === "browserUse" &&
-      state?.choices.capabilities["browserUse"] === true &&
-      state.choices.browseSetup === true &&
-      (offer.browse?.profiles?.length ?? 0) > 0
-        ? ([BROWSE_PROFILE] as const)
-        : []),
-    ]),
+    ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
   ]
 }
 
 /** The state a run starts in. */
-export const initialState = (choices: Choices): State => ({
+export const initialState = (choices: Choices, onlyCodex = false): State => ({
   screen: "choose",
-  tab: "pi",
+  tab: onlyCodex ? "codex" : "pi",
   focus: 0,
   action: 0,
   scroll: 0,
@@ -196,7 +222,6 @@ const toggleProvider = (choices: Choices, id: PiProvider): Choices => {
 }
 
 const toggled = (choices: Choices, row: RowId): Choices => {
-  if (row === BROWSE_ROW) return { ...choices, browseSetup: choices.browseSetup !== true }
   if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
     return toggleProvider(
       choices,
@@ -222,6 +247,125 @@ const toggled = (choices: Choices, row: RowId): Choices => {
   }
 }
 
+const settingsFor = (row: RowId, offer: Offer | undefined): SettingsPage | undefined => {
+  if (row === BROWSER_USE && offer?.browse !== undefined) return "browser-use"
+  if (row === "codexInAppBrowser") return "codex-iab"
+  if (row === "codexBrowserExtension") return "codex-extension"
+  return undefined
+}
+
+const browserOptions = (offer: Offer | undefined): ReadonlyArray<BrowserOption> =>
+  offer?.browse?.browsers ?? []
+const extensionBrowsers = (offer: Offer | undefined) =>
+  offer?.harnesses?.codexDesktop?.extensionBrowsers ?? []
+
+const selectedProfiles = (choices: Choices, offer: Offer | undefined) => {
+  const ids = choices.browseBrowserIds
+  const profiles = (offer?.browse?.profiles ?? []).map((profile, index) => ({ ...profile, index }))
+  if (ids === undefined) return profiles
+  const names = browserOptions(offer)
+    .filter(({ id }) => ids.includes(id))
+    .map(({ name }) => name)
+  return profiles.filter(({ browser }) => names.includes(browser))
+}
+
+const settingsOptions = (state: State, offer: Offer | undefined): ReadonlyArray<SettingsOption> =>
+  state.settings === "codex-extension"
+    ? [
+        "extension-skip",
+        ...extensionBrowsers(offer).map(({ id }): SettingsOption => `extension:${id}`),
+        "back",
+      ]
+    : state.settings === "browser-selection"
+      ? [
+          ...browserOptions(offer).map(({ id }): SettingsOption => `browser:${id}`),
+          "confirm",
+          "back",
+        ]
+      : state.settings === "browser-use"
+        ? [
+            ...(offer?.browse?.action === undefined ? [] : (["configure", "skip"] as const)),
+            ...(browserOptions(offer).length > 0 ? (["browsers"] as const) : []),
+            ...(selectedProfiles(state.choices, offer).length > 0 ? (["profile"] as const) : []),
+            "capability",
+            "back",
+          ]
+        : ["back"]
+
+const settingsBack = (state: State, offer: Offer | undefined): State => {
+  if (state.settings === "browser-selection") {
+    const parent: State = { ...state, settings: "browser-use" }
+    return { ...parent, action: Math.max(0, settingsOptions(parent, offer).indexOf("browsers")) }
+  }
+  return { ...state, screen: "choose", action: 0 }
+}
+
+const selectSetting = (state: State, option: SettingsOption, offer: Offer | undefined): State => {
+  if (option === "back") return settingsBack(state, offer)
+  const choices = state.choices
+  if (option === "extension-skip") {
+    const { codexBrowserHandoff: _previous, ...kept } = choices
+    return { ...state, choices: kept }
+  }
+  if (option.startsWith("extension:")) {
+    const id = option.slice("extension:".length)
+    return extensionBrowsers(offer).some((entry) => entry.id === id)
+      ? { ...state, choices: { ...choices, codexBrowserHandoff: id } }
+      : state
+  }
+  if (option === "browsers")
+    return {
+      ...state,
+      settings: "browser-selection",
+      action: 0,
+      browserDraft: choices.browseBrowserIds ?? [],
+    }
+  if (option === "confirm") {
+    const selected = { ...choices, browseBrowserIds: state.browserDraft ?? [] }
+    const profile =
+      selectedProfiles(selected, offer).find(({ index }) => index === choices.browseProfile) ??
+      selectedProfiles(selected, offer)[0]
+    return settingsBack(
+      {
+        ...state,
+        choices: {
+          ...selected,
+          ...(profile === undefined ? {} : { browseProfile: profile.index }),
+        },
+      },
+      offer,
+    )
+  }
+  if (option.startsWith("browser:")) {
+    const id = option.slice("browser:".length)
+    const candidate = browserOptions(offer).find((entry) => entry.id === id)
+    if (candidate === undefined || candidate.browseCompatibility === "unsupported") return state
+    const marked = state.browserDraft ?? []
+    return {
+      ...state,
+      browserDraft: marked.includes(id) ? marked.filter((entry) => entry !== id) : [...marked, id],
+    }
+  }
+  if (option === "configure")
+    return {
+      ...state,
+      choices: {
+        ...choices,
+        capabilities: { ...choices.capabilities, browserUse: true },
+        browseSetup: true,
+      },
+    }
+  if (option === "skip") return { ...state, choices: { ...choices, browseSetup: false } }
+  if (option === "capability") return { ...state, choices: toggled(choices, BROWSER_USE) }
+  const profiles = selectedProfiles(choices, offer)
+  const index = profiles.findIndex(({ index }) => index === (choices.browseProfile ?? 0))
+  const profile = profiles[wrapped(index, 1, Math.max(1, profiles.length))]
+  return {
+    ...state,
+    choices: profile === undefined ? choices : { ...choices, browseProfile: profile.index },
+  }
+}
+
 const pagedBy = (state: State, key: Key, scroll: Scroll): State | undefined => {
   if (key.ctrl) return undefined
   const direction = key.name === "pagedown" ? 1 : key.name === "pageup" ? -1 : 0
@@ -239,12 +383,13 @@ export const press = (
   rows: ReadonlyArray<RowId>,
   key: Key,
   scroll: Scroll = { page: 1, max: 0 },
-  browseProfiles = 0,
+  offer?: Offer,
 ): { readonly state: State; readonly command?: Command } => {
   if (state.screen === "choose") {
     if (isQuit(key)) return { state, command: "cancel" }
     if (
       state.choices.harnesses !== undefined &&
+      offer?.harnesses?.onlyCodex !== true &&
       !key.ctrl &&
       (key.name === "left" || key.name === "right")
     ) {
@@ -257,21 +402,29 @@ export const press = (
       return { state: { ...state, focus: wrapped(state.focus, step, rows.length + 1) } }
     if (isEnter(key) && !key.ctrl) {
       const row = rows[state.focus]
-      if (row !== undefined)
+      if (row !== undefined) {
+        const settings = settingsFor(row, offer)
+        if (settings !== undefined) {
+          const opened: State = { ...state, screen: "settings", settings, action: 0 }
+          const preferred: SettingsOption =
+            settings === "codex-extension"
+              ? state.choices.codexBrowserHandoff === undefined
+                ? "extension-skip"
+                : `extension:${state.choices.codexBrowserHandoff}`
+              : state.choices.browseSetup === true
+                ? "configure"
+                : "skip"
+          const focus = settingsOptions(opened, offer).indexOf(preferred)
+          return { state: { ...opened, action: Math.max(0, focus) } }
+        }
         return {
           state: {
             ...state,
             focus: row === "enablePi" ? 0 : state.focus,
-            choices:
-              row === BROWSE_PROFILE
-                ? {
-                    ...state.choices,
-                    browseProfile:
-                      ((state.choices.browseProfile ?? 0) + 1) % Math.max(1, browseProfiles),
-                  }
-                : toggled(state.choices, row),
+            choices: toggled(state.choices, row),
           },
         }
+      }
       return {
         state: {
           ...state,
@@ -283,6 +436,37 @@ export const press = (
         },
         command: "review",
       }
+    }
+    return { state }
+  }
+  if (state.screen === "settings") {
+    if (key.ctrl && key.name === "c") return { state, command: "cancel" }
+    if (key.name === "escape" || (!key.ctrl && key.name === "backspace"))
+      return { state: settingsBack(state, offer) }
+    const options = settingsOptions(state, offer)
+    const step = stepOf(key)
+    if (step !== 0)
+      return { state: { ...state, action: wrapped(state.action, step, options.length) } }
+    if (!key.ctrl && key.name === "end")
+      return {
+        state: {
+          ...state,
+          action: options.length - (state.settings === "browser-selection" ? 2 : 1),
+        },
+      }
+    if (
+      state.settings === "browser-selection" &&
+      !key.ctrl &&
+      (key.name === "space" || key.name === " ")
+    ) {
+      const option = options[state.action]
+      return {
+        state: option?.startsWith("browser:") ? selectSetting(state, option, offer) : state,
+      }
+    }
+    if (!key.ctrl && isEnter(key)) {
+      const option = options[state.action]
+      if (option !== undefined) return { state: selectSetting(state, option, offer) }
     }
     return { state }
   }
@@ -320,19 +504,26 @@ export const pressControl = (
   rows: ReadonlyArray<RowId>,
   control: Control,
   scroll: Scroll = FIXED,
-  browseProfiles = 0,
+  offer?: Offer,
 ) => {
-  const key = (name: string, from = state) =>
-    press(from, rows, { name, ctrl: false }, FIXED, browseProfiles)
+  const key = (name: string, from = state) => press(from, rows, { name, ctrl: false }, FIXED, offer)
   if (typeof control === "object") {
     if ("tab" in control)
-      return state.screen === "choose" && state.choices.harnesses !== undefined
+      return state.screen === "choose" &&
+        state.choices.harnesses !== undefined &&
+        offer?.harnesses?.onlyCodex !== true
         ? { state: { ...state, tab: control.tab, focus: 0 } }
         : { state }
     if ("scrollTo" in control)
       return (state.screen === "review" || state.screen === "done") && scroll.max > 0
         ? { state: { ...state, scroll: Math.min(scroll.max, Math.max(0, control.scrollTo)) } }
         : { state }
+    if ("settingsOption" in control) {
+      const action = settingsOptions(state, offer).indexOf(control.settingsOption)
+      return state.screen === "settings" && action >= 0
+        ? key("enter", { ...state, action })
+        : { state }
+    }
     if ("row" in control) {
       const focus = rows.indexOf(control.row)
       return state.screen === "choose" && focus >= 0 ? key("enter", { ...state, focus }) : { state }
@@ -417,16 +608,16 @@ const blank: Line = []
 const hintLines = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text, width).map((part) => [segment(part, "hint")])
 
-const hintOf = (row: RowId, offer: Offer, choices: Choices): string => {
-  if (row === BROWSE_ROW)
-    return `${offer.browse?.state ?? ""}. Choose ${offer.browse?.action ?? "Configure"} or Skip.`
-  if (row === BROWSE_PROFILE) {
-    const profile = offer.browse?.profiles?.[choices.browseProfile ?? 0]
-    return `Selected: ${profile === undefined ? "none" : `${profile.browser}, ${profile.profile}`}. Press Enter or click to cycle through detected profiles.`
-  }
+const hintOf = (row: RowId, offer: Offer): string => {
+  if (row === BROWSER_USE && offer.browse !== undefined)
+    return "Open settings to configure OpenCode Browse."
   if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
   if (row === "enableCodex")
     return "Prepare the native plugin and startup settings in a dedicated Codex home."
+  if (row === "codexInAppBrowser")
+    return "See where to use the built-in desktop browser without changing any settings."
+  if (row === "codexBrowserExtension")
+    return "Choose whether to open the official guide for your existing browser profile."
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review."
   if (providerOf(row, offer) !== undefined)
@@ -458,15 +649,15 @@ const isOn = (row: RowId, choices: Choices): boolean =>
               choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
 const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; word: string } => {
-  if (row === BROWSE_ROW)
+  if (row === "codexInAppBrowser") return { box: "", word: "Built-in" }
+  if (row === "codexBrowserExtension")
+    return choices.codexBrowserHandoff === undefined
+      ? { box: "[ ]", word: "Skip" }
+      : { box: "[x]", word: "Open guide" }
+  if (row === BROWSER_USE && offer.browse?.action !== undefined)
     return choices.browseSetup === true
-      ? { box: "[x]", word: offer.browse?.action ?? "Configure" }
+      ? { box: "[x]", word: offer.browse.action }
       : { box: "[ ]", word: "Skip" }
-  if (row === BROWSE_PROFILE) {
-    const profiles = offer.browse?.profiles ?? []
-    const index = choices.browseProfile ?? 0
-    return { box: `${index + 1}/${profiles.length}`, word: "selected" }
-  }
   const provider = providerOf(row, offer)
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider)) return { box: "[ ]", word: "disabled" }
@@ -493,7 +684,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const labels = rows.map((row) => labelOf(row, offer))
   // Reserve the longest state even when all visible choices are enabled. On narrow terminals
   // changing one choice must not move every state column.
-  const valueWidth = cells("[ ] disabled")
+  const valueWidth = cells(offer.browse?.action === "Configure" ? "[x] Configure" : "[ ] disabled")
   const labelWidth = Math.min(
     Math.max(0, ...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
@@ -532,7 +723,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const focused = rows[state.focus]
   const combined = state.choices.harnesses
   const tabsLine: ReadonlyArray<Line> =
-    combined === undefined
+    combined === undefined || offer.harnesses?.onlyCodex === true
       ? []
       : [
           tabs.flatMap((tab): Line => [
@@ -579,9 +770,113 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     ...(state.tab === "codex" && offer.harnesses?.codexHome !== undefined
       ? choiceHint(`Profile: ${offer.harnesses.codexHome}`)
       : []),
-    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices))),
+    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer))),
     ...choiceHint(`Environment: ${offer.form}`),
   ]
+}
+
+const settingsLines = (state: State, context: Context): ReadonlyArray<Line> => {
+  const { width, look, offer } = context
+  const g = glyphs(look)
+  const profile = offer.browse?.profiles?.[state.choices.browseProfile ?? 0]
+  const picker = state.settings === "browser-selection"
+  const nativeBrowser = state.settings === "codex-iab"
+  const browserExtension = state.settings === "codex-extension"
+  const enabled = state.choices.capabilities["browserUse"] === true
+  const configure = state.choices.browseSetup === true && enabled
+  const candidates = browserOptions(offer)
+  const picked = state.choices.browseBrowserIds
+  const selected = candidates.filter(({ id }) => picked?.includes(id)).map(({ name }) => name)
+  const box = (checked: boolean) => (checked ? "[x]" : "[ ]")
+  const optionText = (option: SettingsOption): string => {
+    if (option === "extension-skip")
+      return `${box(state.choices.codexBrowserHandoff === undefined)} Skip`
+    if (option.startsWith("extension:")) {
+      const id = option.slice("extension:".length)
+      const candidate = extensionBrowsers(offer).find((entry) => entry.id === id)
+      return `${box(state.choices.codexBrowserHandoff === id)} Open official guide in ${candidate?.name ?? ""}`
+    }
+    if (option === "configure") return `${box(configure)} ${offer.browse?.action ?? "Configure"}`
+    if (option === "skip") return `${box(!configure)} Skip`
+    if (option === "browsers")
+      return `Browsers: ${picked === undefined ? "Automatic profile" : selected.join(", ") || "None selected"}`
+    if (option === "profile")
+      return `Browser profile: ${profile === undefined ? "automatic" : `${profile.browser}, ${profile.profile}`}`
+    if (option === "capability") return `${box(enabled)} Allow Browser Use for visual specialists`
+    if (option === "confirm") return "Done"
+    if (option.startsWith("browser:")) {
+      const candidate = candidates.find(({ id }) => id === option.slice("browser:".length))
+      if (candidate !== undefined) {
+        const availability =
+          candidate.browseCompatibility === "unsupported"
+            ? " — not supported by Browse"
+            : candidate.browseCompatibility === "unverified"
+              ? " — compatibility unverified"
+              : ""
+        return `${box(state.browserDraft?.includes(candidate.id) === true)} ${candidate.name}${availability}`
+      }
+    }
+    return "Back"
+  }
+  const options = settingsOptions(state, offer).map((option, index) => ({ option, index }))
+  const shortcuts = keyLines(
+    [`${g.arrows} or j/k focus`, ...(picker ? ["Space mark"] : []), "Enter select", "Esc back"],
+    width,
+  )
+  const capacity = Math.max(1, context.height - shortcuts.length - 9)
+  const start = Math.max(0, Math.min(candidates.length - capacity, state.action - capacity + 1))
+  const visible = picker
+    ? [...options.slice(0, -2).slice(start, start + capacity), ...options.slice(-2)]
+    : options
+  const optionLines = ({ option, index }: (typeof options)[number]): ReadonlyArray<Line> =>
+    (picker
+      ? [clip(optionText(option), width - 2, g.ellipsis)]
+      : wrap(optionText(option), width - 2)
+    ).map((part, line): Line => [
+      {
+        text: `${line === 0 && index === state.action ? g.focus : " "} ${part}`,
+        tone: index === state.action ? "focus" : "option",
+        click: { settingsOption: option },
+      },
+    ])
+  const controls = [
+    ...shortcuts,
+    blank,
+    ...heading(
+      picker
+        ? "Select browsers"
+        : nativeBrowser
+          ? "Codex In-App Browser"
+          : browserExtension
+            ? "ChatGPT browser extension"
+            : "Browser Use",
+      width,
+    ),
+    ...visible.flatMap(optionLines),
+  ]
+  const hint = picker
+    ? hintLines("Mark any number. Done keeps the selection. Back discards these edits.", width)
+    : nativeBrowser
+      ? hintLines(
+          "Use @Browser in the ChatGPT desktop app. The built-in browser has its own profile, and setup does not change its permissions.",
+          width,
+        )
+      : browserExtension
+        ? hintLines(
+            "Open OpenAI’s installation guide only after you review and apply. The extension connects your existing browser profile. Setup does not install it or grant access.",
+            width,
+          )
+        : [
+            ...hintLines(
+              "OpenCode Browse connects a selected Chromium-family browser profile. Each browser needs its own extension and pairing.",
+              width,
+            ),
+            ...(offer.browse === undefined ? [] : hintLines(offer.browse.state, width)),
+            ...hintLines("Nothing runs here. Review all choices before applying setup.", width),
+          ]
+  // Keep focusable controls visible before adding explanatory text in short terminals.
+  const room = Math.max(0, context.height - controls.length - 2)
+  return [...controls, ...(room === 0 ? [] : [blank, ...hint.slice(0, room)])]
 }
 
 const MARK_TONES: Readonly<Record<ReviewLine["mark"], Tone>> = {
@@ -923,11 +1218,13 @@ const applyingLines = (context: Context): ReadonlyArray<Line> => {
 const layoutOf = (state: State, context: Context): Layout =>
   state.screen === "choose"
     ? { lines: chooseLines(state, context), scroll: FIXED }
-    : state.screen === "review"
-      ? reviewLayout(state, context)
-      : state.screen === "applying"
-        ? { lines: applyingLines(context), scroll: FIXED }
-        : doneLayout(state, context)
+    : state.screen === "settings"
+      ? { lines: settingsLines(state, context), scroll: FIXED }
+      : state.screen === "review"
+        ? reviewLayout(state, context)
+        : state.screen === "applying"
+          ? { lines: applyingLines(context), scroll: FIXED }
+          : doneLayout(state, context)
 
 /** How far the screen the state is on scrolls, for {@link press}. */
 export const scrollOf = (state: State, context: Context): Scroll => layoutOf(state, context).scroll

@@ -1,6 +1,10 @@
 import { Effect, Schema } from "effect"
 
 import { enabledPiProviders } from "../../../../core/src/pi/provider.ts"
+import {
+  checkBrowserExecutable,
+  discoverBrowsers,
+} from "../../../../core/src/setup/browser-discovery.ts"
 import { SetupProgress } from "../../../../core/src/setup/progress.ts"
 import {
   CAPABILITIES,
@@ -13,12 +17,19 @@ import { inCloudSession } from "../../vcs/identity.ts"
 import {
   type BrowsePair,
   type BrowsePlan,
+  type BrowseTarget,
   browseForProfile,
   browseReview,
   configureBrowse,
   pairBrowseOnTerminal,
   planBrowse,
 } from "../browse-setup.ts"
+import { BROWSE_EXTENSION_STORE } from "../browse.ts"
+import {
+  type CodexBrowserChoice,
+  detectCodexBrowserHandoff,
+  openCodexBrowserHandoff,
+} from "../codex-browser-handoff.ts"
 import type { Env } from "../environment.ts"
 import { describeForm, type FormChoice, inCi } from "../form.ts"
 import { type CapabilityChoices, loadPiConfigSource, piInUse } from "../pi-check.ts"
@@ -29,6 +40,7 @@ import { previewT3Settings, type T3Preview, type T3UnitPreview } from "../t3-set
 import { loadPackagedSetupTui, loadSetupTui, plain, TuiUnavailable } from "./load.ts"
 import {
   type Applied,
+  type BrowserOption,
   type CapabilityOffer,
   type Choices,
   type Offer,
@@ -233,7 +245,7 @@ export const reviewOf = (
         ? []
         : [
             choiceLine(
-              "Agent device access",
+              "T3 Device Simulator",
               choices.deviceAccess ? unit("deviceAccess") : undefined,
             ),
           ]),
@@ -263,7 +275,11 @@ export interface InteractiveOptions {
   /** Public setup loads the packaged renderer and stops if it fails. */
   readonly t3Workflow?: boolean
   /** Available only on public Pi setup; uses the runner that installed the public CLI. */
-  readonly browse?: { readonly packageRoot: string | undefined; readonly pair?: BrowsePair }
+  readonly browse?: {
+    readonly packageRoot: string | undefined
+    readonly executable?: string
+    readonly pair?: BrowsePair
+  }
   /** The form in force, which decides what each capability row says it installs. */
   readonly form: FormChoice
   /** Overrides the packaged or private renderer loader, for tests. */
@@ -287,6 +303,7 @@ export interface InteractiveOptions {
   /** Read-only preview and confirmed application of the public harness selections. */
   readonly combined?: {
     readonly codexHome?: string
+    readonly onlyCodex?: boolean
     readonly run: (
       target: "pi" | "claude" | "codex",
       choices: Choices,
@@ -326,6 +343,7 @@ const stopped = (reason: string, applyStarted = false): Interactive => ({
 
 const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessProperty: "error" })
 const BROWSE_HANDOFF = "OpenCode Browse: close this screen to "
+const CODEX_BROWSER_HANDOFF = "ChatGPT browser extension: close this screen to open "
 
 /**
  * Offers the capability switches and the T3 choices in the interface when Pi is in use (and setup
@@ -342,13 +360,16 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   if (options.undo || inCloudSession(options.env)) return line
   const fallbackReason = tuiFallbackReason(options)
   const combined = fallbackReason === undefined ? options.combined : undefined
-  const piUsed = yield* piInUse(options.env)
+  const onlyCodex = options.combined?.onlyCodex === true
+  const piUsed = onlyCodex ? false : yield* piInUse(options.env)
   if (!piUsed && combined === undefined) return line
   // Loaded once for the run: a config that cannot be read is reported by the line-based Pi steps,
   // which then run.
-  const source = yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(
-    Effect.orElseSucceed(() => undefined),
-  )
+  const source = onlyCodex
+    ? undefined
+    : yield* loadPiConfigSource(options.env, options.cwd, options.scope).pipe(
+        Effect.orElseSucceed(() => undefined),
+      )
   const config = source?.config
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config })
   const features =
@@ -367,16 +388,6 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   // With no T3 work the capability rows are all the screen would hold; a scripted run has nothing
   // to explain then, as before the rows existed.
   if (fallbackReason !== undefined) return preview === undefined ? line : fallback(fallbackReason)
-  const load =
-    options.load ??
-    (options.t3Workflow
-      ? () => loadPackagedSetupTui()
-      : (env, notify) => loadSetupTui(env, { notify }))
-  const loaded = yield* load(options.env, options.notify).pipe(
-    Effect.catchTag("TuiUnavailable", (error) => Effect.succeed(error)),
-  )
-  const fail = options.t3Workflow ? stopped : fallback
-  if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
   const initialSwitches = features === undefined ? {} : features
   const piAvailable = piUsed && config?.pi.enable === true
   const browse =
@@ -387,12 +398,90 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     offers.some(({ feature }) => feature === "browserUse")
       ? yield* planBrowse(options.env, options.browse.packageRoot)
       : undefined
-  const browseFor = (choices: Choices): BrowsePlan | undefined =>
-    browse !== undefined &&
-    choices.harnesses?.pi !== false &&
-    choices.capabilities["browserUse"] === true
-      ? browseForProfile(browse, choices.browseProfile ?? 0)
+  const desktopOptions = { cwd: options.cwd }
+  const detectDesktop = combined?.codexHome !== undefined && options.form.form === "normal"
+  const detected =
+    browse === undefined && !detectDesktop ? [] : yield* discoverBrowsers(options.env)
+  const explicit = options.browse?.executable
+  const manual =
+    browse === undefined || explicit === undefined
+      ? undefined
+      : yield* checkBrowserExecutable(options.env, explicit)
+  const browsers =
+    manual === undefined ? detected : [...detected.filter(({ id }) => id !== manual.id), manual]
+  const codexHandoff = detectDesktop
+    ? yield* detectCodexBrowserHandoff(options.env, detected, desktopOptions)
+    : undefined
+  const desktop = codexHandoff?.desktop
+  if (onlyCodex && desktop === undefined) return line
+  const load =
+    options.load ??
+    (options.t3Workflow
+      ? () => loadPackagedSetupTui()
+      : (env, notify) => loadSetupTui(env, { notify }))
+  const loaded = yield* load(options.env, options.notify).pipe(
+    Effect.catchTag("TuiUnavailable", (error) => Effect.succeed(error)),
+  )
+  const fail = options.t3Workflow ? stopped : fallback
+  if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
+  const requestedHandoff = (choices: Choices) =>
+    choices.harnesses?.codex === true && codexHandoff?.status === "candidate"
+      ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff)
       : undefined
+  const browserOptions: ReadonlyArray<BrowserOption> = browsers.map(
+    ({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }),
+  )
+  const selectedBrowsers = (choices: Choices) =>
+    browserOptions.filter(({ id }) => choices.browseBrowserIds?.includes(id))
+  const browseFor = (choices: Choices): BrowsePlan | undefined => {
+    if (
+      browse === undefined ||
+      choices.harnesses?.pi === false ||
+      choices.capabilities["browserUse"] !== true
+    )
+      return undefined
+    if (choices.browseBrowserIds === undefined)
+      return browseForProfile(browse, choices.browseProfile ?? 0)
+    const selected = selectedBrowsers(choices)
+    if (selected.length === 0) return undefined
+    const requested = browse.profiles?.[choices.browseProfile ?? -1]
+    const targets = selected.map(({ name, browseCompatibility }): BrowseTarget => {
+      if (browseCompatibility !== "supported")
+        return {
+          target: name,
+          next: "manual",
+          guidance: "compatibility is unverified; nothing will be started",
+        }
+      const profile =
+        requested?.browser === name
+          ? requested
+          : browse.profiles?.find(({ browser }) => browser === name)
+      const target = profile === undefined ? name : `${name}, ${profile.profile}`
+      if (profile?.extension === "enabled") {
+        if (browse.alreadyPaired === true)
+          return {
+            target,
+            next: "manual",
+            guidance: `keep existing pairings. Check browse pair --list, then run ${browse.command ?? "the official browse pair command"} only for a profile not yet paired`,
+          }
+        return { target, next: "pair" }
+      }
+      return {
+        target,
+        next: "extension",
+        guidance:
+          profile?.extension === "disabled"
+            ? "enable the existing Browse extension in this profile, then review setup again"
+            : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`,
+      }
+    })
+    const ready = targets.find(({ next }) => next === "pair")
+    return {
+      ...browse,
+      targets,
+      ...(ready === undefined ? {} : { next: "pair", target: ready.target }),
+    }
+  }
   const providerChoices =
     piAvailable &&
     config !== undefined &&
@@ -413,19 +502,16 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       : undefined
   const withProviderChanges = (choices: Choices): Choices => {
     const selection = choices.piProviders
-    return selection !== undefined &&
+    if (
+      selection !== undefined &&
       providerChoices !== undefined &&
       selection.providers.length === providerChoices.providers.length &&
       selection.providers.every((provider) => providerChoices.providers.includes(provider))
-      ? {
-          worktrees: choices.worktrees,
-          deviceAccess: choices.deviceAccess,
-          capabilities: choices.capabilities,
-          ...(choices.harnesses === undefined ? {} : { harnesses: choices.harnesses }),
-          ...(choices.browseSetup === undefined ? {} : { browseSetup: choices.browseSetup }),
-          ...(choices.browseProfile === undefined ? {} : { browseProfile: choices.browseProfile }),
-        }
-      : choices
+    ) {
+      const { piProviders: _unchanged, ...rest } = choices
+      return rest
+    }
+    return choices
   }
   const failedReport = (report: Report) =>
     new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed")
@@ -443,6 +529,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   let reviewSequence = 0
   let reviewedReplacement: string | undefined
   let stagedBrowse: BrowsePlan | undefined
+  let stagedHandoff: CodexBrowserChoice | undefined
   const replacementOf = (report: Report) =>
     report.lines.find((line) => line.startsWith("+ pi package: replace "))
   const input: TuiInput = {
@@ -453,9 +540,14 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         ? {}
         : {
             browse: {
-              state: plain(browse.state),
+              state: plain(
+                explicit !== undefined && manual === undefined
+                  ? `${browse.state}. The supplied browser executable could not be verified.`
+                  : browse.state,
+              ),
               ...(browse.action === undefined ? {} : { action: browse.action }),
               ...(browse.profiles === undefined ? {} : { profiles: browse.profiles }),
+              browsers: browserOptions,
             },
           }),
       ...(providerChoices === undefined ? {} : { providers: PiProvider.literals }),
@@ -466,12 +558,32 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               piAvailable,
               scope: options.scope,
               ...(combined.codexHome === undefined ? {} : { codexHome: combined.codexHome }),
+              ...(onlyCodex ? { onlyCodex: true } : {}),
+              ...(desktop === undefined
+                ? {}
+                : {
+                    codexDesktop: {
+                      name: desktop.name,
+                      ...(desktop.version === undefined ? {} : { version: desktop.version }),
+                      ...(codexHandoff?.status === "candidate"
+                        ? {
+                            extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
+                              id,
+                              name,
+                            })),
+                          }
+                        : {}),
+                    },
+                  }),
             },
           }),
     },
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
+      ...(browse?.action === undefined || initialSwitches["browserUse"] !== true
+        ? {}
+        : { browseSetup: true }),
       ...(providerChoices === undefined ? {} : { piProviders: providerChoices }),
       ...(combined === undefined
         ? {}
@@ -479,7 +591,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             harnesses: {
               pi: piAvailable,
               claude: false,
-              ...(combined.codexHome === undefined ? {} : { codex: false }),
+              ...(combined.codexHome === undefined ? {} : { codex: onlyCodex }),
             },
           }),
     },
@@ -493,13 +605,30 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             return yield* Effect.fail(noProvider())
           }
           const plan = browseFor(choices)
+          const selection = selectedBrowsers(choices)
+          const selectedNotes =
+            browse === undefined ||
+            choices.harnesses?.pi === false ||
+            choices.browseBrowserIds === undefined
+              ? []
+              : [
+                  hint(
+                    `Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name, browseCompatibility }) => (browseCompatibility === "supported" ? name : `${name} (compatibility unverified)`)).join(", ")}`,
+                  ),
+                  ...(plan === undefined
+                    ? [hint("OpenCode Browse: no compatible selected profile will be paired")]
+                    : []),
+                ]
           const browserReview =
-            plan === undefined
+            plan === undefined && selectedNotes.length === 0
               ? {}
               : {
-                  browse: browseReview(plan, choices.browseSetup === true, options.dryRun).map(
-                    plain,
-                  ),
+                  browse: [
+                    ...selectedNotes,
+                    ...(plan === undefined
+                      ? []
+                      : browseReview(plan, choices.browseSetup === true, options.dryRun)),
+                  ].map(plain),
                 }
           if (combined !== undefined) {
             const sequence = ++reviewSequence
@@ -511,11 +640,27 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               return yield* Effect.fail(new Error("Pi is not available for setup here."))
             if (targets.includes("codex") && combined.codexHome === undefined)
               return yield* Effect.fail(new Error("Codex setup is not available here."))
+            const handoff = requestedHandoff(choices)
             const changed = changedSwitches(initialSwitches, choices.capabilities)
             const plans = yield* Effect.forEach(targets, (target, index) =>
               combined
                 .run(target, withProviderChanges(choices), changed, true, index > 0, true)
-                .pipe(Effect.map((report) => ({ name: label(target), ...report }))),
+                .pipe(
+                  Effect.map((report) => ({
+                    name: label(target),
+                    ok: report.ok,
+                    lines: [
+                      ...report.lines,
+                      ...(target !== "codex" || handoff === undefined
+                        ? []
+                        : [
+                            hint(
+                              `ChatGPT browser extension: ${options.dryRun ? "would open" : "open"} OpenAI's setup guide in ${handoff.name} after closing. No extension or approval is applied by setup.`,
+                            ),
+                          ]),
+                    ],
+                  })),
+                ),
             )
             const error = plans.find((plan) => !plan.ok)
             if (error !== undefined)
@@ -586,6 +731,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       const chosen = withProviderChanges(choices)
       const plan = browseFor(choices)
       const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true
+      const handoff = requestedHandoff(choices)
       if (
         (combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) &&
         reviewedChoices !== choices
@@ -650,12 +796,25 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             )
         ).pipe(
           Effect.map((report): Applied => {
-            if (plan === undefined || plan.action === undefined) return report
+            if (report.ok && handoff !== undefined && !options.dryRun) stagedHandoff = handoff
+            const lines = [
+              ...report.lines,
+              ...(handoff === undefined || !report.ok
+                ? []
+                : [
+                    hint(
+                      options.dryRun
+                        ? `ChatGPT browser extension: would open OpenAI's guide in ${handoff.name}`
+                        : `${CODEX_BROWSER_HANDOFF}OpenAI's guide in ${handoff.name}`,
+                    ),
+                  ]),
+            ]
+            if (plan === undefined || plan.action === undefined) return { ok: report.ok, lines }
             if (report.ok && wantsBrowse && !options.dryRun) stagedBrowse = plan
             return {
               ok: report.ok,
               lines: [
-                ...report.lines,
+                ...lines,
                 ...(options.dryRun
                   ? browseReview(plan, wantsBrowse, true)
                   : !wantsBrowse
@@ -691,9 +850,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               ? yield* options
                   .notify(
                     plain(
-                      stagedBrowse.next === "pair"
-                        ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.`
-                        : "OpenCode Browse: verifying the pinned CLI.",
+                      stagedBrowse.targets !== undefined && stagedBrowse.next === "pair"
+                        ? "OpenCode Browse: verifying the pinned CLI, then pairing the reviewed profiles one at a time."
+                        : stagedBrowse.next === "pair"
+                          ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.`
+                          : "OpenCode Browse: verifying the pinned CLI.",
                     ),
                   )
                   .pipe(
@@ -702,18 +863,33 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                         options.env,
                         stagedBrowse,
                         options.browse?.pair ?? pairBrowseOnTerminal,
+                        options.notify,
                       ),
                     ),
                   )
+              : { ok: true, lines: [] }
+          const finishedHandoff =
+            applied.ok && codexHandoff !== undefined && stagedHandoff !== undefined
+              ? yield* openCodexBrowserHandoff(
+                  options.env,
+                  codexHandoff,
+                  stagedHandoff.id,
+                  desktopOptions,
+                )
               : { ok: true, lines: [] }
           return {
             kind: options.t3Workflow === true ? "applied" : "done",
             report: {
               lines: [
-                ...applied.lines.filter((line) => !line.startsWith(hint(BROWSE_HANDOFF))),
+                ...applied.lines.filter(
+                  (line) =>
+                    !line.startsWith(hint(BROWSE_HANDOFF)) &&
+                    !line.startsWith(hint(CODEX_BROWSER_HANDOFF)),
+                ),
                 ...finishedBrowse.lines,
+                ...finishedHandoff.lines,
               ],
-              ok: applied.ok && finishedBrowse.ok,
+              ok: applied.ok && finishedBrowse.ok && finishedHandoff.ok,
             },
           }
         }

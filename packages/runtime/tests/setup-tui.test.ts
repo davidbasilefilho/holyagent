@@ -29,7 +29,7 @@ describe("the setup interface, choose screen", () => {
     expect(text).toContain("Enter select")
     expect(text).not.toContain("Space")
     expect(text).not.toContain("fixed")
-    expect(text).toContain("❯ Agent device access")
+    expect(text).toContain("❯ T3 Device Simulator")
     expect(text).toContain("New threads in worktrees")
     expect(text).toContain("[Review choices]")
   })
@@ -86,13 +86,80 @@ describe("the setup interface, choose screen", () => {
   test("omits unavailable T3 choices and keeps the review button", async () => {
     const screen = await shown({ width: 80, height: 24, device: undefined, worktrees: false })
     const text = screen.lines().join("\n")
-    expect(text).not.toContain("Agent device access")
+    expect(text).not.toContain("T3 Device Simulator")
     expect(text).not.toContain("worktrees")
     expect(text).toContain("❯ [Review choices]")
   })
 })
 
 describe("the setup interface, review and apply", () => {
+  test("verified Codex desktop shows two distinct browser paths and the external guide is opt-in", async () => {
+    const screen = await shown({
+      width: 88,
+      height: 22,
+      combined: true,
+      codexHome: "/isolated/profile",
+      codexDesktop: {
+        name: "ChatGPT desktop app",
+        version: "26.1120",
+        extensionBrowsers: [{ id: "edge", name: "Microsoft Edge" }],
+      },
+    })
+    await screen.keys("left", "enter")
+    expect(screen.lines().find(ROW("Codex In-App Browser"))).toContain("Built-in")
+    expect(screen.lines().find(ROW("ChatGPT browser extension"))).toContain("[ ] Skip")
+    await clickText(screen, "Codex In-App Browser")
+    expect(screen.lines().join("\n")).toContain("has its own profile")
+    await screen.keys("escape")
+    await clickText(screen, "ChatGPT browser extension")
+    expect(screen.lines().join("\n")).toContain("[x] Skip")
+    await clickText(screen, "Open official guide in Microsoft Edge")
+    await screen.keys("escape")
+    expect(screen.lines().find(ROW("ChatGPT browser extension"))).toContain("[x] Open guide")
+    expect(screen.applies).toHaveLength(0)
+    await screen.keys("end", "enter")
+    expect(screen.reviews[0]?.codexBrowserHandoff).toBe("edge")
+    expect(screen.applies).toHaveLength(0)
+  })
+
+  test("a native Codex CLI profile does not imply desktop browser controls", async () => {
+    const screen = await shown({
+      width: 80,
+      height: 24,
+      combined: true,
+      codexHome: "/isolated/profile",
+    })
+    await screen.keys("left", "enter")
+    expect(screen.lines().join("\n")).toContain("Configure Codex")
+    expect(screen.lines().join("\n")).not.toContain("Codex In-App Browser")
+    expect(screen.lines().join("\n")).not.toContain("ChatGPT browser extension")
+  })
+
+  test("named Codex setup starts on its own desktop controls and cannot switch harnesses", async () => {
+    const screen = await shown({
+      width: 80,
+      height: 24,
+      combined: true,
+      onlyCodex: true,
+      codexHome: "/isolated/profile",
+      codexDesktop: {
+        name: "ChatGPT desktop app",
+        extensionBrowsers: [{ id: "chrome", name: "Google Chrome" }],
+      },
+    })
+    const before = screen.lines()
+    expect(before.join("\n")).toContain("Codex In-App Browser")
+    expect(before.join("\n")).toContain("ChatGPT browser extension")
+    expect(before.join("\n")).not.toContain("change harness")
+    expect(before.join("\n")).not.toContain("Configure Pi")
+    await screen.keys("left", "right")
+    expect(screen.lines()).toEqual(before)
+    await screen.keys("end", "enter")
+    expect(screen.reviews[0]?.harnesses?.codex).toBe(true)
+    expect(screen.reviews[0]?.codexBrowserHandoff).toBeUndefined()
+    expect(screen.applies).toHaveLength(0)
+  })
+
   test("retains multiple harnesses and Pi providers by keyboard without applying", async () => {
     const screen = await shown({ width: 80, height: 30, combined: true })
     const initial = screen.lines().join("\n")
@@ -127,7 +194,7 @@ describe("the setup interface, review and apply", () => {
     expect(screen.reviews).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
     expect(screen.applies).toEqual([])
     await clickText(screen, "Back", true)
-    await clickText(screen, "Agent device access")
+    await clickText(screen, "T3 Device Simulator")
     await clickText(screen, "Review choices")
     await clickText(screen, "Apply", true)
     expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: false, capabilities: {} }])
@@ -152,7 +219,7 @@ describe("the setup interface, review and apply", () => {
     expect(text).toContain("/home/user/.t3/userdata/settings.json")
     expect(text).toContain("YOUR CHOICES")
     expect(text).toContain("+ Pi provider")
-    expect(text).toContain("- Agent device access       off; nothing written")
+    expect(text).toContain("- T3 Device Simulator       off; nothing written")
     expect(text).toContain("ALWAYS APPLIED")
     await screen.keys("pagedown")
     expect(screen.lines().join("\n")).toContain("= Branch naming             already set")
@@ -192,7 +259,7 @@ describe("the setup interface, review and apply", () => {
     const summary = screen.lines().join("\n")
     expect(summary).toContain("Setup finished.")
     expect(summary).toContain("WARNINGS\nbrowser-use")
-    expect(summary).not.toContain("setup harness")
+    expect(summary).toContain("STATUS\nsetup harness: pi")
     await screen.keys("d")
     expect(screen.lines().join("\n")).toContain(lines.join("\n"))
   })
@@ -210,7 +277,7 @@ describe("the setup interface, review and apply", () => {
     await screen.keys("end", "enter", "enter")
     const text = screen.lines().join("\n")
     expect(text).toContain("Setup finished with failures.")
-    expect(text).toContain("WARNINGS\nt3 settings")
+    expect(text).toContain("FAILURES\nt3 settings")
     expect(text).not.toContain("/t3/settings.json")
     await screen.keys("d")
     expect(screen.lines().join("\n")).toContain("! t3 settings: /t3/settings.json changed")
@@ -265,7 +332,7 @@ describe("the setup interface, review and apply", () => {
     expect(screen.lines().join("\n")).toContain("Reading what will change")
     await screen.keys("enter")
     expect(screen.lines()[3]).toBe("T3 CODE")
-    expect(screen.lines().join("\n")).toMatch(/Agent device access +\[ \] disabled/)
+    expect(screen.lines().join("\n")).toMatch(/T3 Device Simulator +\[ \] disabled/)
     release()
     await screen.settle()
     expect(screen.lines()[3]).toBe("T3 CODE")
@@ -363,16 +430,16 @@ describe("the setup interface, look", () => {
     expect(listing).toContain(`${TERMINAL_THEME.heading} bold "HolyAgent  ·  setup"`)
     expect(listing).toContain(`${TERMINAL_THEME.option} "↑/↓ or j/k focus`)
     expect(listing).toContain(`${TERMINAL_THEME.heading} bold "T3 CODE"`)
-    expect(listing).toContain(`${TERMINAL_THEME.focus} bold "❯ Agent device access`)
+    expect(listing).toContain(`${TERMINAL_THEME.focus} bold "❯ T3 Device Simulator`)
     expect(listing).toContain(`${TERMINAL_THEME.enabled} "[x] enabled"`)
     expect(listing).toContain(`${TERMINAL_THEME.hint} "Lets agents use the iOS simulator`)
     await screen.keys("enter")
     expect(spanListing(screen)).toContain(
-      `${TERMINAL_THEME.focus} bold "❯ Agent device access       [ ] disabled"`,
+      `${TERMINAL_THEME.focus} bold "❯ T3 Device Simulator       [ ] disabled"`,
     )
     await screen.keys("down")
     expect(spanListing(screen)).toContain(
-      `${TERMINAL_THEME.argument} "  Agent device access       [ ] disabled"`,
+      `${TERMINAL_THEME.argument} "  T3 Device Simulator       [ ] disabled"`,
     )
   })
 
@@ -386,8 +453,8 @@ describe("the setup interface, look", () => {
     const listing = spanListing(screen)
     expect(listing).not.toMatch(/#[0-9a-f]{6}/)
     expect(listing).toContain('default bold "HolyAgent  ·  setup"')
-    expect(listing).toContain('default bold "❯ Agent device access       [ ] disabled"')
-    expect(screen.lines().join("\n")).toMatch(/Agent device access +\[ \] disabled/)
+    expect(listing).toContain('default bold "❯ T3 Device Simulator       [ ] disabled"')
+    expect(screen.lines().join("\n")).toMatch(/T3 Device Simulator +\[ \] disabled/)
     await screen.keys("end", "enter", "pagedown")
     expect(spanListing(screen)).not.toMatch(/#[0-9a-f]{6}/)
     expect(screen.lines().join("\n")).toContain("+ Pi provider")
@@ -410,7 +477,7 @@ describe("the setup interface, look", () => {
     const lines = screen.lines()
     expect(lines[1]).toBe("↑/↓ or j/k focus   Enter select")
     expect(lines[2]).toBe("Esc cancel")
-    expect(lines.some((line) => line.includes("❯ Agent device access"))).toBe(true)
+    expect(lines.some((line) => line.includes("❯ T3 Device Simulator"))).toBe(true)
     expect(lines.some((line) => line.includes("New threads in worktrees"))).toBe(true)
     for (const line of lines) expect(cells(line)).toBeLessThanOrEqual(40)
     await screen.keys("end", "enter")

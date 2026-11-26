@@ -1,6 +1,6 @@
 import { type PiPackageName, piPackageSource } from "../config/pi-packages.ts"
 import type { Config, PiProvider, RouteChoice, RouteKey, Thinking } from "../config/schema.ts"
-import { PROVIDER_ROUTES } from "../config/schema.ts"
+import { defaultRootRoute, PROVIDER_ROUTES } from "../config/schema.ts"
 type PiFamily = "kimi-k3.1" | "gpt-6"
 import { APPLY_PATCH_TOOL } from "./codex/names.ts"
 import { CODEX_PROVIDER_ID, screenRoute } from "./codex/routes.ts"
@@ -151,20 +151,35 @@ const resolvedRoute = (
 }
 
 /**
- * The two Pi settings keys that legacy undo keeps or removes as a pair: a model id means something
- * only beside its provider, so a route's model next to a provider chosen by hand (or the reverse)
- * could name a model that provider lacks.
+ * The two Pi settings keys that undo keeps or removes as a pair: a model id means something only
+ * beside its provider, so a route's model next to a provider chosen by hand (or the reverse) could
+ * name a model that provider lacks.
  */
 export const ROOT_MODEL_PAIR: ReadonlyArray<string> = ["defaultProvider", "defaultModel"]
 
 /**
- * The root's route as the three keys Pi's settings hold for the model a session starts on:
- * `defaultProvider`, `defaultModel` and `defaultThinkingLevel`. Setup does not apply these.
+ * The root's initial Pi settings. If its configured provider is disabled, use the enabled
+ * provider's own root defaults for this profile. This is a startup choice only.
  */
 export const rootModelSettings = (config: Config) => {
-  const { provider, model, thinking } = routeModel(config, "root")
+  const configured = routeModel(config, "root")
+  const enabled = enabledPiProviders(config)
+  const [fallback] = enabled
+  if (fallback === undefined) return undefined
+  const {
+    provider,
+    model: id,
+    thinking,
+  } = enabled.some((candidate) => PROVIDERS[candidate].id === configured.provider)
+    ? configured
+    : resolvedRoute("root", fallback, defaultRootRoute(fallback, config.pi.profile), false)
+  const prefix = `${provider}/`
+  const model = id.startsWith(prefix) && id.length > prefix.length ? id.slice(prefix.length) : id
   return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking } as const
 }
+
+/** The native Pi startup setting keys, seeded as a single selection. */
+export const ROOT_MODEL_KEYS: ReadonlyArray<string> = [...ROOT_MODEL_PAIR, "defaultThinkingLevel"]
 
 /**
  * The model of a route as `@tintinweb/pi-subagents` takes it per call (the `model` of its `Agent`

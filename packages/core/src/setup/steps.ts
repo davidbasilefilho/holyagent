@@ -278,6 +278,9 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
                     "t3 settings",
                     installT3Settings(env, piOptions.cwd, {
                       dryRun: options.dryRun,
+                      ...(options.piProviders === undefined
+                        ? {}
+                        : { providers: options.piProviders }),
                       ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees }),
                       ...(options.deviceAccess === undefined
                         ? {}

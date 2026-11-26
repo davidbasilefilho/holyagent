@@ -177,8 +177,9 @@ interface BrowserDirectory {
 /**
  * The user-data folders of the Chromium-family browsers browse sets up, per platform, as browse
  * itself lays them out (a subset of its own table: Chrome and its channels, Chromium, Edge, Brave,
- * Opera and Vivaldi, and Arc on macOS). A browser that is not here is not scanned, and the report
- * says it scanned these.
+ * Opera, Vivaldi and Helium, and Arc on macOS). Helium for Windows uses the company and product
+ * paths from its installer, even though the executable is called chrome.exe. A profile found here
+ * is not evidence that the browser is installed or that Browse can connect to it.
  */
 export const browserDirectories = (
   env: Env,
@@ -196,6 +197,7 @@ export const browserDirectories = (
       ["Brave", "BraveSoftware/Brave-Browser"],
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
+      ["Helium", "net.imput.helium"],
       ["Arc", "Arc/User Data"],
     ].map(([name = "", folder = ""]) => ({ name, directory: join(support, folder) }))
   }
@@ -207,6 +209,7 @@ export const browserDirectories = (
       { name: "Microsoft Edge", directory: join(local, "Microsoft", "Edge", "User Data") },
       { name: "Brave", directory: join(local, "BraveSoftware", "Brave-Browser", "User Data") },
       { name: "Vivaldi", directory: join(local, "Vivaldi", "User Data") },
+      { name: "Helium", directory: join(local, "imput", "Helium", "User Data") },
       { name: "Opera", directory: join(roaming, "Opera Software", "Opera Stable") },
     ]
   }
@@ -222,6 +225,7 @@ export const browserDirectories = (
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"],
+    ["Helium", "net.imput.helium"],
   ].map(([name = "", folder = ""]) => ({ name, directory: join(config, folder) }))
 }
 

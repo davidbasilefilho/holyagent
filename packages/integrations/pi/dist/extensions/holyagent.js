@@ -9879,6 +9879,10 @@ var PROVIDER_ROUTES = {
   "kimi-coding-global": KIMI_ROUTES,
   "openai-codex": CODEX_ROUTES
 };
+var defaultRootRoute = (provider, profile) => {
+  const baseline = PROVIDER_ROUTES[provider].root;
+  return profile === "fast" && provider === "openai-codex" ? { ...baseline, model: "gpt-6.1-terra" } : baseline;
+};
 var route = () => defaulted(Struct({
   provider: optionalKey2(PiProvider),
   model: optionalKey2(ModelId),
@@ -9935,11 +9939,10 @@ var withProviderRoutes = (pi) => {
     (() => {
       const override = pi.routes[key];
       const provider = override.provider ?? (pi.providers?.length === 1 ? pi.providers[0] : pi.provider);
-      const baseline = PROVIDER_ROUTES[provider][key];
-      const profileModel = pi.profile === "fast" && key === "root" && provider === "openai-codex" ? "gpt-6.1-terra" : baseline.model;
+      const baseline = key === "root" ? defaultRootRoute(provider, pi.profile) : PROVIDER_ROUTES[provider][key];
       return {
         ...override.provider === undefined ? {} : { provider: override.provider },
-        model: override.model ?? profileModel,
+        model: override.model ?? baseline.model,
         thinking: override.thinking ?? baseline.thinking
       };
     })()
@@ -10821,6 +10824,22 @@ var resolvedRoute = (key, provider, row, screen) => {
   };
 };
 var ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
+var rootModelSettings = (config) => {
+  const configured = routeModel(config, "root");
+  const enabled = enabledPiProviders(config);
+  const [fallback] = enabled;
+  if (fallback === undefined)
+    return;
+  const {
+    provider,
+    model: id,
+    thinking
+  } = enabled.some((candidate) => PROVIDERS[candidate].id === configured.provider) ? configured : resolvedRoute("root", fallback, defaultRootRoute(fallback, config.pi.profile), false);
+  const prefix = `${provider}/`;
+  const model = id.startsWith(prefix) && id.length > prefix.length ? id.slice(prefix.length) : id;
+  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
+};
+var ROOT_MODEL_KEYS = [...ROOT_MODEL_PAIR, "defaultThinkingLevel"];
 var subagentModel = ({ provider, model }) => `${provider}/${model}`;
 var routedModels = (config) => Object.keys(config.pi.routes).map((key) => routeModel(config, key));
 var enabledPiProviders = (config) => [
@@ -14624,8 +14643,8 @@ var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
   return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
-var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
-var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
+var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, { text: unchangedSince });
+var replaceJsonObject = (path, value, options, snapshot) => gen2(function* () {
   const fs = yield* fileSystem;
   const exists = yield* fileOperation(path, "write", () => fs.stat(path).then(() => true, (error) => error.code === "ENOENT" ? false : Promise.reject(error)));
   const target = exists ? yield* fileOperation(path, "write", () => fs.realpath(path)) : path;
@@ -14643,7 +14662,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   return yield* gen2(function* () {
     if (mode !== undefined)
       yield* fileOperation(temporary, "write", () => fs.chmod(temporary, mode));
-    if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => fs.readFile(target, "utf8"))) !== unchangedSince) {
+    if (snapshot !== undefined && (yield* readJsonText(target)) !== snapshot.text) {
       yield* fileOperation(temporary, "remove", () => fs.rm(temporary, { force: true }));
       return false;
     }
@@ -14762,6 +14781,7 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Brave", "BraveSoftware/Brave-Browser"],
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
+      ["Helium", "net.imput.helium"],
       ["Arc", "Arc/User Data"]
     ].map(([name = "", folder = ""]) => ({ name, directory: join14(support, folder) }));
   }
@@ -14773,6 +14793,7 @@ var browserDirectories = (env, platform = process.platform) => {
       { name: "Microsoft Edge", directory: join14(local, "Microsoft", "Edge", "User Data") },
       { name: "Brave", directory: join14(local, "BraveSoftware", "Brave-Browser", "User Data") },
       { name: "Vivaldi", directory: join14(local, "Vivaldi", "User Data") },
+      { name: "Helium", directory: join14(local, "imput", "Helium", "User Data") },
       { name: "Opera", directory: join14(roaming, "Opera Software", "Opera Stable") }
     ];
   }
@@ -14786,7 +14807,8 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Microsoft Edge", "microsoft-edge"],
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
-    ["Vivaldi", "vivaldi"]
+    ["Vivaldi", "vivaldi"],
+    ["Helium", "net.imput.helium"]
   ].map(([name = "", folder = ""]) => ({ name, directory: join14(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
@@ -15802,6 +15824,8 @@ var KNOWN_FILES = [
 ];
 var AGENT_PREFIX = "~/.pi/agent/";
 var PI_PREFIX = "~/.pi/";
+var KIMI_SETTINGS = PROVIDERS["kimi-coding-global"].toolsFile;
+var kimiRegionDefault = (env, scope, config) => scope === "user" && config.pi.enable && config.pi.providers?.includes("kimi-coding-global") === true && firstNonEmpty2(env["KIMI_CODE_REGION"], env["KIMI_CODE_BASE_URL"], env["KIMI_BASE_URL"], env["KIMI_CODE_OAUTH_HOST"], env["KIMI_OAUTH_HOST"]) === undefined;
 var locate2 = (env, cwd, scope, logical) => {
   const project = scope !== "user";
   const home = homeDirectory2(env);
@@ -15833,6 +15857,12 @@ var planFor = (env, cwd, scope, config, form) => {
   for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
+  if (KIMI_SETTINGS !== undefined && kimiRegionDefault(env, scope, config))
+    byFile.set(KIMI_SETTINGS, [
+      ...byFile.get(KIMI_SETTINGS) ?? [],
+      ...leaves({ region: "global" })
+    ]);
+  const startupModel = leaves(rootModelSettings(config) ?? {});
   const targets = [];
   const unplaced = [];
   for (const [logical, all] of byFile) {
@@ -15845,24 +15875,28 @@ var planFor = (env, cwd, scope, config, form) => {
       file,
       global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
       all,
-      defaults: PACKAGE_DEFAULTS.get(logical)
+      defaults: PACKAGE_DEFAULTS.get(logical),
+      startupModel: logical === PI_SETTINGS_FILE ? startupModel : []
     });
   }
   return { targets, unplaced };
 };
-var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
+var resolveTarget = fn2("resolveToolSettingsTarget")(function* (env, target) {
   const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
-  const existing = yield* readJsonObject(target.file);
+  const { value: existing, text: unchangedSince } = yield* readJsonObjectSnapshot(target.file);
   const setIn = (content, key) => content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added";
   const setGlobally = (key) => setIn(global, key);
   const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
   const free = target.all.filter((key) => !setGlobally(key));
+  const startupNote = target.startupModel.length === 0 ? undefined : ROOT_MODEL_KEYS.some((key) => global?.[key] !== undefined) ? "kept the startup model preferences in your global file" : ROOT_MODEL_KEYS.some((key) => existing[key] !== undefined) ? "kept the existing startup model preferences" : (yield* readRecorded(env, target.file)).some(({ path }) => ROOT_MODEL_KEYS.includes(path.join("."))) ? "kept the startup model reset" : undefined;
   return {
     file: target.file,
     existing,
-    keys: free.filter((key) => !isDefault(key)),
+    unchangedSince,
+    keys: [...free.filter((key) => !isDefault(key)), ...startupNote ? [] : target.startupModel],
     atDefault: free.filter(isDefault).map(keyName),
-    atGlobal: target.all.filter(setGlobally).map(keyName)
+    atGlobal: target.all.filter(setGlobally).map(keyName),
+    startupNote
   };
 });
 var planAt = (env, cwd, scope, form, choices, providers) => loadPiConfig(env, cwd, scope, choices, providers).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
@@ -15874,7 +15908,7 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   const { dryRun } = options;
   const { file } = planned;
   yield* refuseLinks(options.cwd, options.scope, file, "write");
-  const target = yield* resolveTarget(planned);
+  const target = yield* resolveTarget(env, planned);
   const { merged, entries } = applyDefaults(target.existing, target.keys);
   const added = entries.filter((entry) => entry.status === "added");
   const kept = entries.filter((entry) => entry.status === "kept");
@@ -15882,7 +15916,12 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   if (added.length > 0 && !dryRun) {
     const names = new Set(added.map((entry) => entry.path));
     yield* readRecorded(env, file);
-    yield* writeJsonObject(file, merged);
+    if (planned.startupModel.length === 0)
+      yield* writeJsonObject(file, merged);
+    else if (!(yield* writeJsonObjectIfUnchanged(file, merged, target.unchangedSince)))
+      return yield* new SetupFailure({
+        message: `${file} changed while setup was working on it, so nothing was written. Run setup again`
+      });
     yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join(".")))).pipe(mapError2((error) => new SetupFailure({
       message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
     })));
@@ -15894,7 +15933,8 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
     ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
     ...kept.map((entry) => `kept ${entry.path} ${show3(entry.value)} (HolyAgent sets ${show3(entry.wanted)}; yours wins)`),
     ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
-    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
+    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`],
+    ...target.startupNote === undefined ? [] : [target.startupNote]
   ];
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
@@ -16020,7 +16060,7 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   for (const planned of plan.targets) {
     lines.push(...yield* gen2(function* () {
       yield* refuseLinks(cwd, scope, planned.file, "write");
-      const target = yield* resolveTarget(planned);
+      const target = yield* resolveTarget(env, planned);
       const missing = applyDefaults(target.existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
       return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
     }).pipe(catchTag2("SetupFailure", (error) => succeed6([
@@ -16424,7 +16464,7 @@ var T3_BRANCH_INSTRUCTIONS = "Name each branch by the repository's own branch na
 var label2 = "t3 settings";
 var needsNotice = (entry) => entry.status === "kept" && !(entry.path === "branchNamingMode" && (entry.value === "semantic" || entry.value === "static"));
 var restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false));
-var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+var writeSettings = (path, value, unchangedSince) => writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
 var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
@@ -16462,7 +16502,25 @@ var BALANCED = {
   pauseWhenClientLowPower: true,
   pauseWhenOnBattery: false
 };
-var units = (devices, worktrees) => [
+var startupModelRefusal = (existing, recorded) => {
+  const instances = existing["providerInstances"];
+  if (instances !== undefined && !isJsonObject(instances))
+    return "providerInstances is not an object";
+  const instance = instances?.["pi"];
+  if (instance !== undefined) {
+    if (!isJsonObject(instance))
+      return "providerInstances.pi is not an object";
+    if (instance["driver"] !== undefined && instance["driver"] !== "pi")
+      return "providerInstances.pi is another driver's instance";
+    const config = instance["config"];
+    if (instance["enabled"] === false || isJsonObject(config) && config["enabled"] === false)
+      return "the Pi provider instance is disabled";
+  }
+  if (existing["defaultModelSelection"] === undefined && recorded.some(({ path }) => path[0] === "defaultModelSelection"))
+    return "kept the startup model reset";
+  return;
+};
+var units = (devices, worktrees, root) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -16480,6 +16538,23 @@ var units = (devices, worktrees) => [
       return isJsonObject(config) && config["enabled"] === false ? "providerInstances.pi.config.enabled is false" : undefined;
     }
   },
+  ...root === undefined ? [] : [
+    {
+      name: "default model for new threads",
+      keys: [
+        {
+          path: ["defaultModelSelection"],
+          value: {
+            instanceId: "pi",
+            model: `${root.defaultProvider}/${root.defaultModel}`,
+            options: [{ id: "thinking", value: root.defaultThinkingLevel }]
+          },
+          default: null
+        }
+      ],
+      refuse: startupModelRefusal
+    }
+  ],
   ...devices ? [
     {
       name: "device access",
@@ -16563,7 +16638,7 @@ var units = (devices, worktrees) => [
 var unitOutcome = (existing, unit, recorded) => {
   if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole))
     return { status: "own" };
-  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing, recorded);
   return reason !== undefined ? { status: "left", reason } : { status: "keys", keys: unit.keys.filter((key) => !equals(key.value, key.default)) };
 };
 var wantedKeys = (existing, all, recorded = []) => {
@@ -16582,7 +16657,7 @@ var wantedKeys = (existing, all, recorded = []) => {
   return { keys, left, own };
 };
 var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
-  const config = options.config ?? (yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
+  const config = options.config ?? (yield* loadPiConfig(env, cwd, "user", undefined, options.providers).pipe(orElseSucceed2(() => {
     return;
   })));
   if (config === undefined || !config.pi.enable)
@@ -16602,7 +16677,7 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
   return {
     target: {
       file: t3SettingsFile(env),
-      units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+      units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees, rootModelSettings(config)),
       deviceNote,
       device: host,
       worktreesAllowed: config.pi.t3.worktrees
@@ -16740,7 +16815,8 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
           fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
         ];
     }
-    const { keys } = wantedKeys(value, wanted);
+    const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+    const { keys } = wantedKeys(value, wanted, recorded);
     const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
     return [
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
@@ -16848,6 +16924,7 @@ var setup = fn2("setup")(function* (env, options) {
       ...scope === "user" ? [
         phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
           dryRun: options.dryRun,
+          ...options.piProviders === undefined ? {} : { providers: options.piProviders },
           ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
           ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
         })), whenPiSaved)

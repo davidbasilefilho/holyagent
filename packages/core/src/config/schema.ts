@@ -136,6 +136,14 @@ export const PROVIDER_ROUTES: Readonly<
   "openai-codex": CODEX_ROUTES,
 }
 
+/** The provider's root default for the selected startup profile. */
+export const defaultRootRoute = (provider: PiProvider, profile: "normal" | "fast" | undefined) => {
+  const baseline = PROVIDER_ROUTES[provider].root
+  return profile === "fast" && provider === "openai-codex"
+    ? { ...baseline, model: "gpt-6.1-terra" }
+    : baseline
+}
+
 /**
  * One route-table row as a config file writes it: either key may be left out, and the selected
  * provider's table fills it (see `PiSection`), since the default depends on `pi.provider`.
@@ -272,14 +280,11 @@ const withProviderRoutes = (pi: typeof PiAsWritten.Type): typeof PiResolved.Enco
         const override = pi.routes[key]
         const provider =
           override.provider ?? (pi.providers?.length === 1 ? pi.providers[0] : pi.provider)
-        const baseline = PROVIDER_ROUTES[provider][key]
-        const profileModel =
-          pi.profile === "fast" && key === "root" && provider === "openai-codex"
-            ? "gpt-6.1-terra"
-            : baseline.model
+        const baseline =
+          key === "root" ? defaultRootRoute(provider, pi.profile) : PROVIDER_ROUTES[provider][key]
         return {
           ...(override.provider === undefined ? {} : { provider: override.provider }),
-          model: override.model ?? profileModel,
+          model: override.model ?? baseline.model,
           thinking: override.thinking ?? baseline.thinking,
         }
       })(),

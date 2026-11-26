@@ -3330,33 +3330,49 @@ var resultHeadline = (ok, dryRun) => {
     return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
   return ok ? "Setup finished." : "Setup finished with failures.";
 };
+var setupNotice = (line) => {
+  if (/^= (?:pi package|Pi model providers|Codex plugin): /i.test(line))
+    return "status";
+  if (!line.startsWith("~ "))
+    return;
+  const detail = line.slice(2);
+  if (/^(?:scope|form|setup harness|Codex home|Startup): /i.test(detail))
+    return "status";
+  if (/^(?:Start Codex with this CODEX_HOME\b|Restart (?:T3 Code|Pi|Codex)\b|OpenCode Browse: close this screen to )/i.test(detail))
+    return "next";
+  return "warning";
+};
 var summarizeResult = (result, dryRun) => {
-  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
-  const warnings = [
-    ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
-  ];
+  const linesOf = (kind) => result.lines.filter((line) => setupNotice(line) === kind);
+  const status = linesOf("status").map((line) => line.slice(2));
+  const failures = subjects(result.lines, "! ");
+  const warnings = subjects(linesOf("warning"), "~ ");
+  const next = linesOf("next").map((line) => line.slice(2));
+  if (!result.ok)
+    next.push("Check the failures in the full report before running setup again.");
+  else if (warnings.length > 0)
+    next.push("Check the warnings in the full report.");
   return [
     {
       title: dryRun ? "Planned changes" : "Changes",
       lines: changes.length === 0 ? ["No changes."] : changes
     },
+    ...status.length > 0 ? [{ title: "Status", lines: status }] : [],
+    ...failures.length > 0 ? [{ title: "Failures", lines: failures }] : [],
     ...warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : [],
-    ...warnings.length > 0 || !result.ok ? [
-      {
-        title: "Next steps",
-        lines: [
-          result.ok ? "Check the warnings in the full report." : "Check the failures in the full report before running setup again."
-        ]
-      }
-    ] : []
+    ...next.length > 0 ? [{ title: "Next steps", lines: next }] : []
   ];
 };
 
+var FORMAT_CHARACTERS = /\p{Cf}/gu;
+var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join("");
 var segmenter = new Intl.Segmenter;
 var cells = (text) => Bun.stringWidth(text);
 var graphemes = (text) => Array.from(segmenter.segment(text), (part) => part.segment);
@@ -3882,16 +3898,17 @@ var lookFor = (env, background = "dark") => ({
 var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193", horizontalArrows: "\u2190/\u2192" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down", horizontalArrows: "</>" };
 
 var CAPABILITY_ROW = "capability:";
-var BROWSE_ROW = "capability:browseSetup";
-var BROWSE_PROFILE = "capability:browseProfile";
+var BROWSER_USE = "capability:browserUse";
 var tabs = ["pi", "claude", "codex"];
 var tabLabels = { pi: "Pi", claude: "Claude Code", codex: "Codex" };
 var LABELS = {
-  deviceAccess: "Agent device access",
+  deviceAccess: "T3 Device Simulator",
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
   enableClaude: "Configure Claude Code",
-  enableCodex: "Configure Codex"
+  enableCodex: "Configure Codex",
+  codexInAppBrowser: "Codex In-App Browser",
+  codexBrowserExtension: "ChatGPT browser extension"
 };
 var capabilityOf = (row, offer) => row.startsWith(CAPABILITY_ROW) ? offer.capabilities.find((capability) => capability.feature === row.slice(CAPABILITY_ROW.length)) : undefined;
 var providerName = {
@@ -3900,10 +3917,8 @@ var providerName = {
 };
 var providerOf = (row, offer) => offer.providers?.find((provider) => row === `provider:${provider}`);
 var labelOf = (row, offer) => {
-  if (row === BROWSE_ROW)
-    return "OpenCode Browse setup";
-  if (row === BROWSE_PROFILE)
-    return "Browse browser profile";
+  if (row === BROWSER_USE && offer.browse !== undefined)
+    return "Browser Use";
   const provider = providerOf(row, offer);
   if (provider !== undefined)
     return providerName[provider];
@@ -3913,7 +3928,13 @@ var rowsOf = (offer, state) => {
   const selected = state?.choices.harnesses;
   if (selected !== undefined && offer.harnesses !== undefined) {
     if (state?.tab === "codex")
-      return offer.harnesses.codexHome === undefined ? [] : ["enableCodex"];
+      return offer.harnesses.codexHome === undefined ? [] : [
+        ...offer.harnesses.onlyCodex === true ? [] : ["enableCodex"],
+        ...selected.codex !== true || offer.harnesses.codexDesktop === undefined ? [] : [
+          "codexInAppBrowser",
+          ...(offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) > 0 ? ["codexBrowserExtension"] : []
+        ]
+      ];
     if (state?.tab === "claude")
       return ["enableClaude"];
     if (!offer.harnesses.piAvailable)
@@ -3926,16 +3947,12 @@ var rowsOf = (offer, state) => {
     ...(offer.providers ?? []).map((provider) => `provider:${provider}`),
     ...offer.t3 && offer.device !== undefined ? ["deviceAccess"] : [],
     ...offer.t3 && offer.worktrees ? ["worktrees"] : [],
-    ...offer.capabilities.flatMap((capability) => [
-      `${CAPABILITY_ROW}${capability.feature}`,
-      ...capability.feature === "browserUse" && state?.choices.capabilities["browserUse"] === true && offer.browse?.action !== undefined ? [BROWSE_ROW] : [],
-      ...capability.feature === "browserUse" && state?.choices.capabilities["browserUse"] === true && state.choices.browseSetup === true && (offer.browse?.profiles?.length ?? 0) > 0 ? [BROWSE_PROFILE] : []
-    ])
+    ...offer.capabilities.map((capability) => `${CAPABILITY_ROW}${capability.feature}`)
   ];
 };
-var initialState = (choices) => ({
+var initialState = (choices, onlyCodex = false) => ({
   screen: "choose",
-  tab: "pi",
+  tab: onlyCodex ? "codex" : "pi",
   focus: 0,
   action: 0,
   scroll: 0,
@@ -3959,8 +3976,6 @@ var toggleProvider = (choices, id) => {
   return { ...choices, piProviders: { providers } };
 };
 var toggled = (choices, row) => {
-  if (row === BROWSE_ROW)
-    return { ...choices, browseSetup: choices.browseSetup !== true };
   if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
     return toggleProvider(choices, row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global");
   if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude" || row === "enableCodex")) {
@@ -3980,6 +3995,109 @@ var toggled = (choices, row) => {
     ...feature === "browserUse" && choices.capabilities[feature] === true ? { browseSetup: false } : {}
   };
 };
+var settingsFor = (row, offer) => {
+  if (row === BROWSER_USE && offer?.browse !== undefined)
+    return "browser-use";
+  if (row === "codexInAppBrowser")
+    return "codex-iab";
+  if (row === "codexBrowserExtension")
+    return "codex-extension";
+  return;
+};
+var browserOptions = (offer) => offer?.browse?.browsers ?? [];
+var extensionBrowsers = (offer) => offer?.harnesses?.codexDesktop?.extensionBrowsers ?? [];
+var selectedProfiles = (choices, offer) => {
+  const ids = choices.browseBrowserIds;
+  const profiles = (offer?.browse?.profiles ?? []).map((profile, index) => ({ ...profile, index }));
+  if (ids === undefined)
+    return profiles;
+  const names = browserOptions(offer).filter(({ id }) => ids.includes(id)).map(({ name }) => name);
+  return profiles.filter(({ browser }) => names.includes(browser));
+};
+var settingsOptions = (state, offer) => state.settings === "codex-extension" ? [
+  "extension-skip",
+  ...extensionBrowsers(offer).map(({ id }) => `extension:${id}`),
+  "back"
+] : state.settings === "browser-selection" ? [
+  ...browserOptions(offer).map(({ id }) => `browser:${id}`),
+  "confirm",
+  "back"
+] : state.settings === "browser-use" ? [
+  ...offer?.browse?.action === undefined ? [] : ["configure", "skip"],
+  ...browserOptions(offer).length > 0 ? ["browsers"] : [],
+  ...selectedProfiles(state.choices, offer).length > 0 ? ["profile"] : [],
+  "capability",
+  "back"
+] : ["back"];
+var settingsBack = (state, offer) => {
+  if (state.settings === "browser-selection") {
+    const parent = { ...state, settings: "browser-use" };
+    return { ...parent, action: Math.max(0, settingsOptions(parent, offer).indexOf("browsers")) };
+  }
+  return { ...state, screen: "choose", action: 0 };
+};
+var selectSetting = (state, option, offer) => {
+  if (option === "back")
+    return settingsBack(state, offer);
+  const choices = state.choices;
+  if (option === "extension-skip") {
+    const { codexBrowserHandoff: _previous, ...kept } = choices;
+    return { ...state, choices: kept };
+  }
+  if (option.startsWith("extension:")) {
+    const id = option.slice("extension:".length);
+    return extensionBrowsers(offer).some((entry) => entry.id === id) ? { ...state, choices: { ...choices, codexBrowserHandoff: id } } : state;
+  }
+  if (option === "browsers")
+    return {
+      ...state,
+      settings: "browser-selection",
+      action: 0,
+      browserDraft: choices.browseBrowserIds ?? []
+    };
+  if (option === "confirm") {
+    const selected = { ...choices, browseBrowserIds: state.browserDraft ?? [] };
+    const profile = selectedProfiles(selected, offer).find(({ index }) => index === choices.browseProfile) ?? selectedProfiles(selected, offer)[0];
+    return settingsBack({
+      ...state,
+      choices: {
+        ...selected,
+        ...profile === undefined ? {} : { browseProfile: profile.index }
+      }
+    }, offer);
+  }
+  if (option.startsWith("browser:")) {
+    const id = option.slice("browser:".length);
+    const candidate = browserOptions(offer).find((entry) => entry.id === id);
+    if (candidate === undefined || candidate.browseCompatibility === "unsupported")
+      return state;
+    const marked = state.browserDraft ?? [];
+    return {
+      ...state,
+      browserDraft: marked.includes(id) ? marked.filter((entry) => entry !== id) : [...marked, id]
+    };
+  }
+  if (option === "configure")
+    return {
+      ...state,
+      choices: {
+        ...choices,
+        capabilities: { ...choices.capabilities, browserUse: true },
+        browseSetup: true
+      }
+    };
+  if (option === "skip")
+    return { ...state, choices: { ...choices, browseSetup: false } };
+  if (option === "capability")
+    return { ...state, choices: toggled(choices, BROWSER_USE) };
+  const profiles = selectedProfiles(choices, offer);
+  const index = profiles.findIndex(({ index }) => index === (choices.browseProfile ?? 0));
+  const profile = profiles[wrapped(index, 1, Math.max(1, profiles.length))];
+  return {
+    ...state,
+    choices: profile === undefined ? choices : { ...choices, browseProfile: profile.index }
+  };
+};
 var pagedBy = (state, key, scroll) => {
   if (key.ctrl)
     return;
@@ -3989,11 +4107,11 @@ var pagedBy = (state, key, scroll) => {
   const from = Math.min(state.scroll, scroll.max);
   return { ...state, scroll: Math.min(scroll.max, Math.max(0, from + direction * scroll.page)) };
 };
-var press = (state, rows, key, scroll = { page: 1, max: 0 }, browseProfiles = 0) => {
+var press = (state, rows, key, scroll = { page: 1, max: 0 }, offer) => {
   if (state.screen === "choose") {
     if (isQuit(key))
       return { state, command: "cancel" };
-    if (state.choices.harnesses !== undefined && !key.ctrl && (key.name === "left" || key.name === "right")) {
+    if (state.choices.harnesses !== undefined && offer?.harnesses?.onlyCodex !== true && !key.ctrl && (key.name === "left" || key.name === "right")) {
       const tab = tabs[wrapped(tabs.indexOf(state.tab), key.name === "left" ? -1 : 1, tabs.length)];
       return { state: { ...state, tab: tab ?? state.tab, focus: 0 } };
     }
@@ -4004,17 +4122,22 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, browseProfiles = 0)
       return { state: { ...state, focus: wrapped(state.focus, step, rows.length + 1) } };
     if (isEnter(key) && !key.ctrl) {
       const row = rows[state.focus];
-      if (row !== undefined)
+      if (row !== undefined) {
+        const settings = settingsFor(row, offer);
+        if (settings !== undefined) {
+          const opened = { ...state, screen: "settings", settings, action: 0 };
+          const preferred = settings === "codex-extension" ? state.choices.codexBrowserHandoff === undefined ? "extension-skip" : `extension:${state.choices.codexBrowserHandoff}` : state.choices.browseSetup === true ? "configure" : "skip";
+          const focus = settingsOptions(opened, offer).indexOf(preferred);
+          return { state: { ...opened, action: Math.max(0, focus) } };
+        }
         return {
           state: {
             ...state,
             focus: row === "enablePi" ? 0 : state.focus,
-            choices: row === BROWSE_PROFILE ? {
-              ...state.choices,
-              browseProfile: ((state.choices.browseProfile ?? 0) + 1) % Math.max(1, browseProfiles)
-            } : toggled(state.choices, row)
+            choices: toggled(state.choices, row)
           }
         };
+      }
       return {
         state: {
           ...state,
@@ -4026,6 +4149,35 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, browseProfiles = 0)
         },
         command: "review"
       };
+    }
+    return { state };
+  }
+  if (state.screen === "settings") {
+    if (key.ctrl && key.name === "c")
+      return { state, command: "cancel" };
+    if (key.name === "escape" || !key.ctrl && key.name === "backspace")
+      return { state: settingsBack(state, offer) };
+    const options = settingsOptions(state, offer);
+    const step = stepOf(key);
+    if (step !== 0)
+      return { state: { ...state, action: wrapped(state.action, step, options.length) } };
+    if (!key.ctrl && key.name === "end")
+      return {
+        state: {
+          ...state,
+          action: options.length - (state.settings === "browser-selection" ? 2 : 1)
+        }
+      };
+    if (state.settings === "browser-selection" && !key.ctrl && (key.name === "space" || key.name === " ")) {
+      const option = options[state.action];
+      return {
+        state: option?.startsWith("browser:") ? selectSetting(state, option, offer) : state
+      };
+    }
+    if (!key.ctrl && isEnter(key)) {
+      const option = options[state.action];
+      if (option !== undefined)
+        return { state: selectSetting(state, option, offer) };
     }
     return { state };
   }
@@ -4060,13 +4212,17 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, browseProfiles = 0)
     return { state: { ...state, details: !state.details, scroll: 0 } };
   return isQuit(key) || isEnter(key) ? { state, command: "close" } : { state };
 };
-var pressControl = (state, rows, control, scroll = FIXED, browseProfiles = 0) => {
-  const key = (name, from = state) => press(from, rows, { name, ctrl: false }, FIXED, browseProfiles);
+var pressControl = (state, rows, control, scroll = FIXED, offer) => {
+  const key = (name, from = state) => press(from, rows, { name, ctrl: false }, FIXED, offer);
   if (typeof control === "object") {
     if ("tab" in control)
-      return state.screen === "choose" && state.choices.harnesses !== undefined ? { state: { ...state, tab: control.tab, focus: 0 } } : { state };
+      return state.screen === "choose" && state.choices.harnesses !== undefined && offer?.harnesses?.onlyCodex !== true ? { state: { ...state, tab: control.tab, focus: 0 } } : { state };
     if ("scrollTo" in control)
       return (state.screen === "review" || state.screen === "done") && scroll.max > 0 ? { state: { ...state, scroll: Math.min(scroll.max, Math.max(0, control.scrollTo)) } } : { state };
+    if ("settingsOption" in control) {
+      const action = settingsOptions(state, offer).indexOf(control.settingsOption);
+      return state.screen === "settings" && action >= 0 ? key("enter", { ...state, action }) : { state };
+    }
     if ("row" in control) {
       const focus = rows.indexOf(control.row);
       return state.screen === "choose" && focus >= 0 ? key("enter", { ...state, focus }) : { state };
@@ -4117,17 +4273,17 @@ var chooseKeys = (focus, width) => wrapItems([focus, "Enter select", "Esc cancel
 var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
-var hintOf = (row, offer, choices) => {
-  if (row === BROWSE_ROW)
-    return `${offer.browse?.state ?? ""}. Choose ${offer.browse?.action ?? "Configure"} or Skip.`;
-  if (row === BROWSE_PROFILE) {
-    const profile = offer.browse?.profiles?.[choices.browseProfile ?? 0];
-    return `Selected: ${profile === undefined ? "none" : `${profile.browser}, ${profile.profile}`}. Press Enter or click to cycle through detected profiles.`;
-  }
+var hintOf = (row, offer) => {
+  if (row === BROWSER_USE && offer.browse !== undefined)
+    return "Open settings to configure OpenCode Browse.";
   if (row === "enablePi")
     return "Include Pi and T3 Code in the combined review.";
   if (row === "enableCodex")
     return "Prepare the native plugin and startup settings in a dedicated Codex home.";
+  if (row === "codexInAppBrowser")
+    return "See where to use the built-in desktop browser without changing any settings.";
+  if (row === "codexBrowserExtension")
+    return "Choose whether to open the official guide for your existing browser profile.";
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review.";
   if (providerOf(row, offer) !== undefined)
@@ -4143,13 +4299,12 @@ var hintOf = (row, offer, choices) => {
 };
 var isOn = (row, choices) => row === "enablePi" ? choices.harnesses?.pi === true : row === "enableCodex" ? choices.harnesses?.codex === true : row === "enableClaude" ? choices.harnesses?.claude === true : row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
 var checkbox = (row, choices, offer) => {
-  if (row === BROWSE_ROW)
-    return choices.browseSetup === true ? { box: "[x]", word: offer.browse?.action ?? "Configure" } : { box: "[ ]", word: "Skip" };
-  if (row === BROWSE_PROFILE) {
-    const profiles = offer.browse?.profiles ?? [];
-    const index = choices.browseProfile ?? 0;
-    return { box: `${index + 1}/${profiles.length}`, word: "selected" };
-  }
+  if (row === "codexInAppBrowser")
+    return { box: "", word: "Built-in" };
+  if (row === "codexBrowserExtension")
+    return choices.codexBrowserHandoff === undefined ? { box: "[ ]", word: "Skip" } : { box: "[x]", word: "Open guide" };
+  if (row === BROWSER_USE && offer.browse?.action !== undefined)
+    return choices.browseSetup === true ? { box: "[x]", word: offer.browse.action } : { box: "[ ]", word: "Skip" };
   const provider = providerOf(row, offer);
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider))
@@ -4167,7 +4322,7 @@ var chooseLines = (state, context) => {
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = cells("[ ] disabled");
+  const valueWidth = cells(offer.browse?.action === "Configure" ? "[x] Configure" : "[ ] disabled");
   const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
@@ -4196,7 +4351,7 @@ var chooseLines = (state, context) => {
   ];
   const focused = rows[state.focus];
   const combined = state.choices.harnesses;
-  const tabsLine = combined === undefined ? [] : [
+  const tabsLine = combined === undefined || offer.harnesses?.onlyCodex === true ? [] : [
     tabs.flatMap((tab) => [
       {
         text: ` ${tabLabels[tab]} `,
@@ -4225,9 +4380,77 @@ var chooseLines = (state, context) => {
     ...unavailable === undefined ? [] : choiceHint(unavailable),
     ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
     ...state.tab === "codex" && offer.harnesses?.codexHome !== undefined ? choiceHint(`Profile: ${offer.harnesses.codexHome}`) : [],
-    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices)),
+    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer)),
     ...choiceHint(`Environment: ${offer.form}`)
   ];
+};
+var settingsLines = (state, context) => {
+  const { width, look, offer } = context;
+  const g = glyphs(look);
+  const profile = offer.browse?.profiles?.[state.choices.browseProfile ?? 0];
+  const picker = state.settings === "browser-selection";
+  const nativeBrowser = state.settings === "codex-iab";
+  const browserExtension = state.settings === "codex-extension";
+  const enabled = state.choices.capabilities["browserUse"] === true;
+  const configure = state.choices.browseSetup === true && enabled;
+  const candidates = browserOptions(offer);
+  const picked = state.choices.browseBrowserIds;
+  const selected = candidates.filter(({ id }) => picked?.includes(id)).map(({ name }) => name);
+  const box = (checked) => checked ? "[x]" : "[ ]";
+  const optionText = (option) => {
+    if (option === "extension-skip")
+      return `${box(state.choices.codexBrowserHandoff === undefined)} Skip`;
+    if (option.startsWith("extension:")) {
+      const id = option.slice("extension:".length);
+      const candidate = extensionBrowsers(offer).find((entry) => entry.id === id);
+      return `${box(state.choices.codexBrowserHandoff === id)} Open official guide in ${candidate?.name ?? ""}`;
+    }
+    if (option === "configure")
+      return `${box(configure)} ${offer.browse?.action ?? "Configure"}`;
+    if (option === "skip")
+      return `${box(!configure)} Skip`;
+    if (option === "browsers")
+      return `Browsers: ${picked === undefined ? "Automatic profile" : selected.join(", ") || "None selected"}`;
+    if (option === "profile")
+      return `Browser profile: ${profile === undefined ? "automatic" : `${profile.browser}, ${profile.profile}`}`;
+    if (option === "capability")
+      return `${box(enabled)} Allow Browser Use for visual specialists`;
+    if (option === "confirm")
+      return "Done";
+    if (option.startsWith("browser:")) {
+      const candidate = candidates.find(({ id }) => id === option.slice("browser:".length));
+      if (candidate !== undefined) {
+        const availability = candidate.browseCompatibility === "unsupported" ? " \u2014 not supported by Browse" : candidate.browseCompatibility === "unverified" ? " \u2014 compatibility unverified" : "";
+        return `${box(state.browserDraft?.includes(candidate.id) === true)} ${candidate.name}${availability}`;
+      }
+    }
+    return "Back";
+  };
+  const options = settingsOptions(state, offer).map((option, index) => ({ option, index }));
+  const shortcuts = keyLines([`${g.arrows} or j/k focus`, ...picker ? ["Space mark"] : [], "Enter select", "Esc back"], width);
+  const capacity = Math.max(1, context.height - shortcuts.length - 9);
+  const start = Math.max(0, Math.min(candidates.length - capacity, state.action - capacity + 1));
+  const visible = picker ? [...options.slice(0, -2).slice(start, start + capacity), ...options.slice(-2)] : options;
+  const optionLines = ({ option, index }) => (picker ? [clip(optionText(option), width - 2, g.ellipsis)] : wrap(optionText(option), width - 2)).map((part, line) => [
+    {
+      text: `${line === 0 && index === state.action ? g.focus : " "} ${part}`,
+      tone: index === state.action ? "focus" : "option",
+      click: { settingsOption: option }
+    }
+  ]);
+  const controls = [
+    ...shortcuts,
+    blank,
+    ...heading(picker ? "Select browsers" : nativeBrowser ? "Codex In-App Browser" : browserExtension ? "ChatGPT browser extension" : "Browser Use", width),
+    ...visible.flatMap(optionLines)
+  ];
+  const hint = picker ? hintLines("Mark any number. Done keeps the selection. Back discards these edits.", width) : nativeBrowser ? hintLines("Use @Browser in the ChatGPT desktop app. The built-in browser has its own profile, and setup does not change its permissions.", width) : browserExtension ? hintLines("Open OpenAI\u2019s installation guide only after you review and apply. The extension connects your existing browser profile. Setup does not install it or grant access.", width) : [
+    ...hintLines("OpenCode Browse connects a selected Chromium-family browser profile. Each browser needs its own extension and pairing.", width),
+    ...offer.browse === undefined ? [] : hintLines(offer.browse.state, width),
+    ...hintLines("Nothing runs here. Review all choices before applying setup.", width)
+  ];
+  const room = Math.max(0, context.height - controls.length - 2);
+  return [...controls, ...room === 0 ? [] : [blank, ...hint.slice(0, room)]];
 };
 var MARK_TONES = {
   "+": "success",
@@ -4466,7 +4689,7 @@ var applyingLines = (context) => {
     ...phase?.activity === undefined ? [] : wrap(phase.activity, context.width).map((part) => [segment(part, "hint")])
   ];
 };
-var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? { lines: applyingLines(context), scroll: FIXED } : doneLayout(state, context);
+var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "settings" ? { lines: settingsLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? { lines: applyingLines(context), scroll: FIXED } : doneLayout(state, context);
 var scrollOf = (state, context) => layoutOf(state, context).scroll;
 var view = (state, context) => [title(context.look), ...layoutOf(state, context).lines].map((line) => fitLine(line, context.width, glyphs(context.look).ellipsis));
 
@@ -4486,7 +4709,7 @@ var SetupApp = (props) => {
   const dimensions = useTerminalDimensions();
   const look = lookFor(props.input.env, props.background);
   const palette = paletteOf(look);
-  const [state, setState] = createSignal(initialState(props.input.initial));
+  const [state, setState] = createSignal(initialState(props.input.initial, props.input.offer.harnesses?.onlyCodex === true));
   const [progress, setProgress] = createSignal();
   const [elapsedSeconds, setElapsedSeconds] = createSignal(0);
   const abort = new AbortController;
@@ -4572,7 +4795,7 @@ var SetupApp = (props) => {
   const keypress = (key) => {
     const before = state();
     const current = context();
-    advance(before, press(before, current.rows, key, scrollOf(before, current), current.offer.browse?.profiles?.length));
+    advance(before, press(before, current.rows, key, scrollOf(before, current), current.offer));
   };
   useKeyboard((event) => keypress({
     name: event.name,
@@ -4610,7 +4833,7 @@ var SetupApp = (props) => {
           pointer = undefined;
           const before = state();
           if (event.button === 0 && down !== undefined && down.x === event.x && down.y === event.y && down.state === before)
-            advance(before, pressControl(before, context().rows, down.control, scrollOf(before, context()), props.input.offer.browse?.profiles?.length));
+            advance(before, pressControl(before, context().rows, down.control, scrollOf(before, context()), props.input.offer));
         });
         _$insert(_el$2, (() => {
           var _c$ = _$memo(() => line.length === 0);
@@ -4690,6 +4913,30 @@ var detectBackground = (env, renderer, timeoutMs = BACKGROUND_TIMEOUT_MS) => {
   return tryPromise2(() => renderer.waitForThemeMode(timeoutMs)).pipe(timeout2(timeoutMs + 50), map2((mode) => mode === "light" ? "light" : "dark"), catch_2(() => succeed4("dark")));
 };
 
+import { pathToFileURL } from "url";
+import { bold, fg, link, t, TextAttributes } from "@opentui/core";
+var renderTerminalOutput = ({ env, lines }) => {
+  const look = lookFor(env, backgroundFromColorfgbg(env));
+  const palette = paletteOf(look);
+  return lines.map(({ text, tone, reportFile }) => {
+    const visible = plain(text);
+    if (!look.color || visible === "")
+      return visible;
+    const colored = fg(palette[tone])(visible);
+    const chunk = BOLD_TONES.has(tone) ? bold(colored) : colored;
+    const styled = t`${reportFile === undefined ? chunk : link(pathToFileURL(reportFile).href)(chunk)}`;
+    return styled.chunks.map(({ text, fg, attributes, link }) => {
+      if (text === "" || fg === undefined)
+        return text;
+      const [r, g, b] = fg.toInts();
+      const weight = ((attributes ?? 0) & TextAttributes.BOLD) !== 0 ? "1;" : "";
+      const colored = `\x1B[${weight}38;2;${r};${g};${b}m${text}\x1B[0m`;
+      return link === undefined ? colored : `\x1B]8;;${link.url}\x1B\\${colored}\x1B]8;;\x1B\\`;
+    }).join("");
+  }).join(`
+`);
+};
+
 // packages/runtime/src/setup/tui/entry.tsx
 var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => detectBackground(input.env, renderer).pipe(flatMap2((background) => callback2((resume) => {
   const finish = (outcome) => resume(succeed4(outcome));
@@ -4718,6 +4965,7 @@ var runSetupTui = (input) => runPromise2(showSetup(tryPromise2({
   catch: (cause) => cause
 }), input));
 export {
+  renderTerminalOutput,
   runSetupTui,
   showSetup
 };

@@ -1,3 +1,23 @@
+// Unicode format characters (category Cf): the bidi controls (U+202A-U+202E, U+2066-U+2069, U+200E,
+// U+200F, U+061C) that reorder a line, zero-width characters (U+200B-U+200D) and the like, which
+// make a text read other than it is written.
+const FORMAT_CHARACTERS = /\p{Cf}/gu
+
+/**
+ * Text with escape sequences, control characters (C0, DEL and C1, which include the line breaks),
+ * the Unicode line and paragraph separators (U+2028, U+2029) and invisible format characters (bidi
+ * controls, zero-width characters) removed: what a tool such as Bun, or a registry behind it,
+ * printed is shown to the user only as plain characters, so it cannot recolour the terminal, move
+ * the cursor or reorder what the line says.
+ */
+export const plain = (text: string): string =>
+  Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, ""))
+    .filter((character) => {
+      const code = character.codePointAt(0) ?? 0
+      return code > 0x1f && (code < 0x7f || code > 0x9f) && code !== 0x2028 && code !== 0x2029
+    })
+    .join("")
+
 const segmenter = new Intl.Segmenter()
 
 /** How many terminal cells a text takes, counting graphemes, wide characters and emoji. */

@@ -34,6 +34,13 @@ const Receipt = Schema.Struct({ version: Schema.String.check(Schema.isPattern(/^
 const receiptFile = (env: Env) => join(dirname(userConfigFile(env)), "browse-setup.json")
 const browseEnv = { OPENCODE_BROWSER_AUTO_UPDATE: "off" } satisfies Env
 
+/** One selected browser's reviewed profile and next step. */
+export interface BrowseTarget {
+  readonly target: string
+  readonly next: "pair" | "extension" | "manual"
+  readonly guidance?: string
+}
+
 /** What setup detected and can offer without changing Browse or opening a browser. */
 export interface BrowsePlan {
   readonly state: string
@@ -44,6 +51,8 @@ export interface BrowsePlan {
   readonly profiles?: ReadonlyArray<BrowseProfile>
   readonly target?: string
   readonly guidance?: string
+  readonly alreadyPaired?: boolean
+  readonly targets?: ReadonlyArray<BrowseTarget>
   readonly receipt?: { readonly text: string | undefined }
 }
 
@@ -57,7 +66,9 @@ export const planBrowse = Effect.fn("planBrowse")(function* (
   const command = browseRunnerCommand(runner, "pair")?.join(" ")
   return yield* Effect.gen(function* () {
     const pairing = yield* readBrowsePairing(env)
-    const profiles = pairing.state === "paired" ? [] : yield* findBrowseProfiles(env, platform)
+    const profiles = (yield* findBrowseProfiles(env, platform))
+      .map((profile) => ({ ...profile, profile: plain(profile.profile) }))
+      .sort((a, b) => Number(b.extension === "enabled") - Number(a.extension === "enabled"))
     const installs = profiles.flatMap(({ browser, profile, extension }) =>
       extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }],
     )
@@ -86,12 +97,16 @@ export const planBrowse = Effect.fn("planBrowse")(function* (
         state: `${status.text}; ${PACKAGE} verified`,
         runner,
         next: "none",
+        alreadyPaired: true,
+        profiles,
       } satisfies BrowsePlan
     if (command === undefined)
       return {
         state: `${status.text}; the HolyAgent runner could not be identified`,
         runner,
         next: "none",
+        alreadyPaired: pairing.state === "paired",
+        profiles,
       } satisfies BrowsePlan
     const update = receipt !== undefined && receipt.version !== BROWSE_VERSION
     return {
@@ -100,9 +115,8 @@ export const planBrowse = Effect.fn("planBrowse")(function* (
       command,
       runner,
       next,
-      profiles: profiles
-        .map((profile) => ({ ...profile, profile: plain(profile.profile) }))
-        .sort((a, b) => Number(b.extension === "enabled") - Number(a.extension === "enabled")),
+      alreadyPaired: pairing.state === "paired",
+      profiles,
       receipt: { text: snapshot.text },
     } satisfies BrowsePlan
   }).pipe(
@@ -113,6 +127,8 @@ export const planBrowse = Effect.fn("planBrowse")(function* (
 })
 
 const browseProfileLabel = ({ browser, profile }: BrowseProfile): string => `${browser}, ${profile}`
+const targetNeeds = ({ target, guidance }: BrowseTarget): string =>
+  `${NAME}: ${target}: ${guidance ?? "verify the browser and its extension manually"}`
 
 /** Select handoff steps for the chosen browser profile without opening channels or changing it. */
 export const browseForProfile = (plan: BrowsePlan, index: number): BrowsePlan => {
@@ -156,20 +172,29 @@ export const browseReview = (
       ? [skipped(`${NAME}: Skip Browser Use setup; no Browse command will run`)]
       : [
           added(`${NAME}: ${plan.action} ${PACKAGE} with ${plan.runner}; keep existing pairing`),
-          ...(plan.next === "pair"
-            ? [
-                hint(
-                  `${NAME}: setup ${dryRun ? "would run" : "runs"} ${plan.command ?? "the official pair command"} after you close the screen. Enter its code in the extension Options of ${plan.target ?? "your chosen browser profile"}`,
-                ),
-              ]
-            : plan.next === "extension"
+          ...(plan.targets !== undefined
+            ? []
+            : plan.next === "pair"
               ? [
                   hint(
-                    `${NAME}: ${plan.guidance ?? "add or enable the extension before pairing"}, then rerun setup to pair`,
+                    `${NAME}: setup ${dryRun ? "would run" : "runs"} ${plan.command ?? "the official pair command"} after you close the screen. Enter its code in the extension Options of ${plan.target ?? "your chosen browser profile"}`,
                   ),
                 ]
-              : []),
+              : plan.next === "extension"
+                ? [
+                    hint(
+                      `${NAME}: ${plan.guidance ?? "add or enable the extension before pairing"}, then rerun setup to pair`,
+                    ),
+                  ]
+                : []),
         ]),
+  ...(plan.targets ?? []).map((target) =>
+    target.next === "pair"
+      ? hint(
+          `${NAME}: ${target.target}: ${selected && plan.action !== undefined ? (dryRun ? "would ask for its own one-time code" : "enter its own one-time code after closing this screen") : "no pairing command will run"}`,
+        )
+      : hint(targetNeeds(target)),
+  ),
 ]
 
 /**
@@ -204,7 +229,12 @@ export const pairBrowseOnTerminal: BrowsePair = (command, args, options) => {
 
 /** Verify the exact runner package, then pair only when reviewed and necessary. */
 export const configureBrowse = Effect.fn("configureBrowse")(
-  function* (env: Env, plan: BrowsePlan, pair: BrowsePair) {
+  function* (
+    env: Env,
+    plan: BrowsePlan,
+    pair: BrowsePair,
+    notify: (line: string) => Effect.Effect<void> = () => Effect.void,
+  ) {
     const failure = (detail: string): Report => ({ ok: false, lines: [`! ${NAME}: ${detail}`] })
     const version = browseRunnerCommand(plan.runner, "--version")
     const pairCommand = browseRunnerCommand(plan.runner, "pair")
@@ -238,7 +268,60 @@ export const configureBrowse = Effect.fn("configureBrowse")(
       )
     const versionLine = present(`${NAME}: verified CLI ${PACKAGE} with ${runner}`)
     const prior = yield* readBrowsePairing(env)
-    if (prior.state === "unpaired") {
+    const targetLines: Array<string> = []
+    if (plan.targets !== undefined) {
+      const ready = plan.targets.filter(({ next }) => next === "pair")
+      if (prior.state === "paired" && ready.length > 0)
+        return failure(
+          "a browser was paired since review. Existing pairings were kept; review again",
+        )
+      let previous = prior
+      for (const target of plan.targets) {
+        if (target.next !== "pair") {
+          targetLines.push(hint(targetNeeds(target)))
+          continue
+        }
+        yield* notify(`${NAME}: ${target.target}. Enter this one-time code in that profile only.`)
+        const exit = yield* pair(runner, pairCommand.slice(1), {
+          cwd,
+          env: { ...env, ...browseEnv },
+        })
+        if (exit !== 0)
+          return {
+            ok: false,
+            lines: [
+              versionLine,
+              ...targetLines,
+              `! ${NAME}: ${target.target}: pairing was not confirmed (exit ${exit}). Previously connected profiles were kept.`,
+            ],
+          }
+        const after = yield* readBrowsePairing(env)
+        const old =
+          previous.state === "paired"
+            ? new Set(previous.browsers.map(({ key }) => key))
+            : new Set<string>()
+        if (
+          after.state !== "paired" ||
+          !after.browsers.some(({ key, lastSeen }) => !old.has(key) && lastSeen !== undefined)
+        )
+          return {
+            ok: false,
+            lines: [
+              versionLine,
+              ...targetLines,
+              `! ${NAME}: ${target.target}: no new connected profile was confirmed. Existing pairings were kept.`,
+            ],
+          }
+        previous = after
+        targetLines.push(
+          present(
+            `${NAME}: a new connected profile was confirmed for the ${target.target} handoff`,
+          ),
+        )
+      }
+      if (ready.length === 0 && prior.state === "unpaired")
+        return { ok: true, lines: [versionLine, ...targetLines] }
+    } else if (prior.state === "unpaired") {
       if (plan.next !== "pair")
         return {
           ok: true,
@@ -279,7 +362,11 @@ export const configureBrowse = Effect.fn("configureBrowse")(
     if (!saved) return failure("the HolyAgent Browse receipt changed; review setup again")
     return {
       ok: true,
-      lines: [versionLine, present(`${NAME}: ${describeBrowseState(pairing, plan.runner).text}`)],
+      lines: [
+        versionLine,
+        ...targetLines,
+        present(`${NAME}: ${describeBrowseState(pairing, plan.runner).text}`),
+      ],
     }
   },
   Effect.catchTag("SetupFailure", ({ message }) =>

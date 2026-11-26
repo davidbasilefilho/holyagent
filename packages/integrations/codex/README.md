@@ -2,7 +2,7 @@
 
 HolyAgent can prepare a dedicated native Codex profile and install the HolyAgent plugin through Codex's marketplace commands. Setup does not change a running session or configure credentials, sandboxing or approvals. The T3 Code workflow with Pi remains the supported public workflow while hosted Codex startup is being verified.
 
-Use a Codex CLI on the verified 0.172.0 line. Run these commands from the installed HolyAgent package, or select Codex in the interactive setup and review the plan.
+Use a Codex CLI on the verified 0.172.0 line. When setup runs in a terminal on a detected ChatGPT desktop installation, it offers the [native browser options](../../../docs/setup-surfaces.md). Use `--non-interactive` or `--form headless` for line-based setup. Run these commands from the installed HolyAgent package, or select Codex in the interactive setup and review the plan.
 
 ```sh
 profile="$HOME/.holyagent/codex"
