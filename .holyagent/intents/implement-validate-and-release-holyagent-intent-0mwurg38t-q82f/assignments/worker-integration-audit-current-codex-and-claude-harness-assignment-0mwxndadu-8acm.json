@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwxndadu-8acm",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.integration",
+  "slug": "audit-current-codex-and-claude-harness",
+  "objective": "Audit current Codex and Claude harness capabilities and implement confirmed public setup gaps without duplicating native features",
+  "state": "Ready",
+  "scope": [
+    "Codex and Claude capability setup, isolated tests, and support matrix documentation"
+  ],
+  "constraints": [
+    "Use official current sources and pin historical code. Keep optional integrations explicit. No personal settings, hosted sessions, publication, or version control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Confirm what is native configurable plugin-managed or unavailable and implement verified gaps",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Keep native browser CUA and OpenCode Browse distinct and optional choices intact",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Exercise effective Codex and Claude setup against isolated profiles and report platform limits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/integrations/codex",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-26T14:27:59.826Z"
+}
