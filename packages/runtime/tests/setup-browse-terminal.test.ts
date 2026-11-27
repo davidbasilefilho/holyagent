@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test"
 import { writeFileSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { dirname, join, sep } from "node:path"
 
-import { Effect, Option } from "effect"
+import { Effect, Layer, Option } from "effect"
 
+import { FileSystem, nodeFileSystem } from "../../core/src/ports/filesystem.ts"
 import { run } from "../src/cli/program.ts"
 import {
   liveBrowseDesktop,
@@ -77,7 +78,12 @@ beforeEach(async () => {
 })
 afterEach(async () => remove())
 
-const env = () => ({ HOME: directory, PATH: join(directory, "bin"), ...display })
+const env = () => ({
+  HOME: directory,
+  PATH: join(directory, "bin"),
+  XDG_DATA_DIRS: directory,
+  ...display,
+})
 const selection = () => join(directory, ".holyagent", "browse-selection.json")
 const executable = (name = "google-chrome") => join(directory, "bin", name)
 const optionsUrl = (id: string) => `chrome-extension://${id}/settings.html`
@@ -89,8 +95,8 @@ const program = async (file: string, content = "fixture executable") => {
   await mkdir(dirname(file), { recursive: true })
   await writeFile(file, content, { mode: 0o755 })
 }
-const desktop = (respond?: (line: string) => void, defaultId = "google-chrome.desktop") =>
-  fakeShell({
+const desktop = (respond?: (line: string) => void, defaultId = "google-chrome.desktop") => {
+  const fixture = fakeShell({
     commands: ["xdg-settings"],
     respond: (line) => {
       respond?.(line)
@@ -101,6 +107,21 @@ const desktop = (respond?: (line: string) => void, defaultId = "google-chrome.de
       }
     },
   })
+  // Hosted Linux runners ship Chrome in a prioritized known path. Keep the fixture's
+  // executable lookup inside its own tree without changing production discovery order.
+  const fs = Layer.succeed(
+    FileSystem,
+    FileSystem.of({
+      ...nodeFileSystem,
+      stat: (async (path: string) => {
+        if (!path.startsWith(directory + sep))
+          throw Object.assign(new Error("outside fixture"), { code: "ENOENT" })
+        return nodeFileSystem.stat(path)
+      }) as typeof nodeFileSystem.stat,
+    }),
+  )
+  return { ...fixture, layer: Layer.merge(fixture.layer, fs) }
+}
 const profileFile = (profile = "Default") => {
   const browser = browserDirectories(env()).find(({ name }) => name === "Google Chrome")
   if (browser === undefined) throw new Error("fixture Chrome profile not found")
