@@ -273,8 +273,16 @@ const rebuild = (directory: string, commit: string, version: string) =>
       "Cannot stamp the exact archived version",
     )
     yield* local($`cp ${stamped} ${manifest}`, "Cannot write scratch package manifest")
+    const emptyConfig = join(directory, "pack.bunfig.toml")
+    yield* Effect.tryPromise({
+      try: () => Bun.write(emptyConfig, ""),
+      catch: () =>
+        new RecoveryError({ detail: "Cannot isolate the historical pack configuration" }),
+    })
     yield* local(
-      $`bun pm pack --destination ${directory}`.cwd(staging),
+      $`bun --no-env-file ${`--config=${emptyConfig}`} pm pack --ignore-scripts --destination ${directory}`
+        .cwd(staging)
+        .env({ PATH: process.env.PATH ?? "", HOME: directory, TMPDIR: directory }),
       "Cannot reproduce the archived dev package",
     )
     return join(directory, `holyagent-${version}.tgz`)

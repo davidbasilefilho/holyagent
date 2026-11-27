@@ -236,7 +236,11 @@ describe("publication authority", () => {
     const current = release?.steps?.find(
       ({ name }) => name === "Reconcile the current protected dev prerelease",
     )
-    expect(current?.if).toBe("needs.publish.result == 'success'")
+    const download = release?.steps?.find(({ name }) => name === "Download published package")
+    expect(download?.if).toBe("${{ !cancelled() && needs.publish.result == 'success' }}")
+    expect(current?.if).toBe(
+      "${{ !cancelled() && needs.publish.result == 'success' && steps.current-package.outcome == 'success' }}",
+    )
     expect(
       release?.steps?.some(
         ({ if: condition, run }) =>

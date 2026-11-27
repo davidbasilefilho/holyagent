@@ -73,13 +73,14 @@ jobs:
           PREVIOUS_DEV: ${{ github.event.before }}
         run: bun scripts/dev-prerelease-recovery.ts previous "$PREVIOUS_DEV"
       - name: Download published package
-        if: needs.publish.result == 'success'
+        id: current-package
+        if: ${{ !cancelled() && needs.publish.result == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: npm-package
           path: ${{ runner.temp }}
       - name: Reconcile the current protected dev prerelease
-        if: needs.publish.result == 'success'
+        if: ${{ !cancelled() && needs.publish.result == 'success' && steps.current-package.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
