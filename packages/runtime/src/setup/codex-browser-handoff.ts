@@ -2,6 +2,10 @@ import { posix, win32 } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
+import {
+  type DetectedBrowser,
+  isChromiumBrowser,
+} from "../../../core/src/setup/browser-discovery.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { hasDisplay, inCi } from "./form.ts"
@@ -11,21 +15,8 @@ import { Shell } from "./shell.ts"
 /** OpenAI's instructions for connecting an existing browser to the desktop app. */
 export const CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension"
 
-const browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"] as const
 const desktopPlatforms = ["darwin", "win32", "linux"] as const
-const decodeBrowser = Schema.decodeUnknownOption(Schema.Literals(browserIds))
 const decodePlatform = Schema.decodeUnknownOption(Schema.Literals(desktopPlatforms))
-
-/** Browser IDs documented for the desktop app extension. */
-export type CodexBrowserId = (typeof browserIds)[number]
-
-const labels: Record<CodexBrowserId, string> = {
-  chrome: "Google Chrome",
-  edge: "Microsoft Edge",
-  brave: "Brave",
-  opera: "Opera",
-  vivaldi: "Vivaldi",
-}
 
 type Platform = (typeof desktopPlatforms)[number]
 
@@ -36,24 +27,15 @@ export interface CodexDesktopEvidence {
   readonly version?: string
 }
 
-/** A documented browser with an executable reported by local discovery. */
+/** A detected Chromium executable that can open the guide, not a verified connection. */
 export interface CodexBrowserChoice {
-  readonly id: CodexBrowserId
+  readonly id: string
   readonly name: string
   readonly executable: string
 }
 
-/** A detected browser for which the official flow is not available. */
-export interface CodexBrowserUnavailable {
-  readonly id: string
-  readonly name: string
-  readonly reason: string
-}
-
 /** An optional handoff to OpenAI's setup guide, or why that action cannot be offered. */
-export type CodexBrowserHandoff = {
-  readonly unavailableBrowsers?: ReadonlyArray<CodexBrowserUnavailable>
-} & (
+export type CodexBrowserHandoff =
   | {
       readonly status: "candidate"
       readonly desktop: CodexDesktopEvidence
@@ -67,7 +49,6 @@ export type CodexBrowserHandoff = {
       readonly reason: string
       readonly desktop?: CodexDesktopEvidence
     }
-)
 
 /** The setup project and the platform on which the installed applications run. */
 export interface CodexBrowserHandoffOptions {
@@ -75,7 +56,7 @@ export interface CodexBrowserHandoffOptions {
   readonly platform?: NodeJS.Platform
 }
 
-type Discovered = { readonly id: string; readonly name?: string; readonly executable?: string }
+type Discovered = Pick<DetectedBrowser, "id" | "name" | "family" | "executable">
 
 const windowsDesktop =
   "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | " +
@@ -178,6 +159,7 @@ const nonlocal = (env: Env, platform: Platform): string | undefined => {
 
 const browserPath = (executable: string | undefined, platform: Platform): executable is string =>
   executable !== undefined &&
+  !/[\p{Cc}"]/u.test(executable) &&
   (platform === "win32"
     ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe")
     : posix.isAbsolute(executable))
@@ -209,51 +191,28 @@ export const detectCodexBrowserHandoff = Effect.fn("detectCodexBrowserHandoff")(
       reason: "No supported local ChatGPT desktop installation was detected.",
     }
   const choices: Array<CodexBrowserChoice> = []
-  const unavailable = new Map<string, CodexBrowserUnavailable>()
   for (const browser of browsers) {
-    const id = Option.getOrUndefined(decodeBrowser(browser.id))
-    if (choices.some((choice) => choice.id === id)) continue
-    const unsupported =
-      id === undefined
-        ? "OpenAI does not document extension support for this browser."
-        : platform === "linux" && id !== "chrome"
-          ? "The Linux preview documents browser actions in Chrome only."
-          : undefined
     if (
-      id === undefined ||
-      unsupported !== undefined ||
-      !browserPath(browser.executable, platform)
-    ) {
-      unavailable.set(browser.id, {
-        id: browser.id,
-        name: browser.name ?? (id === undefined ? browser.id : labels[id]),
-        reason: unsupported ?? "No local executable could be verified.",
-      })
+      !isChromiumBrowser(browser) ||
+      !browserPath(browser.executable, platform) ||
+      choices.some(({ id }) => id === browser.id)
+    )
       continue
-    }
-    choices.push({ id, name: labels[id], executable: browser.executable })
-    unavailable.delete(id)
+    choices.push({ id: browser.id, name: browser.name, executable: browser.executable })
   }
-  const unavailableBrowsers =
-    unavailable.size === 0 ? {} : { unavailableBrowsers: [...unavailable.values()] }
   if (choices.length === 0)
     return {
       status: "unavailable",
       desktop,
-      ...unavailableBrowsers,
-      reason:
-        platform === "linux"
-          ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions."
-          : "No documented local browser installation was detected.",
+      reason: "No installed Chromium browser with a local executable was detected.",
     }
   return {
     status: "candidate",
     desktop,
     browsers: choices,
-    ...unavailableBrowsers,
     url: CODEX_BROWSER_GUIDE,
     detail:
-      "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
+      "This console can open the guide, not confirm a connection. Check browser availability in ChatGPT desktop. Support depends on rollout and your workspace settings.",
     steps,
   }
 })
@@ -265,7 +224,7 @@ const windowsGuide = `Start-Process -FilePath $env:HOLYAGENT_SETUP_BROWSER_EXE -
 export const openCodexBrowserHandoff = Effect.fn("openCodexBrowserHandoff")(function* (
   env: Env,
   offer: CodexBrowserHandoff,
-  selected: CodexBrowserId | undefined,
+  selected: string | undefined,
   options: CodexBrowserHandoffOptions,
 ): Effect.fn.Return<Report, never, Shell> {
   if (selected === undefined) return { ok: true, lines: [] }

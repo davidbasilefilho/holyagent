@@ -29229,6 +29229,7 @@ import { isAbsolute as isAbsolute11, win32 as win328 } from "path";
 
 import { constants as constants7 } from "fs";
 import { posix as posix5, win32 as win325 } from "path";
+var isChromiumBrowser = (browser) => browser.family === "chromium";
 var BROWSERS = [
   {
     id: "chrome",
@@ -29579,7 +29580,10 @@ var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
         continue;
       if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix5.basename(executable)))
         continue;
-      extra.push(yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"));
+      extra.push({
+        ...yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"),
+        desktopEntry: entry
+      });
     }
   }
   return extra;
@@ -29673,7 +29677,7 @@ ObjC.import("AppKit");
 var app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.URLWithString("https://example.invalid/"));
 if (app) ObjC.unwrap(app.path);`;
 var systemDefaultBrowser = fn2("systemDefaultBrowser")(function* (env, cwd, detected, platform = process.platform) {
-  const candidates = detected.filter(({ executable, browseCompatibility }) => executable !== undefined && browseCompatibility === "supported");
+  const candidates = detected.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser));
   if (candidates.length === 0)
     return;
   if (platform === "win32") {
@@ -29694,7 +29698,11 @@ var systemDefaultBrowser = fn2("systemDefaultBrowser")(function* (env, cwd, dete
     if (command._tag === "None")
       return;
     const result = yield* shell.run(command.value, ["get", "default-web-browser"], { cwd });
-    const id = result.exitCode === 0 ? LINUX_BROWSER_IDS.get(result.stdout.trim()) : undefined;
+    if (result.exitCode !== 0)
+      return;
+    const entry = result.stdout.trim();
+    const registered = detected.find((candidate) => candidate.desktopEntry === entry);
+    const id = registered?.id ?? LINUX_BROWSER_IDS.get(entry);
     return candidates.find((candidate) => candidate.id === id)?.id;
   }
   if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {
@@ -31157,7 +31165,7 @@ var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requeste
   if (requested !== undefined && !isBrowserId(requested))
     return yield* failure("use a detected browser id with --browse-browser, for example chrome");
   const detected = yield* discoverBrowsers(env, platform);
-  const compatible = detected.filter(({ executable, browseCompatibility }) => executable !== undefined && browseCompatibility === "supported");
+  const compatible = detected.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser));
   const choices = compatible.map(({ id }) => id).join(", ") || "none detected";
   const saved = requested === undefined ? (yield* readBrowserPreference(env)).browsers : undefined;
   if (requested === undefined && saved !== undefined && saved.length !== 1)
@@ -31188,6 +31196,12 @@ var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requeste
     file.mtimeMs,
     file.ctimeMs
   ]);
+  const target = { id, name: browser.name, executable, executableIdentity };
+  if (browser.profileDirectory === undefined) {
+    if (pinnedProfile !== undefined)
+      return yield* failure("the selected browser profile changed");
+    return { ...target, next: "store" };
+  }
   const profiles = yield* browserProfiles(env, browser.name, platform);
   const enabled = profiles.filter(({ extension }) => extension === "enabled");
   const profile = pinnedProfile !== undefined ? profiles.find(({ profile: name }) => name === pinnedProfile) : enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
@@ -31199,10 +31213,7 @@ var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requeste
   if (profile?.extension === "enabled" && !isKnownExtension(profile.extensionId))
     return yield* failure("the detected extension cannot be opened safely; use its Options manually");
   return {
-    id,
-    name: browser.name,
-    executable,
-    executableIdentity,
+    ...target,
     profile: profileName,
     next: profile?.extension === "enabled" ? "pair" : profile?.extension === "disabled" ? "disabled" : "extension",
     ...profile?.extensionId === undefined ? {} : { extensionId: profile.extensionId }
@@ -31260,7 +31271,7 @@ var liveBrowseDesktop = {
   probeRelay: browseRelaySafe,
   signals: liveHost.signals
 };
-var label3 = (plan) => `${plan.name}, ${plan.profile}`;
+var label3 = (plan) => plan.profile === undefined ? plan.name : `${plan.name}, ${plan.profile}`;
 var waitForInstall = (env, target, host, wait) => scoped2(gen2(function* () {
   const received = yield* host.signals ?? succeed6(never2);
   const check = gen2(function* () {
@@ -31283,7 +31294,7 @@ var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoo
   });
   const profile = label3(expected);
   const kept = `existing pairings were kept. Setup did not verify a connection for ${profile}.`;
-  const open = (url) => host.open(expected.executable, [`--profile-directory=${expected.profile}`, url], {
+  const open = (url) => host.open(expected.executable, expected.profile === undefined ? [url] : [`--profile-directory=${expected.profile}`, url], {
     cwd: homeDirectory2(env),
     env
   });
@@ -31291,9 +31302,14 @@ var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoo
     yield* check(expected, false);
     if (expected.next === "disabled")
       return pending(`extension is disabled in ${profile}. Enable it in the browser and rerun setup.`);
-    yield* checkLocalRelay;
+    if (expected.next !== "store")
+      yield* checkLocalRelay;
     if (!wait.reopenPaired && (yield* readBrowsePairing(env)).state === "paired")
       return pending(kept);
+    if (expected.next === "store") {
+      yield* open(BROWSE_EXTENSION_STORE);
+      return pending(`opened the official store in ${profile}. Choose the profile and complete extension installation and pairing manually. Setup did not verify a connection.`);
+    }
     const ready = yield* gen2(function* () {
       if (expected.next !== "extension")
         return expected;
@@ -32084,17 +32100,8 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
 });
 import { posix as posix9, win32 as win3210 } from "path";
 var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
-var browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"];
 var desktopPlatforms = ["darwin", "win32", "linux"];
-var decodeBrowser = decodeUnknownOption2(Literals(browserIds));
 var decodePlatform = decodeUnknownOption2(Literals(desktopPlatforms));
-var labels = {
-  chrome: "Google Chrome",
-  edge: "Microsoft Edge",
-  brave: "Brave",
-  opera: "Opera",
-  vivaldi: "Vivaldi"
-};
 var windowsDesktop = "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | " + "Where-Object PackageFamilyName -CEQ 'OpenAI.Codex_2p2nqsd0c76g0' | " + "Select-Object -First 1 | ForEach-Object { $_.Version.ToString() }";
 var windowsDrivePath = /^[a-z]:[\\/]/i;
 var powershell = (env) => {
@@ -32155,7 +32162,7 @@ var nonlocal = (env, platform) => {
     return "Use the native desktop outside WSL to connect your browser.";
   return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
 };
-var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix9.isAbsolute(executable));
+var browserPath = (executable, platform) => executable !== undefined && !/[\p{Cc}"]/u.test(executable) && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix9.isAbsolute(executable));
 var steps = [
   "Update the ChatGPT desktop app. Find your browser in Settings > Computer Use, under More browsers if needed.",
   "Follow any plugin prompt. Use Install to open the extension store and review the permission prompts there.",
@@ -32178,38 +32185,23 @@ var detectCodexBrowserHandoff = fn2("detectCodexBrowserHandoff")(function* (env,
       reason: "No supported local ChatGPT desktop installation was detected."
     };
   const choices = [];
-  const unavailable = new Map;
   for (const browser of browsers) {
-    const id = getOrUndefined(decodeBrowser(browser.id));
-    if (choices.some((choice) => choice.id === id))
+    if (!isChromiumBrowser(browser) || !browserPath(browser.executable, platform) || choices.some(({ id }) => id === browser.id))
       continue;
-    const unsupported = id === undefined ? "OpenAI does not document extension support for this browser." : platform === "linux" && id !== "chrome" ? "The Linux preview documents browser actions in Chrome only." : undefined;
-    if (id === undefined || unsupported !== undefined || !browserPath(browser.executable, platform)) {
-      unavailable.set(browser.id, {
-        id: browser.id,
-        name: browser.name ?? (id === undefined ? browser.id : labels[id]),
-        reason: unsupported ?? "No local executable could be verified."
-      });
-      continue;
-    }
-    choices.push({ id, name: labels[id], executable: browser.executable });
-    unavailable.delete(id);
+    choices.push({ id: browser.id, name: browser.name, executable: browser.executable });
   }
-  const unavailableBrowsers = unavailable.size === 0 ? {} : { unavailableBrowsers: [...unavailable.values()] };
   if (choices.length === 0)
     return {
       status: "unavailable",
       desktop,
-      ...unavailableBrowsers,
-      reason: platform === "linux" ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions." : "No documented local browser installation was detected."
+      reason: "No installed Chromium browser with a local executable was detected."
     };
   return {
     status: "candidate",
     desktop,
     browsers: choices,
-    ...unavailableBrowsers,
     url: CODEX_BROWSER_GUIDE,
-    detail: "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
+    detail: "This console can open the guide, not confirm a connection. Check browser availability in ChatGPT desktop. Support depends on rollout and your workspace settings.",
     steps
   };
 });
@@ -32415,8 +32407,12 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   if (loaded instanceof TuiUnavailable)
     return fail(`unavailable (${loaded.reason})`);
   const requestedHandoff = (choices) => choices.harnesses?.codex === true && codexHandoff?.status === "candidate" ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff) : undefined;
-  const browserOptions = browsers.map(({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }));
-  const selectedBrowsers = (choices) => browserOptions.filter(({ id, browseCompatibility }) => browseCompatibility === "supported" && choices.browseBrowserIds?.includes(id));
+  const chromium = browsers.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser)).map((browser) => ({ ...browser, name: plain(browser.name) }));
+  const browserOptions = chromium.map(({ id, name }) => ({
+    id,
+    name
+  }));
+  const selectedBrowsers = (choices) => chromium.filter(({ id }) => choices.browseBrowserIds?.includes(id));
   const browserSelectionToSave = (choices) => {
     const chosen = choices.browseBrowserIds;
     const enabled = choices.capabilities["browserUse"] === true;
@@ -32430,8 +32426,22 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     if (selected.length === 0)
       return;
     const requested = browse.profiles?.[choices.browseProfile ?? -1];
-    const targets = selected.map(({ name }) => {
-      const profile = requested?.browser === name ? requested : browse.profiles?.find(({ browser }) => browser === name);
+    const targets = selected.map(({ name, profileDirectory }) => {
+      if (profileDirectory === undefined)
+        return {
+          target: name,
+          next: "manual",
+          guidance: `open the official Browse extension store (${BROWSE_EXTENSION_STORE}) in the intended profile and pair manually; setup could not verify a profile directory`
+        };
+      const profiles = (browse.profiles ?? []).filter(({ browser }) => browser === name);
+      const enabled = profiles.filter(({ extension }) => extension === "enabled");
+      const profile = requested?.browser === name ? requested : enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
+      if (profile === undefined && profiles.length > 1)
+        return {
+          target: name,
+          next: "manual",
+          guidance: "more than one profile is possible; open the Browse extension in the intended profile and pair manually"
+        };
       const target = profile === undefined ? name : `${name}, ${profile.profile}`;
       if (profile?.extension === "enabled") {
         if (browse.alreadyPaired === true)
@@ -32448,6 +32458,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         guidance: profile?.extension === "disabled" ? "enable the existing Browse extension in this profile, then review setup again" : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`
       };
     });
+    if (!browse.alreadyPaired && targets.every(({ next }) => next === "manual")) {
+      const { action: _action, ...manual } = browse;
+      return { ...manual, next: "none", targets };
+    }
     const ready = targets.find(({ next }) => next === "pair");
     return {
       ...browse,
@@ -32521,10 +32535,9 @@ var runInteractive = fn2("runInteractive")(function* (options) {
               ...codexHandoff?.status === "candidate" ? {
                 extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
                   id,
-                  name
+                  name: plain(name)
                 }))
-              } : {},
-              ...codexHandoff?.unavailableBrowsers === undefined ? {} : { extensionUnavailableBrowsers: codexHandoff.unavailableBrowsers }
+              } : {}
             }
           }
         }
@@ -33727,7 +33740,17 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const commands = commandsFor(surface);
   if (first === undefined || isHelp(first)) {
     const agent = yield* hostForText(host.env);
-    return showHelp(listed(commands, agent), agent, surface);
+    const visible = listed(commands, agent);
+    const result = showHelp(visible, agent, surface);
+    return surface === "public" && given.length === 0 ? {
+      ...result,
+      publicHelp: {
+        commands: visible.flatMap((command) => {
+          const [name] = command.path;
+          return command.path.length === 1 && name !== undefined && name !== "setup" ? [{ name, summary: forWords(command, wordsFor(agent)).summary }] : [];
+        })
+      }
+    } : result;
   }
   if (first === "--version" || first === "-v") {
     if (surface === "agent" && argv.length > 1)
@@ -33872,7 +33895,7 @@ var main = (interactiveSetup = false, surface = "host", installedPackageRoot, pr
       terminal
     } : {}
   }, surface);
-  const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result.setupResult);
+  const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result);
   const stderr = yield* present(result.stderr, "stderr", Boolean(process.stderr.isTTY));
   yield* write2(process.stdout, stdout);
   yield* write2(process.stderr, stderr);
