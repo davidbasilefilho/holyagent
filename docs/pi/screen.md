@@ -55,7 +55,7 @@ On a local desktop, this line-based setup opts in to opening the selected browse
 holyagent setup pi --no-tui --browser-use on
 ```
 
-Setup starts with a single compatible saved browser, or a detected compatible system default if no preference was saved. A saved empty, multiple, stale or incompatible selection does not fall back to another browser. Add `--browse-browser chrome` to make an explicit choice for this run. If several profiles are plausible, open the extension Options in the intended profile and pair manually. The older `--open-browse` flag is accepted but no longer needed.
+Setup starts with a single compatible saved browser, or a detected compatible system default if no preference was saved. A saved empty, multiple, stale or incompatible selection does not fall back to another browser. Add `--browse-browser chrome` to make an explicit choice for this run. Use `--no-open-browse` to skip the handoff while keeping Browser Use enabled. If several profiles are plausible, open the extension Options in the intended profile and pair manually. The older `--open-browse` flag is accepted but no longer needed.
 
 If the extension is missing, setup opens the official store in that browser and waits up to two minutes for the extension to appear enabled in the selected profile. Add it yourself. Setup opens its Options and starts pairing in the same run after it detects installation. If the extension is disabled, enable it first. If you cancel the wait or it expires, setup reports the remaining steps without undoing Pi setup. Rerun when ready.
 

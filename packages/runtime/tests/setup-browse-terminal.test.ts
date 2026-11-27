@@ -243,7 +243,7 @@ test("public Pi alone accepts the new flags and requires explicit terminal Brows
   const pa = (args: ReadonlyArray<string>) => Effect.runPromise(run(args, host, "public"))
   expect(await pa(["setup", "pi", "--help"])).toMatchObject({
     code: 0,
-    stdout: expect.stringContaining("--open-browse"),
+    stdout: expect.stringContaining("--no-open-browse"),
   })
   expect(await pa(["setup", "pi", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "pi", "--browse-browser", "chrome"])).toMatchObject({ code: 2 })
@@ -261,6 +261,14 @@ test("public Pi alone accepts the new flags and requires explicit terminal Brows
   ).toMatchObject({ code: 2 })
   expect(await pa(["setup", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "claude", "--open-browse"])).toMatchObject({ code: 2 })
+  expect(await pa(["setup", "claude", "--no-open-browse"])).toMatchObject({ code: 2 })
+  const skipped = ["setup", "pi", "--no-tui", "--browser-use", "on", "--no-open-browse"]
+  for (const flag of [["--open-browse"], ["--browse-browser", "chrome"]]) {
+    expect(await pa([...skipped, ...flag])).toMatchObject({
+      code: 2,
+      stderr: expect.stringContaining("--no-open-browse cannot be combined"),
+    })
+  }
 })
 
 test("the public Pi dry run respects terminal handoff flags without selecting, spawning or writing", async () => {

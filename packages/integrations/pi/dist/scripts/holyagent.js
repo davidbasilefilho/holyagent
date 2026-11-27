@@ -35260,8 +35260,14 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       };
       const capabilities = yield* capabilitySwitches(args, usage);
       const form = yield* formOf(args, env, usage);
-      const openBrowse = surface === "public" && target === "pi" && booleanFlag(args, "no-tui") && capabilities.browserUse === true;
+      const skipBrowse = booleanFlag(args, "no-open-browse");
       const browseBrowser = stringFlag(args, "browse-browser");
+      if (skipBrowse && (booleanFlag(args, "open-browse") || browseBrowser !== undefined))
+        return yield* new Usage({
+          message: "--no-open-browse cannot be combined with --open-browse or --browse-browser",
+          hint: `Usage: holyagent ${usage}`
+        });
+      const openBrowse = !skipBrowse && surface === "public" && target === "pi" && booleanFlag(args, "no-tui") && capabilities.browserUse === true;
       if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
         return yield* new Usage({
           message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
@@ -35424,7 +35430,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       ...flags,
       "non-interactive": "boolean",
       "browser-executable": "string",
-      ...target === "pi" ? { "open-browse": "boolean", "browse-browser": "string" } : {},
+      ...target === "pi" ? { "open-browse": "boolean", "no-open-browse": "boolean", "browse-browser": "string" } : {},
       ...target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}
     },
     notes: [
@@ -35435,7 +35441,8 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
       "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
       ...target === "pi" ? [
-        "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. The former --open-browse flag is accepted but not needed.",
+        "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. Use --no-open-browse to skip this handoff and keep Browser Use enabled.",
+        "The older --open-browse flag is optional. It can reopen the extension Options without replacing an existing pairing.",
         "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode."
       ] : []
     ]
@@ -35470,7 +35477,7 @@ var init_setup3 = __esm(() => {
     const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
     return { scope, source: "flag" };
   });
-  PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--browse-browser <id>]");
+  PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--no-open-browse|--browse-browser <id>]");
   PublicManifest = Struct({ name: Literal2("holyagent"), version: String6 });
   codexCommand = {
     path: ["setup", "codex"],

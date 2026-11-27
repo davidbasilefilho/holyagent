@@ -87,7 +87,7 @@ const CLAUDE_USAGE =
   "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]"
 const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace(
   "[--no-tui]",
-  "[--no-tui|--non-interactive] [--browse-browser <id>]",
+  "[--no-tui|--non-interactive] [--no-open-browse|--browse-browser <id>]",
 )
 
 const CODEX_USAGE =
@@ -343,12 +343,19 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         }
         const capabilities = yield* capabilitySwitches(args, usage)
         const form = yield* formOf(args, env, usage)
+        const skipBrowse = booleanFlag(args, "no-open-browse")
+        const browseBrowser = stringFlag(args, "browse-browser")
+        if (skipBrowse && (booleanFlag(args, "open-browse") || browseBrowser !== undefined))
+          return yield* new Usage({
+            message: "--no-open-browse cannot be combined with --open-browse or --browse-browser",
+            hint: `Usage: holyagent ${usage}`,
+          })
         const openBrowse =
+          !skipBrowse &&
           surface === "public" &&
           target === "pi" &&
           booleanFlag(args, "no-tui") &&
           capabilities.browserUse === true
-        const browseBrowser = stringFlag(args, "browse-browser")
         if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
           return yield* new Usage({
             message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
@@ -679,7 +686,9 @@ const publicPiSetup = (target?: "pi"): Command => {
       ...flags,
       "non-interactive": "boolean",
       "browser-executable": "string",
-      ...(target === "pi" ? { "open-browse": "boolean", "browse-browser": "string" } : {}),
+      ...(target === "pi"
+        ? { "open-browse": "boolean", "no-open-browse": "boolean", "browse-browser": "string" }
+        : {}),
       ...(target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}),
     },
     notes: [
@@ -693,7 +702,8 @@ const publicPiSetup = (target?: "pi"): Command => {
       "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
       ...(target === "pi"
         ? [
-            "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. The former --open-browse flag is accepted but not needed.",
+            "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. Use --no-open-browse to skip this handoff and keep Browser Use enabled.",
+            "The older --open-browse flag is optional. It can reopen the extension Options without replacing an existing pairing.",
             "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode.",
           ]
         : []),
