@@ -1,5 +1,5 @@
-import { constants, realpathSync } from "node:fs"
-import { delimiter, dirname, join, posix, win32 } from "node:path"
+import { constants, lstatSync, realpathSync } from "node:fs"
+import { delimiter, dirname, isAbsolute, join, posix, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Context, Effect, Layer, Option } from "effect"
@@ -9,26 +9,36 @@ import { nodeFileSystem } from "../ports/filesystem.ts"
 import { spawn } from "../state/process.ts"
 import { definedEnv, type Env, homeDirectory } from "./environment.ts"
 
+const whichInDirectory = (
+  fs: typeof nodeFileSystem,
+  command: string,
+  directory: string,
+): string | null => {
+  const names =
+    process.platform === "win32" && !/\.[^\\/]+$/.test(command)
+      ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`)
+      : [command]
+  for (const name of names) {
+    const candidate = join(directory || ".", name)
+    try {
+      fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK)
+      if (fs.statSync(candidate).isFile()) return candidate
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return null
+}
+
 /** Searches an explicit PATH using the given filesystem. */
 export const whichWith = (
   fs: typeof nodeFileSystem,
   command: string,
   options: { readonly PATH: string },
 ): string | null => {
-  const names =
-    process.platform === "win32" && !/\.[^\\/]+$/.test(command)
-      ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`)
-      : [command]
   for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join(directory || ".", name)
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK)
-        if (fs.statSync(candidate).isFile()) return candidate
-      } catch {
-        /* try the next candidate */
-      }
-    }
+    const found = whichInDirectory(fs, command, directory)
+    if (found !== null) return found
   }
   return null
 }
@@ -82,6 +92,8 @@ export const pathWithBunBin = (
 export interface StrictLookup {
   /** The working directory of the call. */
   readonly cwd: string
+  /** Also exclude enclosing checkouts, on both the lexical and resolved working paths. */
+  readonly excludeCheckout?: boolean
   /** The platform whose path rules apply; the running one when absent. For tests. */
   readonly platform?: NodeJS.Platform
   /** The lookup in a search path; the Node host lookup when absent. For tests. */
@@ -92,6 +104,8 @@ export interface StrictLookup {
 export interface WhichOptions {
   /** Also search Bun's global bin directory. */
   readonly includeBunBin?: boolean
+  /** Check one literal absolute directory instead of searching PATH. */
+  readonly directory?: string
   /** Trust only what {@link StrictLookup} allows. */
   readonly strict?: StrictLookup
 }
@@ -105,6 +119,27 @@ const isInside = (api: typeof posix, parent: string, path: string): boolean => {
   )
 }
 
+/** A marker cuts off executable trust, never grants it. Do not follow a .git file or link. */
+const checkoutAncestors = (api: typeof posix, cwd: string): ReadonlyArray<string> => {
+  const roots: Array<string> = []
+  for (let dir = cwd; ; dir = api.dirname(dir)) {
+    try {
+      const path = api.join(dir, ".git")
+      const marker = lstatSync(path)
+      if (marker.isDirectory()) {
+        // An empty .git directory (including a sandbox placeholder) is not a checkout.
+        const head = lstatSync(api.join(path, "HEAD"))
+        if (head.isFile() || head.isSymbolicLink()) roots.push(dir)
+      } else if ((marker.isFile() && marker.size > 0) || marker.isSymbolicLink()) {
+        roots.push(dir)
+      }
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
+    }
+    if (api.dirname(dir) === dir) return roots
+  }
+}
+
 const strictWhich = (
   command: string,
   path: string,
@@ -114,18 +149,35 @@ const strictWhich = (
   const windows = (strict.platform ?? process.platform) === "win32"
   const api = windows ? win32 : posix
   if (!api.isAbsolute(strict.cwd)) return null
+  const excluded = [strict.cwd]
+  // Injected lookups model non-native paths. Real lookups also exclude resolved locations.
+  if (strict.which === undefined) {
+    try {
+      const physical = realpathSync(strict.cwd)
+      excluded.push(physical)
+      if (strict.excludeCheckout) {
+        const roots = new Set([
+          ...checkoutAncestors(api, strict.cwd),
+          ...checkoutAncestors(api, physical),
+        ])
+        for (const root of roots) excluded.push(root, realpathSync(root))
+      }
+    } catch {
+      return null
+    }
+  }
+  const excludedPath = (candidate: string) =>
+    excluded.some((root) => isInside(api, root, candidate))
   const trusted = path
     .split(windows ? ";" : ":")
-    .filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry))
+    .filter((entry) => api.isAbsolute(entry) && !excludedPath(entry))
   if (trusted.length === 0) return null
   const acceptable = (found: string | null): found is string => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found)) return false
+    if (found === null || !api.isAbsolute(found) || excludedPath(found)) return false
     if (windows && !found.toLowerCase().endsWith(".exe")) return false
-    // Injected lookups model non-native platform paths in tests. Real lookups must also reject
-    // aliases whose resolved executable lives inside the project or cannot be proven.
     if (strict.which === undefined) {
       try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found))) return false
+        if (excludedPath(realpathSync(found))) return false
       } catch {
         return false
       }
@@ -160,9 +212,13 @@ export const findCommand = (
   )
   const path = options?.includeBunBin ? bunBin.value : (env[bunBin.key] ?? "")
   return Option.fromNullishOr(
-    options?.strict === undefined
-      ? lookup(command, { PATH: path })
-      : strictWhich(command, path, options.strict, lookup),
+    options?.directory !== undefined
+      ? isAbsolute(options.directory)
+        ? whichInDirectory(nodeFileSystem, command, options.directory)
+        : null
+      : options?.strict === undefined
+        ? lookup(command, { PATH: path })
+        : strictWhich(command, path, options.strict, lookup),
   )
 }
 

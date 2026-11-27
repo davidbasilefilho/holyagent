@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
+import { CTX7_MISE_UNVERIFIED, lookupCtx7 } from "./context7.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, type FormChoice } from "./form.ts"
@@ -30,22 +31,30 @@ const checkBun = Effect.gen(function* () {
     : fail("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI")
 })
 
-/**
- * A command setup installs: on PATH or in Bun's global bin directory (where setup and the
- * SessionStart check look too), or skipped by design in a claude.ai cloud session. A command found
- * only in Bun's bin directory passes with a hint to add that directory to PATH.
- */
-const checkCommand = (env: Env, command: string, fix = FIX) =>
+/** The same availability lookup as setup. An unactivated install still needs a PATH hint. */
+const checkCtx7 = (env: Env, fix = FIX) =>
   Effect.gen(function* () {
     if (inCloudSession(env))
-      return pass(command, "not installed in a claude.ai cloud session, by design")
-    const shell = yield* Shell
-    const onPath = yield* shell.which(command)
-    if (Option.isSome(onPath)) return pass(command, onPath.value)
-    const anywhere = yield* shell.which(command, { includeBunBin: true })
-    return Option.isSome(anywhere)
-      ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`)
-      : fail(command, `not found on PATH or in Bun's bin directory; ${fix}`)
+      return pass("ctx7", "not installed in a claude.ai cloud session, by design")
+    const found = yield* lookupCtx7(env)
+    switch (found.kind) {
+      case "path":
+        return pass("ctx7", found.path)
+      case "bun":
+        return pass("ctx7", `${found.path} (not on PATH; add its directory to PATH)`)
+      case "mise":
+        return pass(
+          "ctx7",
+          `${found.path} (installed with mise, not on PATH; add its directory to PATH)`,
+        )
+      case "unverified":
+        return fail("ctx7", CTX7_MISE_UNVERIFIED)
+      case "missing":
+        return fail(
+          "ctx7",
+          `not found on PATH, in Bun's bin directory, or installed by mise; ${fix}`,
+        )
+    }
   })
 
 /** The fix for failing settings; a scope other than user is named, or the fix would target user. */
@@ -65,14 +74,14 @@ const checkSettings = (file: string, scope: Scope) =>
   )
 
 const checks = (env: Env, file: string, scope: Scope) =>
-  Effect.all([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)])
+  Effect.all([checkBun, checkCtx7(env), checkSettings(file, scope)])
 
 /**
- * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
- * recommended keys of the settings of the chosen scope (`user` unless set; `project` and `local`
- * are found from `cwd`, the process directory when absent), then the Pi checks of {@link piChecks}
- * (the form in force and each enabled capability's health included) when Pi is in use and
- * `pi.enable` is on in the HolyAgent config of that scope (the user's file for `user`, so a
+ * Checks the environment HolyAgent needs, one line per check: `bun` on PATH, Context7 availability,
+ * the recommended keys of the settings of the chosen scope (`user` unless set; `project` and
+ * `local` are found from `cwd`, the process directory when absent), then the Pi checks of
+ * {@link piChecks} (the form in force and each enabled capability's health included) when Pi is in
+ * use and `pi.enable` is on in the HolyAgent config of that scope (the user's file for `user`, so a
  * repository's own config cannot change what doctor expects of the global install; the project's
  * over it for `project` and `local`). A machine without Pi gets one informational line instead, and
  * a cloud session runs no Pi. When Pi is in use, a `~` line follows for each Pi tool settings file
@@ -120,8 +129,8 @@ export const doctor = Effect.fn("doctor")(function* (
       ]
   if (options.t3Workflow === true) {
     const blockers = yield* checkT3Prerequisites(env, piUsed)
-    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix")
-    const ctx7 = yield* checkCtx7
+    const ctx7Check = checkCtx7(env, "run holyagent doctor --fix")
+    const ctx7 = yield* ctx7Check
     const fixes =
       options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0
         ? yield* asStep("ctx7", installCtx7(env, false))
@@ -130,7 +139,7 @@ export const doctor = Effect.fn("doctor")(function* (
       ...blockers.map((line) => `FAIL ${line}`),
       yield* checkBun,
       ...fixes,
-      ...(fixes.length > 0 ? [yield* checkCtx7] : [ctx7]),
+      ...(fixes.length > 0 ? [yield* ctx7Check] : [ctx7]),
       ...pi,
     ]
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
@@ -142,7 +151,7 @@ export const doctor = Effect.fn("doctor")(function* (
     // The target is refused (a symlink): report it as the failing settings check, fix nothing.
     const lines = yield* Effect.all([
       checkBun,
-      checkCommand(env, "ctx7"),
+      checkCtx7(env),
       Effect.succeed(fail("settings", located.message)),
     ])
     return {
