@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -29,6 +29,7 @@ const env = () => ({
   APPDATA: join(home, "app"),
   DISPLAY: ":0",
   HOLYAGENT_HOST: "pi",
+  XDG_DATA_DIRS: join(home, "system-data"),
 })
 const receipt = () => join(home, ".holyagent", "browse-setup.json")
 const selectionFile = () => join(home, ".holyagent", "browse-selection.json")
@@ -690,6 +691,45 @@ describe("public setup's OpenCode Browse choice", () => {
     expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: ["chrome", "edge"] })
   })
 })
+
+test.skipIf(process.platform !== "linux")(
+  "matches an OS default launcher alias only to the same detected Chromium installation",
+  async () => {
+    const bin = join(home, "bin")
+    const links = join(home, "links")
+    const apps = join(home, "system-data", "applications")
+    for (const path of [bin, links, apps]) await mkdir(path, { recursive: true })
+    const helium = join(bin, "helium")
+    const launcher = join(links, "helium-stable")
+    const other = join(links, "different-browser")
+    await writeFile(helium, "#!/bin/sh\nexit 1\n", { mode: 0o700 })
+    await writeFile(other, "#!/bin/sh\nexit 1\n", { mode: 0o700 })
+    await symlink(helium, launcher)
+    const entry = (path: string) =>
+      writeFile(
+        join(apps, "helium.desktop"),
+        `[Desktop Entry]\nType=Application\nName=Helium\nCategories=WebBrowser;\nExec="${path}" %U\n`,
+      )
+    await entry(launcher)
+    const aliased = await choiceSession({
+      useInitial: true,
+      defaultDesktop: "helium.desktop",
+      cancel: true,
+    })
+    expect(aliased.offeredBrowserIds).toContain("helium")
+    expect(aliased.initialBrowserIds).toEqual(["helium"])
+
+    await entry(other)
+    const different = await choiceSession({
+      useInitial: true,
+      defaultDesktop: "helium.desktop",
+      cancel: true,
+    })
+    expect(different.offeredBrowserIds).toContain("helium")
+    expect(different.initialBrowserIds).toEqual([])
+    expect(await Bun.file(selectionFile()).exists()).toBe(false)
+  },
+)
 
 test.skipIf(process.platform !== "linux")(
   "real Browse discovery offers both known and new Chromium engines and stores an unprofiled OS default",

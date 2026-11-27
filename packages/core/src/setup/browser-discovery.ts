@@ -717,7 +717,24 @@ export const systemDefaultBrowser = Effect.fn("systemDefaultBrowser")(function* 
     const entry = result.stdout.trim()
     const registered = detected.find((candidate) => candidate.desktopEntry === entry)
     const id = registered?.id ?? LINUX_BROWSER_IDS.get(entry)
-    return candidates.find((candidate) => candidate.id === id)?.id
+    const direct = candidates.find((candidate) => candidate.id === id)
+    if (direct !== undefined) return direct.id
+
+    // A distribution may use two symbolic launchers for one Chromium installation. A desktop
+    // alias need not have the engine's resources beside it, but its name alone proves nothing.
+    const executable = registered?.executable
+    if (executable === undefined || registered?.family !== "unknown") return undefined
+    const fs = yield* fileSystem
+    const canonical = (path: string) =>
+      Effect.tryPromise(() => fs.realpath(path)).pipe(Effect.orElseSucceed(() => undefined))
+    const target = yield* canonical(executable)
+    if (target === undefined) return undefined
+    const aliases = yield* Effect.filter(candidates, ({ executable: other }) =>
+      other === undefined
+        ? Effect.succeed(false)
+        : canonical(other).pipe(Effect.map((path) => path === target)),
+    )
+    return aliases.length === 1 ? aliases[0]?.id : undefined
   }
   if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {
     const result = yield* shell.run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_DEFAULT], {
