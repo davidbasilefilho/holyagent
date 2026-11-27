@@ -102,6 +102,7 @@ describe("the workflows", () => {
     expect(grants.sort()).toEqual([
       ".github/workflows/dev.yml#prerelease:contents",
       ".github/workflows/dev.yml#publish:id-token",
+      ".github/workflows/npm-preview.yml#reconcile:id-token",
       ".github/workflows/publish.yml#dev:contents",
       ".github/workflows/publish.yml#dev:id-token",
       ".github/workflows/publish.yml#stable:contents",
@@ -130,7 +131,7 @@ describe("the workflows", () => {
     ])
   })
 
-  test("only the stable and dev publishing jobs hold id-token: write", () => {
+  test("only the protected publishing jobs hold id-token: write", () => {
     const writers = files().flatMap((file) => {
       const document = parse(file)
       const jobs = (document["jobs"] ?? {}) as Record<
@@ -143,11 +144,48 @@ describe("the workflows", () => {
     })
     expect(writers.sort()).toEqual([
       ".github/workflows/dev.yml#publish",
+      ".github/workflows/npm-preview.yml#reconcile",
       ".github/workflows/publish.yml#dev",
       ".github/workflows/publish.yml#stable",
       ".github/workflows/stable.yml#publish",
     ])
   })
+})
+
+test("npm preview authority is opt-in and runs protected code without PR event or artifact inputs", () => {
+  const file = ".github/workflows/npm-preview.yml"
+  const workflow = parse(file)
+  const trigger = workflow["on"] as Record<string, unknown>
+  expect(Object.keys(trigger).sort()).toEqual(["push", "schedule", "workflow_dispatch"])
+  expect(trigger["push"]).toEqual({ branches: ["dev"] })
+  const jobs = workflow["jobs"] as Record<
+    string,
+    {
+      if: string
+      environment: string
+      needs?: string
+      permissions?: Record<string, unknown>
+      steps: Array<{ with?: Record<string, unknown>; run?: string }>
+    }
+  >
+  const job = jobs["reconcile"]!
+  expect(Object.keys(jobs)).toEqual(["source", "reconcile"])
+  expect(job.environment).toBe("npm-preview")
+  expect(job.needs).toBe("source")
+  expect(jobs.source?.if).toContain("vars.NPM_PREVIEW_ENABLED == 'true'")
+  expect(jobs.source?.if).toContain("github.ref_protected")
+  expect(jobs.source?.permissions?.["id-token"]).toBeUndefined()
+  expect(job.steps[0]?.run).toContain(".protected == true")
+  expect(job.steps[0]?.run).toContain('test "$actual" = "$EXPECTED_SHA"')
+  expect(job.steps[1]?.with).toEqual({
+    ref: "${{ needs.source.outputs.sha }}",
+    "persist-credentials": false,
+  })
+  const source = read(file)
+  expect(source).toContain("--frozen-lockfile --ignore-scripts")
+  expect(source).not.toMatch(
+    /pull_request_target|workflow_run|download-artifact|NPM_TOKEN|secrets\./,
+  )
 })
 
 describe("publication authority", () => {

@@ -1,0 +1,86 @@
+name: npm preview channels
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+  schedule:
+    - cron: "17,47 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-preview-channels
+  cancel-in-progress: false
+
+jobs:
+  source:
+    if: >-
+      vars.NPM_PREVIEW_ENABLED == 'true' && github.repository == 'davidbasilefilho/holyagent' &&
+      github.ref_protected && (github.ref == 'refs/heads/dev' ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'schedule'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Resolve protected dev without publication credentials
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="$(gh api repos/davidbasilefilho/holyagent/branches/dev | jq -er 'select(.name == "dev" and .protected == true) | .commit.sha')"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$GITHUB_EVENT_NAME" != schedule ]]; then test "$sha" = "$GITHUB_SHA"; fi
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+  reconcile:
+    needs: source
+    # The environment also restricts the triggering deployment refs.
+    environment: npm-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - name: Recheck the exact protected dev before any checkout or source code
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          actual="$(gh api repos/davidbasilefilho/holyagent/branches/dev | jq -er 'select(.name == "dev" and .protected == true) | .commit.sha')"
+          test "$actual" = "$EXPECTED_SHA"
+      - name: Check out the protected source only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - name: Set up tools
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+      - name: Load protected dependencies without lifecycle scripts
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify the npm CLI used for OIDC dist-tag writes
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d "$RUNNER_TEMP/holyagent-npm-cli.XXXXXX")"
+          curl --fail --silent --show-error --max-time 60 --proto '=https' \
+            https://registry.npmjs.org/npm/-/npm-11.21.0.tgz -o "$dir/npm.tgz"
+          expected='Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg=='
+          actual="$(openssl dgst -sha512 -binary "$dir/npm.tgz" | openssl base64 -A)"
+          test "$actual" = "$expected"
+          tar -xzf "$dir/npm.tgz" -C "$dir" --no-same-owner --no-same-permissions
+          npm_cli="$dir/package/bin/npm-cli.js"
+          test "$(node "$npm_cli" --version)" = '11.21.0'
+          printf 'PREVIEW_NPM_CLI=%s\n' "$npm_cli" >> "$GITHUB_ENV"
+      - name: Reconcile exact reviewed PR heads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_REVIEWERS: ${{ vars.NPM_PREVIEW_REVIEWERS }}
+        run: bun scripts/npm-preview-publisher.ts
