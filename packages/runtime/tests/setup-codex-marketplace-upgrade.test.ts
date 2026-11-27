@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
+import { SetupProgress, type SetupProgressUpdate } from "../../core/src/setup/progress.ts"
 import { CODEX_ASSET_VERSION, CODEX_MARKETPLACE, CODEX_PLUGIN } from "../src/setup/codex/assets.ts"
 import {
   type CodexSetupOptions,
@@ -71,11 +72,13 @@ const profile = async (
     readonly version?: string
     readonly missingCodex?: boolean
     readonly overrides?: Readonly<Record<string, Partial<ShellResult>>>
+    readonly onProgress?: (update: SetupProgressUpdate) => void
   } = {},
 ) => {
   const home = join(root, name)
   const market = marketAt(home)
   const config = configAt(home)
+  const onProgress = options.onProgress
   const assets = await Effect.runPromise(codexStartupFiles(home))
   const shell = fakeShell({
     commands: options.missingCodex === true ? [] : ["codex"],
@@ -122,6 +125,7 @@ const profile = async (
     Effect.runPromise(
       setupCodex({ HOME: root }, { home, dryRun: false, ...options }).pipe(
         Effect.provide(shell.layer),
+        Effect.provideService(SetupProgress, onProgress),
       ),
     )
   return { home, market, config, shell, apply }
@@ -159,7 +163,25 @@ test("native Windows literal TOML path aliases resolve to the same local marketp
     false,
   )
   expect(sameCodexMarketplacePath("C:holyagent\\marketplace", normal, "win32")).toBe(false)
+  const parentAlias = native.replace(
+    "holyagent\\marketplace",
+    "holyagent\\another\\..\\marketplace",
+  )
+  expect(sameCodexMarketplacePath(parentAlias, normal, "win32")).toBe(false)
+  const mixedExtended = native.replace("\\holyagent\\", "/holyagent\\")
+  expect(sameCodexMarketplacePath(mixedExtended, normal, "win32")).toBe(false)
+  for (const name of ["Codex Profile.", "Codex Profile "]) {
+    const ambiguous = normal.replace("Codex Profile", name)
+    expect(sameCodexMarketplacePath(ambiguous, ambiguous, "win32")).toBe(false)
+  }
 })
+
+test.each(["/fixture/./holyagent/marketplace", "/fixture/elsewhere/../holyagent/marketplace"])(
+  "POSIX source %s is not accepted as a lexical alias",
+  (source) => {
+    expect(sameCodexMarketplacePath(source, "/fixture/holyagent/marketplace", "linux")).toBe(false)
+  },
+)
 
 test("fresh Codex setup previews without mutations, then registers and checks one native plugin", async () => {
   const fixture = await scratch("holyagent-codex-fresh-marketplace-")
@@ -580,4 +602,97 @@ test.skipIf(native === undefined)(
     }
   },
   30_000,
+)
+
+test.each([
+  "source before install",
+  "managed tree before install",
+  "source before list",
+  "managed tree before list",
+])(
+  "live marketplace recheck rejects a change to the %s without a native plugin call",
+  async (change) => {
+    const fixture = await scratch("holyagent-codex-market-late-change-")
+    try {
+      const root = await realpath(fixture.directory)
+      const home = join(root, "profile")
+      const market = marketAt(home)
+      const source = join(root, "different marketplace")
+      const descriptor = join(market, "plugins", "holyagent", ".codex-plugin", "plugin.json")
+      const fresh = change.endsWith("install")
+      const changesTree = change.startsWith("managed tree")
+      const activityPrefix = fresh ? "Installing " : "Checking enabled version "
+      const alteredAsset = "an external edit to the managed plugin\n"
+      let armed = fresh
+      let changed = false
+      const p = await profile(root, "profile", {
+        onProgress: ({ label, activity }) => {
+          if (!armed || label !== "Codex plugin" || activity?.startsWith(activityPrefix) !== true)
+            return
+          armed = false
+          changed = true
+          if (changesTree) {
+            writeFileSync(descriptor, alteredAsset)
+          } else {
+            const config = readFileSync(configAt(home), "utf8")
+            writeFileSync(
+              configAt(home),
+              config.replace(marketSection(market), marketSection(source)),
+            )
+          }
+        },
+      })
+      let snapshot: Awaited<ReturnType<typeof files>> | undefined
+      if (!fresh) {
+        await p.apply()
+        p.shell.calls.length = 0
+        armed = true
+        snapshot = await files(pluginCache(home))
+      }
+      await expect(p.apply()).rejects.toMatchObject({
+        detail: expect.stringMatching(/changed|modified|marketplace/i),
+      })
+      expect(changed).toBe(true)
+      expect(p.shell.calls.map(({ args }) => args)).toEqual(
+        fresh ? [...preflight, ["plugin", "marketplace", "add", market, "--json"]] : preflight,
+      )
+      if (snapshot === undefined)
+        await expect(readdir(pluginCache(home))).rejects.toMatchObject({ code: "ENOENT" })
+      else expect(await files(pluginCache(home))).toEqual(snapshot)
+      if (changesTree) expect(await Bun.file(descriptor).text()).toBe(alteredAsset)
+      else expect(sourceFrom(await Bun.file(configAt(home)).text())).toBe(source)
+    } finally {
+      await fixture.remove()
+    }
+  },
+)
+
+const rootOnlyCatalog = Bun.env.HOLYAGENT_TEST_CODEX_ROOT_ONLY_CATALOG
+
+test.skipIf(rootOnlyCatalog === undefined)(
+  "explicit root-only mode accepts the reviewed runtime, but rejects a merely capability-compatible version",
+  async () => {
+    if (rootOnlyCatalog === undefined) throw new Error("Expected the Codex 0.172.0 catalog fixture")
+    const fixture = await scratch("holyagent-codex-root-only-capability-")
+    try {
+      const root = await realpath(fixture.directory)
+      const approved = await profile(root, "verified runtime", { version: "0.172.0" })
+      expect(await approved.apply({ catalog: rootOnlyCatalog })).toMatchObject({ ok: true })
+      expect(Bun.TOML.parse(await Bun.file(approved.config).text())).toMatchObject({
+        agents: { enabled: true, max_depth: 1 },
+      })
+      const later = await profile(root, "unverified runtime", { version: "0.180.1" })
+      const { fingerprint } = await later.apply({ catalog: rootOnlyCatalog, dryRun: true })
+      expect(later.shell.calls).toEqual([])
+      await expect(
+        later.apply({ catalog: rootOnlyCatalog, expectedPlan: fingerprint }),
+      ).rejects.toMatchObject({
+        detail: expect.stringMatching(/root.only|verified runtime/i),
+      })
+      await expect(readdir(later.home)).rejects.toMatchObject({ code: "ENOENT" })
+      for (const call of later.shell.calls) expect(preflightLines).toContain(call.line)
+    } finally {
+      await fixture.remove()
+    }
+  },
 )

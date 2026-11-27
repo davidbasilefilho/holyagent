@@ -21,7 +21,7 @@ The default profile disables native agents at the common entry point, including 
 
 To test adaptive root-only delegation, download the [unmodified Codex 0.172.0 model catalog](https://raw.githubusercontent.com/openai/codex/rust-v0.172.0/codex-rs/models-manager/models.json). On a fresh profile, pass its absolute path to setup as `--root-only-catalog /absolute/models.json`. Setup checks the catalog fingerprint, selects native V1 with maximum depth one, and keeps the V2 tools unavailable. The root can work directly or delegate, while its specialists cannot delegate again.
 
-The optional profile pins the model catalog, not the installed CLI version. The setup command checks the plugin API, which does not prove support for root-only delegation. Verify the effective policy in the launched process on your exact CLI build before enabling native delegation on a host. Use the default direct-only setup if the launcher cannot select the profile or the policy cannot be verified.
+Ordinary setup checks the plugin API without pinning the installed CLI. Those checks cannot prove root-only delegation. The optional experimental mode still accepts only the runtime for which that policy has been verified (`0.172.0` stable) and the matching catalog. On another build, keep your installed CLI and use a direct-only profile. Verify the effective policy in the launched process before enabling adaptive mode on a host.
 
 ## Select the profile in T3 Code
 

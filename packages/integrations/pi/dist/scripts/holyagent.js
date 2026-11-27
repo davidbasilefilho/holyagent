@@ -31247,16 +31247,25 @@ import {
 } from "fs/promises";
 import { tmpdir as tmpdir4 } from "os";
 import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, posix as posix3, resolve as resolve14, win32 as win323 } from "path";
-var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), installCodex = "If you want to install or update Codex, run `npm install -g @openai/codex@latest`, then rerun setup.", codexVersion, nativeQueries, defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`)))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
+var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), installCodex = "If you want to install or update Codex, run `npm install -g @openai/codex@latest`, then rerun setup.", codexVersion, verifiedRootOnlyRelease = "0.172.0", nativeQueries, defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`)))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
   try: () => record4(Bun.TOML.parse(content)),
   catch: () => fail9("Invalid Codex config.toml; left it unchanged")
 }), same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b), localMarketplacePath = (path, platform) => {
   if (/[\p{Cc}]/u.test(path))
     return;
+  if (path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === ".."))
+    return;
   if (platform !== "win32")
     return posix3.isAbsolute(path) ? posix3.normalize(path) : undefined;
-  const drivePath = path.replaceAll("/", "\\").replace(/^\\\\\?\\(?=[a-z]:\\)/i, "");
-  return /^[a-z]:\\/i.test(drivePath) ? win323.normalize(drivePath) : undefined;
+  const extended = path.startsWith("\\\\?\\");
+  if (extended && (path.includes("/") || path.slice(4).includes("\\\\")))
+    return;
+  const drivePath = extended ? path.slice(4) : path.replaceAll("/", "\\");
+  if (!/^[a-z]:\\/i.test(drivePath))
+    return;
+  if (drivePath.slice(3).split("\\").some((part) => /[<>:"|?*]|[. ]$/u.test(part)))
+    return;
+  return win323.normalize(drivePath);
 }, sameCodexMarketplacePath = (first, second, platform = process.platform) => {
   const a = localMarketplacePath(first, platform);
   const b = localMarketplacePath(second, platform);
@@ -31381,7 +31390,11 @@ var init_setup2 = __esm(() => {
   });
   priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market) {
     const oldHome = dirname13(dirname13(market));
-    if (!sameCodexMarketplacePath(join31(oldHome, CODEX_STARTUP_MARKETPLACE), market))
+    const expected = join31(oldHome, CODEX_STARTUP_MARKETPLACE);
+    if (!sameCodexMarketplacePath(expected, market))
+      return;
+    const prior = yield* resolvedLocalPath(yield* inside(oldHome, CODEX_STARTUP_MARKETPLACE));
+    if (prior === undefined || !(yield* sameResolvedMarketplace(market, prior)))
       return;
     const snapshot = yield* read2(oldHome, receiptFile);
     if (snapshot === undefined)
@@ -31616,11 +31629,26 @@ var init_setup2 = __esm(() => {
     const backups = [];
     let relinked = false;
     const backupRoot = join31("holyagent", "setup-backups", randomUUID5());
+    const verifyActiveMarketplace = fn2("verifyActiveCodexMarketplace")(function* () {
+      const liveConfig = yield* read2(home, "config.toml");
+      if (liveConfig === undefined)
+        return yield* fail9("Codex config.toml disappeared during setup.");
+      const liveSettings = yield* parseToml(liveConfig);
+      const active = record4(record4(liveSettings.marketplaces)[CODEX_MARKETPLACE]);
+      if ((yield* marketplaceLink(active, market)).kind !== "keep")
+        return yield* fail9("The active Codex marketplace source changed during setup. Review it again.");
+      if (record4(liveSettings.features).plugins === false || record4(record4(liveSettings.plugins)[CODEX_PLUGIN]).enabled === false)
+        return yield* fail9("The HolyAgent plugin is now disabled. Setup kept that choice unchanged.");
+      yield* checkPolicy(liveSettings, yield* parseToml(config));
+      yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
+    });
     const steps = [
       {
         label: "Codex runtime",
         run: gen2(function* () {
           const version = yield* checkNativeCodex(run);
+          if (options.catalog !== undefined && version !== verifiedRootOnlyRelease)
+            return yield* fail9(`Codex ${version} supports plugin setup, but native root-only delegation has not been verified on this build. Remove --root-only-catalog and use a separate direct-only profile. No profile files were changed.`);
           lines.push(`= Codex CLI ${version}: marketplace and plugin commands verified`);
         })
       },
@@ -31666,8 +31694,10 @@ var init_setup2 = __esm(() => {
             if (relinkedConfig !== undefined) {
               if (!same2(yield* marketplaceLink(registered, market), link))
                 return yield* fail9("The previous HolyAgent marketplace changed. Review setup again.");
-              yield* store2(home, "config.toml", beforeConfig, relinkedConfig);
-              relinked = true;
+              yield* gen2(function* () {
+                yield* store2(home, "config.toml", beforeConfig, relinkedConfig);
+                relinked = true;
+              }).pipe(uninterruptible2);
               return;
             }
             yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected marketplace")));
@@ -31679,12 +31709,14 @@ var init_setup2 = __esm(() => {
         run: gen2(function* () {
           if (install) {
             yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`);
+            yield* verifyActiveMarketplace();
             const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected plugin")));
             if (result.version !== version)
               return yield* fail9(`Codex installed version ${result.version}, expected ${version}`);
             yield* checkPluginTree(home, cache, expectedCache, true);
           }
           yield* reportSetupActivity(`Checking enabled version ${version}`);
+          yield* verifyActiveMarketplace();
           const list = yield* decodeUnknownEffect2(fromJsonString2(PluginList))(yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"])).pipe(mapError2(() => fail9("Codex did not report enabled plugins for this profile")));
           if (!list.installed.some((item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version))
             return yield* fail9(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`);
