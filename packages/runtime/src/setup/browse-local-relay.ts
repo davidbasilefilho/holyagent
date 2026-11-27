@@ -1,8 +1,9 @@
 import { get } from "node:http"
-import { isAbsolute, join } from "node:path"
+import { posix, win32 } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
+import { fileSystem } from "../../../core/src/ports/filesystem.ts"
 import { readJsonObjectSnapshot } from "../../../core/src/setup/json-file.ts"
 import { type Env, firstNonEmpty } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
@@ -53,31 +54,47 @@ export const browseRelaySafe: BrowseRelayProbe = (port) =>
 export const checkLocalBrowseRelay = Effect.fn("checkBrowseDesktopRelay")(function* (
   env: Env,
   probe: BrowseRelayProbe,
+  platform: NodeJS.Platform = process.platform,
 ) {
   const refuse = (message: string) => new SetupFailure({ message })
+  const windows = platform === "win32"
+  const path = windows ? win32 : posix
+  const absolute = (candidate: string) => {
+    if (!path.isAbsolute(candidate)) return false
+    if (!windows || /^[a-z]:[\\/]/i.test(candidate)) return true
+    if (candidate.startsWith("\\\\?\\"))
+      return /^(?:[a-z]:\\|unc\\[^\\]+\\[^\\]+(?:\\|$))/i.test(candidate.slice(4))
+    return /^[\\/]{2}[^\\/?.][^\\/]*[\\/][^\\/]+(?:[\\/]|$)/.test(candidate)
+  }
   const custom = firstNonEmpty(env.OPENCODE_BROWSER_HOME)
-  if (custom !== undefined && !isAbsolute(custom))
-    return yield* refuse("OPENCODE_BROWSER_HOME must be absolute for automatic pairing")
+  if (custom !== undefined && !absolute(custom))
+    return yield* refuse("OPENCODE_BROWSER_HOME must be fully qualified for automatic pairing")
   // Match the npm package's native relay path resolution, not a Windows/Unix shell fallback.
   const home = env.HOME ?? env.USERPROFILE
+  const xdgDirectories = [env.XDG_CONFIG_HOME, env.XDG_STATE_HOME, env.XDG_DATA_HOME]
+  if (
+    custom === undefined &&
+    windows &&
+    xdgDirectories.some((dir) => dir !== undefined && path.isAbsolute(dir) && !absolute(dir))
+  )
+    return yield* refuse(
+      "Browse cannot verify a Windows XDG path without a complete drive or UNC share",
+    )
   const root = (xdg: string | undefined, folder: string) =>
     custom ??
-    (xdg !== undefined && isAbsolute(xdg)
-      ? join(xdg, "browse")
-      : home !== undefined && isAbsolute(home)
-        ? join(home, folder, "browse")
+    (xdg !== undefined && absolute(xdg)
+      ? path.join(xdg, "browse")
+      : home !== undefined && absolute(home)
+        ? path.join(home, folder, "browse")
         : undefined)
   const config = root(env.XDG_CONFIG_HOME, ".config")
   const state = root(env.XDG_STATE_HOME, ".local/state")
-  if (
-    config === undefined ||
-    state === undefined ||
-    root(env.XDG_DATA_HOME, ".local/share") === undefined
-  )
+  const data = root(env.XDG_DATA_HOME, ".local/share")
+  if (config === undefined || state === undefined || data === undefined)
     return yield* refuse(
       "the Browse relay folders could not be verified; use Browse's own pairing instructions",
     )
-  const { value } = yield* readJsonObjectSnapshot(join(config, "config.json"))
+  const { value } = yield* readJsonObjectSnapshot(path.join(config, "config.json"))
   const hostname = value.hostname
   if (
     hostname !== undefined &&
@@ -90,10 +107,31 @@ export const checkLocalBrowseRelay = Effect.fn("checkBrowseDesktopRelay")(functi
   const rawPort = env.OPENCODE_BROWSER_PORT?.trim() ?? ""
   const pinned = /^\+?\d+$/.test(rawPort) ? Number(rawPort) : NaN
   const port = validPort(pinned) ? pinned : DEFAULT_PORT
+  // The native relay cleans up these old files on startup. Check only metadata and do not remove
+  // or read them. An unreadable entry is not proof it is safe to start the relay.
+  const fs = yield* fileSystem
+  const legacyPaths = [
+    path.join(data, "site-secrets"),
+    path.join(data, "secrets"),
+    path.join(data, "relays", String(port), "sessions.json"),
+  ]
+  for (const entry of legacyPaths) {
+    const missing = yield* Effect.tryPromise(() => fs.lstat(entry)).pipe(
+      Effect.match({
+        onSuccess: () => false,
+        onFailure: ({ cause }) =>
+          cause instanceof Error && "code" in cause && cause.code === "ENOENT",
+      }),
+    )
+    if (!missing)
+      return yield* refuse(
+        "Browse has legacy data or an unreadable data folder; use Browse's own instructions so setup does not change it",
+      )
+  }
   const ports = new Set([port])
   if (!validPort(pinned)) {
     const { value: receipt } = yield* readJsonObjectSnapshot(
-      join(state, "relays", String(port), "relay.json"),
+      path.join(state, "relays", String(port), "relay.json"),
     )
     if (receipt.configuredPort === port && validPort(receipt.port)) ports.add(receipt.port)
   }

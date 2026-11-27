@@ -28815,11 +28815,11 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join36 } from "path";
+import { join as join35 } from "path";
 
 import { realpath as realpath7, stat as stat7 } from "fs/promises";
 import { release as release2 } from "os";
-import { isAbsolute as isAbsolute12, win32 as win326 } from "path";
+import { isAbsolute as isAbsolute11, win32 as win327 } from "path";
 
 import { constants as constants6 } from "fs";
 import { posix as posix4, win32 as win324 } from "path";
@@ -29321,7 +29321,7 @@ var checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absol
   } : evidence(browser, "manual", platform, profileRoot(browser, env, platform), clean);
 });
 import { get as get2 } from "http";
-import { isAbsolute as isAbsolute11, join as join30 } from "path";
+import { posix as posix5, win32 as win325 } from "path";
 var DEFAULT_PORT = 19988;
 var validPort = (value) => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535;
 var RelayVersion = fromJsonString2(Struct({ version: String5, runtime: optionalKey2(String5) }));
@@ -29352,27 +29352,56 @@ var browseRelaySafe = (port) => callback2((resume) => {
     request.destroy();
   });
 }).pipe(timeoutOption2(800), map4(getOrElse(() => false)));
-var checkLocalBrowseRelay = fn2("checkBrowseDesktopRelay")(function* (env, probe) {
+var checkLocalBrowseRelay = fn2("checkBrowseDesktopRelay")(function* (env, probe, platform = process.platform) {
   const refuse = (message) => new SetupFailure({ message });
+  const windows = platform === "win32";
+  const path = windows ? win325 : posix5;
+  const absolute = (candidate) => {
+    if (!path.isAbsolute(candidate))
+      return false;
+    if (!windows || /^[a-z]:[\\/]/i.test(candidate))
+      return true;
+    if (candidate.startsWith("\\\\?\\"))
+      return /^(?:[a-z]:\\|unc\\[^\\]+\\[^\\]+(?:\\|$))/i.test(candidate.slice(4));
+    return /^[\\/]{2}[^\\/?.][^\\/]*[\\/][^\\/]+(?:[\\/]|$)/.test(candidate);
+  };
   const custom = firstNonEmpty2(env.OPENCODE_BROWSER_HOME);
-  if (custom !== undefined && !isAbsolute11(custom))
-    return yield* refuse("OPENCODE_BROWSER_HOME must be absolute for automatic pairing");
+  if (custom !== undefined && !absolute(custom))
+    return yield* refuse("OPENCODE_BROWSER_HOME must be fully qualified for automatic pairing");
   const home = env.HOME ?? env.USERPROFILE;
-  const root = (xdg, folder) => custom ?? (xdg !== undefined && isAbsolute11(xdg) ? join30(xdg, "browse") : home !== undefined && isAbsolute11(home) ? join30(home, folder, "browse") : undefined);
+  const xdgDirectories = [env.XDG_CONFIG_HOME, env.XDG_STATE_HOME, env.XDG_DATA_HOME];
+  if (custom === undefined && windows && xdgDirectories.some((dir) => dir !== undefined && path.isAbsolute(dir) && !absolute(dir)))
+    return yield* refuse("Browse cannot verify a Windows XDG path without a complete drive or UNC share");
+  const root = (xdg, folder) => custom ?? (xdg !== undefined && absolute(xdg) ? path.join(xdg, "browse") : home !== undefined && absolute(home) ? path.join(home, folder, "browse") : undefined);
   const config = root(env.XDG_CONFIG_HOME, ".config");
   const state = root(env.XDG_STATE_HOME, ".local/state");
-  if (config === undefined || state === undefined || root(env.XDG_DATA_HOME, ".local/share") === undefined)
+  const data = root(env.XDG_DATA_HOME, ".local/share");
+  if (config === undefined || state === undefined || data === undefined)
     return yield* refuse("the Browse relay folders could not be verified; use Browse's own pairing instructions");
-  const { value } = yield* readJsonObjectSnapshot(join30(config, "config.json"));
+  const { value } = yield* readJsonObjectSnapshot(path.join(config, "config.json"));
   const hostname = value.hostname;
   if (hostname !== undefined && (typeof hostname !== "string" || !["127.0.0.1", "::1", "[::1]", "localhost"].includes(hostname.trim().toLowerCase())))
     return yield* refuse("the existing Browse relay is configured for remote access. Use Browse's own instructions instead of this local handoff");
   const rawPort = env.OPENCODE_BROWSER_PORT?.trim() ?? "";
   const pinned = /^\+?\d+$/.test(rawPort) ? Number(rawPort) : NaN;
   const port = validPort(pinned) ? pinned : DEFAULT_PORT;
+  const fs = yield* fileSystem;
+  const legacyPaths = [
+    path.join(data, "site-secrets"),
+    path.join(data, "secrets"),
+    path.join(data, "relays", String(port), "sessions.json")
+  ];
+  for (const entry of legacyPaths) {
+    const missing = yield* tryPromise2(() => fs.lstat(entry)).pipe(match4({
+      onSuccess: () => false,
+      onFailure: ({ cause }) => cause instanceof Error && ("code" in cause) && cause.code === "ENOENT"
+    }));
+    if (!missing)
+      return yield* refuse("Browse has legacy data or an unreadable data folder; use Browse's own instructions so setup does not change it");
+  }
   const ports = new Set([port]);
   if (!validPort(pinned)) {
-    const { value: receipt } = yield* readJsonObjectSnapshot(join30(state, "relays", String(port), "relay.json"));
+    const { value: receipt } = yield* readJsonObjectSnapshot(path.join(state, "relays", String(port), "relay.json"));
     if (receipt.configuredPort === port && validPort(receipt.port))
       ports.add(receipt.port);
   }
@@ -29382,11 +29411,11 @@ var checkLocalBrowseRelay = fn2("checkBrowseDesktopRelay")(function* (env, probe
   }
 });
 
-import { dirname as dirname14, join as join32 } from "path";
+import { dirname as dirname14, join as join31 } from "path";
 var {$: $2 } = globalThis.Bun;
 import { lstat as lstat10, mkdir as mkdir11, mkdtemp as mkdtemp4, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile6 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename8, dirname as dirname13, join as join31, posix as posix5, win32 as win325 } from "path";
+import { basename as basename8, dirname as dirname13, join as join30, posix as posix6, win32 as win326 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -30308,7 +30337,7 @@ class TuiUnavailable extends TaggedError2("TuiUnavailable") {
     return this.reason;
   }
 }
-var pathModule = (platform) => platform === "win32" ? win325 : posix5;
+var pathModule = (platform) => platform === "win32" ? win326 : posix6;
 var cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   const { join } = pathModule(platform);
@@ -30348,8 +30377,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join31(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join31(directory, file)}`, cause)
+      try: () => Bun.write(join30(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join30(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -30368,11 +30397,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join31(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join30(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join31(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join30(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -30384,7 +30413,7 @@ var importPackagedTui = (bundle) => gen2(function* () {
   yield* importFile(preload);
   return yield* importFile(bundle);
 });
-var loadPackagedSetupTui = (bundle = join31(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+var loadPackagedSetupTui = (bundle = join30(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
   const loaded = yield* importPackagedTui(bundle);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
@@ -30442,8 +30471,8 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat10(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join31(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join31(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join30(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join30(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
@@ -30453,26 +30482,26 @@ var sweepStale = (directory, uid) => gen2(function* () {
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir5(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join31(parent, name);
+    const path = join30(parent, name);
     const found = yield* tryPromise2(() => lstat10(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp4(join31(dirname13(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp4(join30(dirname13(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join31(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join30(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join31(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join30(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -30491,9 +30520,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join31(directory, TUI_BUNDLE);
+  const target = join30(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join31(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join30(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -30503,7 +30532,7 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 var NAME = "OpenCode Browse";
 var PACKAGE = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var Receipt = Struct({ version: String5.check(isPattern2(/^\d+\.\d+\.\d+$/)) });
-var receiptFile = (env) => join32(dirname14(userConfigFile(env)), "browse-setup.json");
+var receiptFile = (env) => join31(dirname14(userConfigFile(env)), "browse-setup.json");
 var browseEnv = { OPENCODE_BROWSER_AUTO_UPDATE: "off" };
 var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = process.platform) {
   const runner = packageRoot === undefined ? "unknown" : packageRunner(packageRoot, env);
@@ -30675,12 +30704,12 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify 
   lines: [`! ${NAME}: ${message}`]
 })));
 
-import { dirname as dirname15, join as join33 } from "path";
+import { dirname as dirname15, join as join32 } from "path";
 var Selection = Struct({
   browsers: ArraySchema(String5.check(isPattern2(/^[a-z][a-z0-9-]{0,99}$/)))
 });
 var readBrowserPreference = fn2("readBrowserPreference")(function* (env) {
-  const file = join33(dirname15(userConfigFile(env)), "browse-selection.json");
+  const file = join32(dirname15(userConfigFile(env)), "browse-selection.json");
   const { value, text } = yield* readJsonObjectSnapshot(file);
   if (text === undefined)
     return { file, text, browsers: undefined };
@@ -30781,14 +30810,14 @@ var livePair = (command, args, { cwd, env }) => scoped2(gen2(function* () {
   const signal = yield* liveHost.signals;
   const path = pathWithBunBin(env, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
   const resolved = getOrUndefined(findCommand(env, command, { includeBunBin: true }));
-  if (resolved === undefined || !isAbsolute12(resolved))
+  if (resolved === undefined || !isAbsolute11(resolved))
     return 127;
   const pairArgs = [...args, "--wait-seconds", String(WAIT_SECONDS)];
   const batch = process.platform === "win32" && isBatchFile(resolved) ? cmdExeArguments(resolved, pairArgs) : undefined;
   if (batch?.ok === false)
     return 127;
   const windowsRoot = Object.entries(env).find(([name, value]) => /^(systemroot|windir)$/i.test(name) && value !== undefined)?.[1];
-  const application = batch?.ok !== true ? resolved : windowsRoot !== undefined && /^[a-z]:[/\\]/i.test(windowsRoot) ? win326.join(windowsRoot, "System32", "cmd.exe") : undefined;
+  const application = batch?.ok !== true ? resolved : windowsRoot !== undefined && /^[a-z]:[/\\]/i.test(windowsRoot) ? win327.join(windowsRoot, "System32", "cmd.exe") : undefined;
   if (application === undefined)
     return 127;
   const child = yield* acquireRelease2(try_2({
@@ -30900,7 +30929,7 @@ import {
   writeFile as writeFile7
 } from "fs/promises";
 import { tmpdir as tmpdir4 } from "os";
-import { basename as basename9, dirname as dirname16, isAbsolute as isAbsolute14, join as join35, posix as posix6, resolve as resolve14, win32 as win327 } from "path";
+import { basename as basename9, dirname as dirname16, isAbsolute as isAbsolute13, join as join34, posix as posix7, resolve as resolve14, win32 as win328 } from "path";
 
 var recover_work_default = `## Recover existing work
 
@@ -31038,7 +31067,7 @@ var codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independen
 });
 
 import { mkdtemp as mkdtemp5 } from "fs/promises";
-import { isAbsolute as isAbsolute13, join as join34 } from "path";
+import { isAbsolute as isAbsolute12, join as join33 } from "path";
 var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace";
 var catalogName = "root-only-models.json";
 var verifiedCatalog = "d50b6749506d97e5f334dbabcb666eb1689f423cf3e88cfabdcf3c536b873068";
@@ -31072,7 +31101,7 @@ var codexStartupConfig = (rootOnlyCatalogPath) => [
 class StartupStageError extends TaggedError2("StartupStageError") {
 }
 var readRootOnlyCatalog = fn2("readRootOnlyCatalog")(function* (file) {
-  if (!isAbsolute13(file))
+  if (!isAbsolute12(file))
     return yield* new StartupStageError({ detail: "Use an absolute path to the Codex catalog" });
   const text = yield* tryPromise2({
     try: () => Bun.file(file).text(),
@@ -31093,29 +31122,29 @@ var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile,
   return [
     {
       path: "config.toml",
-      content: codexStartupConfig(catalog === undefined ? undefined : join34(target, catalogName))
+      content: codexStartupConfig(catalog === undefined ? undefined : join33(target, catalogName))
     },
     ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
     { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
     ...codexRoleFiles(),
     ...codexMarketplaceFiles(version).map(({ path, content }) => ({
-      path: join34(CODEX_STARTUP_MARKETPLACE, path),
+      path: join33(CODEX_STARTUP_MARKETPLACE, path),
       content
     }))
   ];
 });
 var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile) {
-  if (!isAbsolute13(parent))
+  if (!isAbsolute12(parent))
     return yield* new StartupStageError({ detail: "Use an absolute staging directory" });
   if (catalogFile !== undefined)
     yield* readRootOnlyCatalog(catalogFile);
   const target = yield* tryPromise2({
-    try: () => mkdtemp5(join34(parent, "holyagent-codex-")),
+    try: () => mkdtemp5(join33(parent, "holyagent-codex-")),
     catch: (cause) => new StartupStageError({ detail: String(cause) })
   });
   const files = yield* codexStartupFiles(target, catalogFile);
   yield* forEach2(files, ({ path, content }) => tryPromise2({
-    try: () => Bun.write(join34(target, path), content),
+    try: () => Bun.write(join33(target, path), content),
     catch: (cause) => new StartupStageError({ detail: `${path}: ${String(cause)}` })
   }));
   return target;
@@ -31137,7 +31166,7 @@ var PluginList = Struct({
     enabled: Boolean3
   }))
 });
-var receiptFile2 = join35("holyagent", "setup-v1.json");
+var receiptFile2 = join34("holyagent", "setup-v1.json");
 var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
 var fail9 = (detail) => new StartupStageError({ detail });
 var installCodex = "If you want to install or update Codex, run `npm install -g @openai/codex@latest`, then rerun setup.";
@@ -31148,7 +31177,7 @@ var nativeQueries = [
   { path: ["plugin", "add"], flags: ["json"] },
   { path: ["plugin", "list"], flags: ["json", "marketplace"] }
 ];
-var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join35(homeDirectory2(env), ".holyagent"), "codex");
+var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join34(homeDirectory2(env), ".holyagent"), "codex");
 var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) });
 var statOptional = (path) => tryPromise2({ try: () => lstat11(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`))));
 var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
@@ -31162,7 +31191,7 @@ var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
     suffix.unshift(basename9(ancestor));
     ancestor = dirname16(ancestor);
   }
-  return join35(yield* io2(ancestor, () => realpath8(ancestor)), ...suffix);
+  return join34(yield* io2(ancestor, () => realpath8(ancestor)), ...suffix);
 });
 var inside = fn2("codexSetupPath")(function* (home, relativePath) {
   let path = home;
@@ -31173,7 +31202,7 @@ var inside = fn2("codexSetupPath")(function* (home, relativePath) {
   if (pieces.some((piece) => piece === "" || piece === "." || piece === ".."))
     return yield* fail9(`Invalid relative profile path: ${relativePath}`);
   for (const [i, piece] of pieces.entries()) {
-    path = join35(path, piece);
+    path = join34(path, piece);
     const entry = yield* statOptional(path);
     if (entry !== undefined && (entry.isSymbolicLink() || i < pieces.length - 1 && !entry.isDirectory()))
       return yield* fail9(`Not a real profile path: ${path}`);
@@ -31204,15 +31233,15 @@ var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expecte
       return yield* fail9(`Missing or invalid Codex plugin directory: ${absolute}`);
     const names = yield* io2(absolute, () => readdir6(absolute));
     for (const name of names) {
-      const file = join35(directory, name);
+      const file = join34(directory, name);
       if (!allowed.has(file) && !directories.has(file))
-        return yield* fail9(`Kept unowned entry in Codex plugin: ${join35(home, file)}`);
+        return yield* fail9(`Kept unowned entry in Codex plugin: ${join34(home, file)}`);
     }
   }
   if (complete) {
     for (const { path, content } of expected)
       if ((yield* read2(home, path)) !== content)
-        return yield* fail9(`Kept modified Codex plugin cache: ${join35(home, path)}`);
+        return yield* fail9(`Kept modified Codex plugin cache: ${join34(home, path)}`);
   }
 });
 var record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
@@ -31227,7 +31256,7 @@ var localMarketplacePath = (path, platform) => {
   if (path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === ".."))
     return;
   if (platform !== "win32")
-    return posix6.isAbsolute(path) ? posix6.normalize(path) : undefined;
+    return posix7.isAbsolute(path) ? posix7.normalize(path) : undefined;
   const extended = path.startsWith("\\\\?\\");
   if (extended && (path.includes("/") || path.slice(4).includes("\\\\")))
     return;
@@ -31236,7 +31265,7 @@ var localMarketplacePath = (path, platform) => {
     return;
   if (drivePath.slice(3).split("\\").some((part) => /[<>:"|?*]|[. ]$/u.test(part)))
     return;
-  return win327.normalize(drivePath);
+  return win328.normalize(drivePath);
 };
 var sameCodexMarketplacePath = (first, second, platform = process.platform) => {
   const a = localMarketplacePath(first, platform);
@@ -31260,7 +31289,7 @@ var sameResolvedMarketplace = fn2("sameResolvedCodexMarketplace")(function* (lef
 var receiptFor = (content) => decodeUnknownEffect2(Receipt2, { onExcessProperty: "error" })(content).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed")));
 var priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market) {
   const oldHome = dirname16(dirname16(market));
-  const expected = join35(oldHome, CODEX_STARTUP_MARKETPLACE);
+  const expected = join34(oldHome, CODEX_STARTUP_MARKETPLACE);
   if (!sameCodexMarketplacePath(expected, market))
     return;
   const prior = yield* resolvedLocalPath(yield* inside(oldHome, CODEX_STARTUP_MARKETPLACE));
@@ -31271,13 +31300,13 @@ var priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market)
     return;
   const receipt = yield* receiptFor(snapshot);
   const installed = codexMarketplaceFiles().map(({ path, content }) => ({
-    path: join35(CODEX_STARTUP_MARKETPLACE, path),
+    path: join34(CODEX_STARTUP_MARKETPLACE, path),
     content
   }));
   const catalog = installed[0];
   if (catalog === undefined || (yield* read2(oldHome, catalog.path)) !== catalog.content)
     return;
-  const pluginRoot = join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+  const pluginRoot = join34(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
   yield* checkPluginTree(oldHome, pluginRoot, installed.slice(1), false);
   for (const { path } of installed) {
     const file = yield* read2(oldHome, path);
@@ -31346,7 +31375,7 @@ var developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m;
 var ownedInstruction = (asset, before) => {
   if (asset.path === "AGENTS.md")
     return true;
-  if (asset.path === join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
+  if (asset.path === join34(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
     return true;
   const line = asset.content.match(developerLine)?.[0];
   return asset.path.startsWith("agents/holyagent-") && asset.path.endsWith(".toml") && line !== undefined && before.replace(developerLine, () => line) === asset.content;
@@ -31382,7 +31411,7 @@ var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expe
   }).pipe(ensuring2(io2(next, () => rm11(next, { force: true })).pipe(ignore2)));
 });
 var checkNativeCodex = fn2("validateNativeCodexCapabilities")(function* (run) {
-  return yield* acquireUseRelease2(io2(tmpdir4(), () => mkdtemp6(join35(tmpdir4(), "holyagent-codex-probe-"))), (probe) => gen2(function* () {
+  return yield* acquireUseRelease2(io2(tmpdir4(), () => mkdtemp6(join34(tmpdir4(), "holyagent-codex-probe-"))), (probe) => gen2(function* () {
     const release = codexVersion.exec(yield* run(["--version"], probe))?.[1];
     if (release === undefined)
       return yield* fail9("`codex --version` did not identify the native CLI.");
@@ -31400,7 +31429,7 @@ var checkNativeCodex = fn2("validateNativeCodexCapabilities")(function* (run) {
   }), (probe) => io2(probe, () => rm11(probe, { recursive: true, force: true })).pipe(ignore2)).pipe(mapError2((error) => fail9(`Incompatible native Codex CLI. ${error.detail} ${installCodex}`)));
 });
 var setupCodex = fn2("setupCodex")(function* (env, options) {
-  if (!isAbsolute14(options.home))
+  if (!isAbsolute13(options.home))
     return yield* fail9("--codex-home must be an absolute path");
   const home = yield* canonicalProfile(options.home);
   if (home === dirname16(home))
@@ -31418,7 +31447,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
   const desired = yield* codexStartupFiles(home, options.catalog, version);
   const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
-    path: join35(CODEX_STARTUP_MARKETPLACE, path),
+    path: join34(CODEX_STARTUP_MARKETPLACE, path),
     content
   }));
   const config = desired.find(({ path }) => path === "config.toml")?.content;
@@ -31433,7 +31462,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     return yield* fail9("This profile disables Codex plugins ([features] plugins = false). No files changed.");
   if (beforeConfig !== undefined)
     yield* checkPolicy(settings, yield* parseToml(config));
-  const market = join35(home, CODEX_STARTUP_MARKETPLACE);
+  const market = join34(home, CODEX_STARTUP_MARKETPLACE);
   const registration = record4(settings.marketplaces)[CODEX_MARKETPLACE];
   const registered = record4(registration);
   if (registration !== undefined && Object.keys(registered).length === 0)
@@ -31451,10 +31480,10 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     const edited = before !== undefined && before !== asset.content && digest(before) !== previousDigest && before !== legacy.find(({ path }) => path === asset.path)?.content;
     const conflict = edited && previousDigest !== undefined && /^[a-f0-9]{64}$/.test(previousDigest) && ownedInstruction(asset, before);
     if (edited && !(conflict && (options.dryRun ? options.managedInstructions === "review" : options.managedInstructions === "replace" && options.expectedPlan !== undefined)))
-      return yield* fail9(`Kept modified or unowned Codex setup file: ${join35(home, asset.path)}`);
+      return yield* fail9(`Kept modified or unowned Codex setup file: ${join34(home, asset.path)}`);
     return { ...asset, before, conflict };
   }));
-  const sourceRoot = join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+  const sourceRoot = join34(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
   const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
   yield* checkPluginTree(home, sourceRoot, pluginAssets, false);
   const nextReceipt = `${JSON.stringify({
@@ -31462,9 +31491,9 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
   }, null, 2)}
 `;
-  const cache = join35("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
+  const cache = join34("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
   const expectedCache = pluginAssets.map(({ path, content }) => ({
-    path: join35(cache, path.slice(sourceRoot.length + 1)),
+    path: join34(cache, path.slice(sourceRoot.length + 1)),
     content
   }));
   const cached = yield* statOptional(yield* inside(home, cache));
@@ -31498,7 +31527,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
   ];
   const managedConflicts = assets.filter(({ conflict }) => conflict).map(({ path }) => ({
-    file: join35(home, path),
+    file: join34(home, path),
     detail: "Edited since setup. Replace with the bundled instructions and save a copy of the current file."
   }));
   if (options.dryRun)
@@ -31510,7 +31539,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     };
   const backups = [];
   let relinked = false;
-  const backupRoot = join35("holyagent", "setup-backups", randomUUID5());
+  const backupRoot = join34("holyagent", "setup-backups", randomUUID5());
   const verifyActiveMarketplace = fn2("verifyActiveCodexMarketplace")(function* () {
     const liveConfig = yield* read2(home, "config.toml");
     if (liveConfig === undefined)
@@ -31538,11 +31567,11 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
       label: "Codex profile files",
       run: gen2(function* () {
         if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile2)) !== beforeReceipt || !same2(yield* marketplaceLink(registered, market), link))
-          return yield* fail9(`Profile changed during setup: ${join35(home, "config.toml")}`);
+          return yield* fail9(`Profile changed during setup: ${join34(home, "config.toml")}`);
         if (options.expectedPlan !== undefined) {
           for (const asset of assets)
             if ((yield* read2(home, asset.path)) !== asset.before)
-              return yield* fail9(`Profile changed during setup: ${join35(home, asset.path)}. Review it again.`);
+              return yield* fail9(`Profile changed during setup: ${join34(home, asset.path)}. Review it again.`);
         }
         yield* io2(home, () => mkdir12(home, { recursive: true, mode: 448 }));
         if (beforeConfig === undefined)
@@ -31553,9 +31582,9 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
             yield* replace;
             continue;
           }
-          const backup = join35(backupRoot, asset.path);
+          const backup = join34(backupRoot, asset.path);
           yield* store2(home, backup, undefined, asset.before);
-          const backupFile = join35(home, backup);
+          const backupFile = join34(home, backup);
           backups.push(backupFile);
           yield* replace.pipe(uninterruptible2, onError2(() => gen2(function* () {
             if ((yield* read2(home, asset.path)) !== asset.before)
@@ -31618,7 +31647,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   })));
   return { ok: true, lines, fingerprint };
 });
-import { posix as posix7, win32 as win328 } from "path";
+import { posix as posix8, win32 as win329 } from "path";
 var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
 var browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"];
 var desktopPlatforms = ["darwin", "win32", "linux"];
@@ -31635,7 +31664,7 @@ var windowsDesktop = "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | "
 var windowsDrivePath = /^[a-z]:[\\/]/i;
 var powershell = (env) => {
   const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
-  return root !== undefined && windowsDrivePath.test(root) ? win328.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
+  return root !== undefined && windowsDrivePath.test(root) ? win329.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
 };
 var powershellArgs = (command) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command];
 var versionText = decodeUnknownOption2(String5.check(isPattern2(/^\d[\w.+:~-]{0,63}$/)));
@@ -31658,9 +31687,9 @@ var detectDesktop = fn2("detectCodexDesktop")(function* (env, platform, cwd) {
     return result.exitCode === 0 && version !== undefined ? desktopEvidence(platform, version) : undefined;
   }
   if (platform === "darwin") {
-    for (const directory of ["/Applications", posix7.join(home, "Applications")]) {
+    for (const directory of ["/Applications", posix8.join(home, "Applications")]) {
       for (const app of ["ChatGPT.app", "Codex.app"]) {
-        const plist = posix7.join(directory, app, "Contents", "Info.plist");
+        const plist = posix8.join(directory, app, "Contents", "Info.plist");
         const read = (key) => shell.run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], input);
         const id = yield* read("CFBundleIdentifier");
         if (id.exitCode !== 0 || id.stdout.trim() !== "com.openai.codex")
@@ -31691,7 +31720,7 @@ var nonlocal = (env, platform) => {
     return "Use the native desktop outside WSL to connect your browser.";
   return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
 };
-var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix7.isAbsolute(executable));
+var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix8.isAbsolute(executable));
 var steps = [
   "Update the ChatGPT desktop app. Find your browser in Settings > Computer Use, under More browsers if needed.",
   "Follow any plugin prompt. Use Install to open the extension store and review the permission prompts there.",
@@ -32355,7 +32384,7 @@ var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-
 var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
 var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
-  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join36(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
+  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join35(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
     return;
   }));
   return yield* setupCodex(env, {
@@ -32940,7 +32969,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute15, join as join37, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute14, join as join36, relative as relative7 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
@@ -32972,7 +33001,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
       continue;
     }
     const local = piLocalSourcePath(env, settings, source);
-    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute15(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
+    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute14(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
       managed++;
       continue;
     }
@@ -32987,7 +33016,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     if (root.exitCode !== 0)
       return failure2("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute15(location) || relative7(registeredRoot, join37(location, "holyagent")) !== "")
+    if (!isAbsolute14(location) || relative7(registeredRoot, join36(location, "holyagent")) !== "")
       return failure2("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -33025,7 +33054,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join37(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join36(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
       return failure2(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)

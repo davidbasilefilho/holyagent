@@ -166,6 +166,44 @@ test("the relay preflight uses native paths/ports and prevents legacy replacemen
   expect(ports).toEqual([])
 })
 
+test("ambiguous drive-less or device-namespace paths cannot authorize Windows pairing", async () => {
+  const probe = () => Effect.die("must not probe an ambiguous root")
+  const check = (environment: Env) =>
+    Effect.runPromise(checkLocalBrowseRelay(environment, probe, "win32"))
+  for (const directory of ["\\fake-drive-root", "/fake/drive-root", "\\\\?\\C:", "\\\\.\\pipe"]) {
+    await expect(check({ OPENCODE_BROWSER_HOME: directory })).rejects.toThrow("fully qualified")
+    await expect(check({ HOME: "C:\\Profile", XDG_DATA_HOME: directory })).rejects.toThrow(
+      "complete drive or UNC",
+    )
+  }
+})
+
+test("legacy data stays untouched and the preflight never probes or starts the relay", async () => {
+  const data = join(directory, "browse-data")
+  const files = [
+    join(data, "site-secrets"),
+    join(data, "secrets"),
+    join(data, "relays", "22017", "sessions.json"),
+  ]
+  for (const file of files) {
+    await json(file, { fixture: "untouched" })
+    await expect(
+      Effect.runPromise(
+        checkLocalBrowseRelay(
+          {
+            ...env(),
+            OPENCODE_BROWSER_HOME: data,
+            OPENCODE_BROWSER_PORT: "22017",
+          },
+          () => Effect.die("must not probe or migrate legacy state"),
+        ),
+      ),
+    ).rejects.toThrow("does not change it")
+    expect(await readFile(file, "utf8")).toBe('{"fixture":"untouched"}')
+    await Bun.file(file).delete()
+  }
+})
+
 test.skipIf(!shouldRunLinux)(
   "the loopback probe is read-only, native-only and does not follow redirects",
   async () => {
