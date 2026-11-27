@@ -183,6 +183,16 @@ Work PRs target `dev` directly. Do not create stacked PRs in this repository; ke
 
 The 0.3.4 transition uses the protected `release/0.3.4/integration` branch because the active 0.3.3 publication repair on `main` predates the switch to `dev`. The transition accepts work branches under `release/0.3.4/` and applies the same required `main` checks, including a strictly newer version, on promotion.
 
+### Exact 0.4.0 promotion
+
+This one-time path repairs the conflicting 0.3.4 ancestry without changing repository settings. The policy must be reviewed and merged on `dev` before a separate promotion PR. Wait for the exact policy-containing `dev` commit to finish its protected `Publish` run. Build a candidate with the audited 0.3.4 `main` as its sole parent and a tree identical to that `dev` commit. Put all three full lowercase SHAs in `release/0.4.0/promote/<main SHA>/<dev SHA>/<candidate SHA>`. The existing `branch-model` job checks the current protected `dev` SHA first, then loads the checker from that immutable commit. The other checks, stricter version gate, and protections remain in force.
+
+Do not enable auto-merge. Record a qualifying independent review and its exact candidate SHA before proceeding. Neither CI nor the preflight is human approval. After the promotion checks finish, run `bun scripts/exact-promotion.ts <owner/repo> <candidate-ref> <main-sha> <candidate-sha> <PR-number>` from a clean checkout of that exact protected `dev` commit. It binds the official Validation run to the PR, base and head, checks jobs in the exact run attempts, and then reads the live PR, `main` rules and all three refs again. Treat this preflight as separate from the PR-controlled workflow definition and inspect any modified workflow during review.
+
+Use a normal squash merge guarded by `--match-head-commit <candidate-sha>` only if authorized. Do not race a separate `dev` update or PR retargeting. GitHub's strict `main` rule and head guard still apply, but the merge API does not lock `dev` with these refs.
+
+The exception stops if `main` changes, even if the new commit could merge cleanly. This protects source that has not been reconciled into `dev`. Record the released `main` and promoted `dev` SHAs and shared tree after the official release. Squash does not synchronize histories. For later releases inspect new `main` changes and carry them through reviewed work on `dev` before preparing another promotion. The 0.4.0 exception does not admit other versions or repair branches.
+
 **Validation** (`.github/workflows/validation.yml`) runs on pull requests (opened, pushed to, reopened and edited, so a changed base is checked again). `publish.yml` calls it again on pushes to the publishing branches `main` and `dev` to validate the exact commit being published. Its jobs and status check names are the job ids below.
 
 | Check          | Runs on              | Does                                                                                                                                              |

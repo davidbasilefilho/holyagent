@@ -18,6 +18,10 @@ concurrency:
 jobs:
   validation:
     uses: ./.github/workflows/validation.yml
+    # The called workflow cannot request more access than its caller, even for PR-only jobs.
+    permissions:
+      contents: read
+      actions: read
 
   # Only the jobs that call the tagging workflows may write contents.
   stable:

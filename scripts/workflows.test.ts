@@ -276,7 +276,10 @@ describe("release readiness", () => {
 describe("publish.yml", () => {
   const publish = parse(".github/workflows/publish.yml") as {
     on: { push: Record<string, unknown> }
-    jobs: Record<string, { uses?: string; needs?: string; if?: string }>
+    jobs: Record<
+      string,
+      { uses?: string; needs?: string; if?: string; permissions?: Record<string, string> }
+    >
   }
 
   test("runs on main and dev pushes only, leaving work branches to pull-request validation", () => {
@@ -297,6 +300,16 @@ describe("publish.yml", () => {
       uses: "./.github/workflows/dev.yml",
     })
   })
+
+  test("the reusable validation caller grants the read-only permissions its branch model requests", () => {
+    const called = parse(".github/workflows/validation.yml") as {
+      jobs: Record<string, { permissions?: Record<string, string> }>
+    }
+    expect(publish.jobs["validation"]?.permissions).toEqual(
+      called.jobs["branch-model"]?.permissions,
+    )
+    expect(publish.jobs["validation"]?.permissions).toEqual({ contents: "read", actions: "read" })
+  })
 })
 
 describe("validation.yml", () => {
@@ -307,7 +320,15 @@ describe("validation.yml", () => {
       string,
       {
         if?: string
-        steps?: Array<{ name?: string; uses?: string; run?: string; env?: Record<string, string> }>
+        permissions?: Record<string, string>
+        steps?: Array<{
+          name?: string
+          if?: string
+          uses?: string
+          run?: string
+          with?: Record<string, unknown>
+          env?: Record<string, string>
+        }>
       }
     >
   }
@@ -352,6 +373,85 @@ describe("validation.yml", () => {
     expect(step?.env).toEqual({ HEAD_REF: "${{ github.head_ref }}" })
     expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
   })
+
+  test("exact promotions use the protected dev checker in the existing branch-model job", () => {
+    const job = validation.jobs["branch-model"]
+    const steps = job?.steps ?? []
+    const original = steps.find((step) => step.name === "Check out")
+    const resolve = steps.find(
+      (step) => step.name === "Resolve the protected development policy SHA",
+    )
+    const policy = steps.find((step) => step.name === "Check out protected development policy")
+    const verifier = steps.find((step) => step.name === "Check exact promotion evidence")
+    expect(job?.permissions).toEqual({ contents: "read", actions: "read" })
+    expect(original?.if).toContain("!startsWith(github.head_ref, 'release/0.4.0/promote/')")
+    expect(resolve?.if).toBe(policy?.if)
+    expect(resolve?.env).toMatchObject({ HEAD_REF: "${{ github.head_ref }}" })
+    expect(resolve?.run).toContain('gh api "repos/$GITHUB_REPOSITORY/branches/dev"')
+    expect(resolve?.run).toContain("select(.protected == true) | .commit.sha")
+    expect(resolve?.run).toContain('[[ "$actual_sha" == "$expected_sha" ]]')
+    expect(steps.indexOf(resolve!)).toBeLessThan(steps.indexOf(policy!))
+    expect(policy?.if).toBe(verifier?.if)
+    expect(policy?.with).toEqual({
+      ref: "${{ steps.promotion-policy.outputs.sha }}",
+      "persist-credentials": false,
+    })
+    expect(verifier?.env).toMatchObject({
+      BASE_SHA: "${{ github.event.pull_request.base.sha }}",
+      HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+    })
+    expect(verifier?.run).toBe(
+      'bun scripts/exact-promotion.ts "$GITHUB_REPOSITORY" "$HEAD_REF" "$BASE_SHA" "$HEAD_SHA"',
+    )
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "resolves policy only for the exact protected dev SHA",
+    () => {
+      const script = validation.jobs["branch-model"]?.steps?.find(
+        (step) => step.name === "Resolve the protected development policy SHA",
+      )?.run
+      if (!script) throw new Error("missing workflow policy resolution")
+      const temp = mkdtempSync(join(tmpdir(), "promotion-policy-"))
+      const a = "a".repeat(40)
+      const b = "b".repeat(40)
+      const c = "c".repeat(40)
+      const head = `release/0.4.0/promote/${a}/${b}/${c}`
+      try {
+        const cases = [
+          [head, b, true],
+          [head, c, false],
+          [head, "", false],
+          ["not-a-promotion", b, false],
+        ] as const
+        for (const [i, [headRef, selectedSha, matched]] of cases.entries()) {
+          const output = join(temp, `output-${i}`)
+          const run = Bun.spawnSync(
+            ["/bin/bash", "-uec", `gh() { printf '%s\\n' "$FIXTURE_SHA"; }\n${script}`],
+            {
+              env: {
+                HEAD_REF: headRef,
+                FIXTURE_SHA: selectedSha,
+                GITHUB_REPOSITORY: "owner/repo",
+                GITHUB_OUTPUT: output,
+              },
+              stdout: "pipe",
+              stderr: "pipe",
+            },
+          )
+          if (matched) {
+            expect(run.exitCode).toBe(0)
+            expect(readFileSync(output, "utf8")).toBe(`sha=${b}\n`)
+          } else {
+            expect(run.exitCode).not.toBe(0)
+            expect(() => readFileSync(output)).toThrow("ENOENT")
+          }
+        }
+      } finally {
+        rmSync(temp, { recursive: true, force: true })
+      }
+    },
+  )
 
   test("the vendor validator runs only in the isolated Linux CI step", () => {
     const steps = Object.entries(validation.jobs).flatMap(([job, value]) =>
