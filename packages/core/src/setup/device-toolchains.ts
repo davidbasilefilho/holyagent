@@ -9,7 +9,7 @@ import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { localGraphicalHostUnavailable } from "./form.ts"
 import { reportSetupActivity } from "./progress.ts"
 import { added, hint, present } from "./report.ts"
-import { Shell, toolPathExclusions } from "./shell.ts"
+import { comparableToolPath, Shell, toolPathExclusions } from "./shell.ts"
 
 /** The caller chooses preview before consent, inspect for doctor, or apply for opted-in setup. */
 export interface DeviceToolchainOptions {
@@ -47,7 +47,7 @@ const report = (lines: ReadonlyArray<string>, ready?: string): DeviceToolchainRe
 })
 
 const inside = (path: typeof posix, parent: string, full: string): boolean => {
-  const relative = path.relative(parent, full)
+  const relative = path.relative(comparableToolPath(path, parent), comparableToolPath(path, full))
   return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
 }
 
@@ -93,20 +93,24 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
       ),
     ])
   const absolute = (candidate: string) =>
-    path.isAbsolute(candidate) &&
+    path.isAbsolute(comparableToolPath(path, candidate)) &&
     !/\p{Cc}/u.test(candidate) &&
-    (!windows || /^[a-z]:[\\/]/i.test(candidate))
+    (!windows || /^[a-z]:[\\/]/i.test(comparableToolPath(path, candidate)))
   const trusted = (candidate: string) =>
     absolute(candidate) && excluded.every((root) => !inside(path, root, candidate))
-  const secure = (candidate: string, root?: string) =>
+  const verifiedPath = (candidate: string, root?: string) =>
     trusted(candidate)
-      ? Effect.tryPromise(() => fs.realpath(candidate)).pipe(
-          Effect.map(
-            (resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved)),
+      ? Effect.try(() => fs.realpathSync(candidate)).pipe(
+          Effect.map((resolved) =>
+            trusted(resolved) && (root === undefined || inside(path, root, resolved))
+              ? resolved
+              : undefined,
           ),
-          Effect.orElseSucceed(() => false),
+          Effect.orElseSucceed(() => undefined),
         )
-      : Effect.succeed(false)
+      : Effect.succeed(undefined)
+  const secure = (candidate: string, root?: string) =>
+    Effect.map(verifiedPath(candidate, root), (resolved) => resolved !== undefined)
   const isDirectory = (candidate: string) =>
     Effect.tryPromise(() => fs.stat(candidate)).pipe(
       Effect.map((entry) => entry.isDirectory()),
@@ -298,15 +302,13 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
   // ANDROID_HOME is authoritative; don't install into a different SDK while T3 sees this setting.
   const configured = firstNonEmpty(env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"])
   const selected = configured ?? defaultSdk
-  if (!(yield* secure(selected)) || !(yield* isDirectory(selected)))
+  const root = yield* verifiedPath(selected)
+  if (root === undefined || !(yield* isDirectory(root)))
     return resultWith([
       failure(
         `Android: no existing SDK verified at ${selected}; use the Android Studio setup wizard or install the official command-line tools and set ANDROID_HOME (${STUDIO})`,
       ),
     ])
-  const root = yield* Effect.tryPromise(() => fs.realpath(selected)).pipe(
-    Effect.orElseSucceed(() => selected),
-  )
   const executable = (name: string) => (windows ? `${name}.exe` : name)
   const adb = path.join(root, "platform-tools", executable("adb"))
   const emulator = path.join(root, "emulator", executable("emulator"))
@@ -460,12 +462,10 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
             Option.isSome(java) &&
             (yield* program(java.value)) &&
             !(mac && java.value === "/usr/bin/java")
-              ? yield* Effect.tryPromise(() => fs.realpath(java.value)).pipe(
-                  Effect.orElseSucceed(() => ""),
-                )
-              : ""
+              ? yield* verifiedPath(java.value)
+              : undefined
           if (
-            !absolute(resolvedJava) ||
+            resolvedJava === undefined ||
             path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin"
           ) {
             lines.push(
@@ -570,10 +570,9 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
       if (yield* absent(pointerFile)) continue
       const pointer = yield* textFile(pointerFile, directory)
       const avd = /^path\s*=\s*([^\r\n]+)$/m.exec(pointer)?.[1]?.trim()
-      if (avd === undefined || !(yield* secure(avd))) break
-      const avdPath = yield* Effect.tryPromise(() => fs.realpath(avd)).pipe(
-        Effect.orElseSucceed(() => avd),
-      )
+      if (avd === undefined) break
+      const avdPath = yield* verifiedPath(avd)
+      if (avdPath === undefined) break
       const config = yield* textFile(path.join(avdPath, "config.ini"), avdPath)
       const imagePath = /^image\.sysdir\.1\s*=\s*([^\r\n]+)$/m.exec(config)?.[1]?.trim()
       if (imagePath === undefined) break

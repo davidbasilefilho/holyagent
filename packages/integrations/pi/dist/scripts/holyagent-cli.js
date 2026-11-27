@@ -13939,8 +13939,17 @@ var pathWithBunBin = (env, options) => {
   const bunBin = join13(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
+var comparableToolPath = (api, path) => {
+  if (api !== win32)
+    return path;
+  if (/^\\\\\?\\[a-z]:\\/i.test(path))
+    return win32.normalize(path.slice(4));
+  if (/^\\\\\?\\UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(path))
+    return win32.normalize(`\\\\${path.slice(8)}`);
+  return win32.normalize(path);
+};
 var isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
+  const relative = api.relative(comparableToolPath(api, parent), comparableToolPath(api, path));
   return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
 };
 var checkoutAncestors = (api, cwd, fs) => {
@@ -13968,22 +13977,24 @@ var toolPathExclusions = (api, cwd, options = {}, fs = nodeFileSystem) => {
   if (!api.isAbsolute(cwd))
     return;
   try {
-    const physical = fs.realpathSync(cwd);
-    const roots = new Set([cwd, physical]);
+    const lexical = comparableToolPath(api, cwd);
+    const physical = comparableToolPath(api, fs.realpathSync(cwd));
+    const roots = new Set([lexical, physical]);
     if (options.home !== undefined) {
-      const physicalHome = fs.realpathSync(options.home);
+      const home = comparableToolPath(api, options.home);
+      const physicalHome = comparableToolPath(api, fs.realpathSync(options.home));
       for (const root of roots) {
-        if (api.relative(options.home, root) === "" || api.relative(physicalHome, root) === "")
+        if (api.relative(home, root) === "" || api.relative(physicalHome, root) === "")
           roots.delete(root);
       }
     }
     if (options.includeCheckout) {
       for (const root of [
-        ...checkoutAncestors(api, cwd, fs),
+        ...checkoutAncestors(api, lexical, fs),
         ...checkoutAncestors(api, physical, fs)
       ]) {
         roots.add(root);
-        roots.add(fs.realpathSync(root));
+        roots.add(comparableToolPath(api, fs.realpathSync(root)));
       }
     }
     return [...roots];
@@ -15739,7 +15750,7 @@ var report = (lines, ready) => ({
   lines
 });
 var inside = (path, parent, full) => {
-  const relative = path.relative(parent, full);
+  const relative = path.relative(comparableToolPath(path, parent), comparableToolPath(path, full));
   return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 };
 var request = ["platform-tools", "emulator"];
@@ -15769,9 +15780,12 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
     return report([
       hint("Device Simulator: could not verify checkout and home paths; no toolchain commands were started")
     ]);
-  const absolute = (candidate) => path.isAbsolute(candidate) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(candidate));
+  const absolute = (candidate) => path.isAbsolute(comparableToolPath(path, candidate)) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(comparableToolPath(path, candidate)));
   const trusted = (candidate) => absolute(candidate) && excluded.every((root) => !inside(path, root, candidate));
-  const secure = (candidate, root) => trusted(candidate) ? tryPromise2(() => fs.realpath(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved))), orElseSucceed2(() => false)) : succeed6(false);
+  const verifiedPath = (candidate, root) => trusted(candidate) ? try_2(() => fs.realpathSync(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved)) ? resolved : undefined), orElseSucceed2(() => {
+    return;
+  })) : succeed6(undefined);
+  const secure = (candidate, root) => map4(verifiedPath(candidate, root), (resolved) => resolved !== undefined);
   const isDirectory = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isDirectory()), orElseSucceed2(() => false));
   const absent = (candidate) => tryPromise2(() => fs.lstat(candidate)).pipe(match4({
     onFailure: ({ cause }) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT",
@@ -15853,11 +15867,11 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
   const defaultSdk = mac ? path.join(home, "Library", "Android", "sdk") : windows ? path.join(firstNonEmpty2(env["LOCALAPPDATA"]) ?? path.join(home, "AppData", "Local"), "Android", "Sdk") : path.join(home, "Android", "Sdk");
   const configured = firstNonEmpty2(env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"]);
   const selected = configured ?? defaultSdk;
-  if (!(yield* secure(selected)) || !(yield* isDirectory(selected)))
+  const root = yield* verifiedPath(selected);
+  if (root === undefined || !(yield* isDirectory(root)))
     return resultWith([
       failure(`Android: no existing SDK verified at ${selected}; use the Android Studio setup wizard or install the official command-line tools and set ANDROID_HOME (${STUDIO})`)
     ]);
-  const root = yield* tryPromise2(() => fs.realpath(selected)).pipe(orElseSucceed2(() => selected));
   const executable = (name) => windows ? `${name}.exe` : name;
   const adb = path.join(root, "platform-tools", executable("adb"));
   const emulator = path.join(root, "emulator", executable("emulator"));
@@ -15936,8 +15950,8 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
               platform: windows ? "win32" : mac ? "darwin" : "linux"
             }
           }) : (yield* program(path.join(javaHome, "bin", executable("java")))) ? some2(path.join(javaHome, "bin", executable("java"))) : none2();
-          const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* tryPromise2(() => fs.realpath(java.value)).pipe(orElseSucceed2(() => "")) : "";
-          if (!absolute(resolvedJava) || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
+          const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* verifiedPath(java.value) : undefined;
+          if (resolvedJava === undefined || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
             lines.push(failure("Android: sdkmanager needs a compatible JDK; set JAVA_HOME to your JDK or Android Studio JBR"));
           } else {
             const args = [`--sdk_root=${root}`, "--install", ...missing];
@@ -16000,9 +16014,11 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
         continue;
       const pointer = yield* textFile(pointerFile, directory);
       const avd = /^path\s*=\s*([^\r\n]+)$/m.exec(pointer)?.[1]?.trim();
-      if (avd === undefined || !(yield* secure(avd)))
+      if (avd === undefined)
         break;
-      const avdPath = yield* tryPromise2(() => fs.realpath(avd)).pipe(orElseSucceed2(() => avd));
+      const avdPath = yield* verifiedPath(avd);
+      if (avdPath === undefined)
+        break;
       const config = yield* textFile(path.join(avdPath, "config.ini"), avdPath);
       const imagePath = /^image\.sysdir\.1\s*=\s*([^\r\n]+)$/m.exec(config)?.[1]?.trim();
       if (imagePath === undefined)

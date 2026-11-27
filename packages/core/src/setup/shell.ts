@@ -110,9 +110,18 @@ export interface WhichOptions {
   readonly strict?: StrictLookup
 }
 
+/** Compare Win32 filesystem aliases without treating a device namespace as an ordinary drive. */
+export const comparableToolPath = (api: typeof posix, path: string): string => {
+  if (api !== win32) return path
+  if (/^\\\\\?\\[a-z]:\\/i.test(path)) return win32.normalize(path.slice(4))
+  if (/^\\\\\?\\UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(path))
+    return win32.normalize(`\\\\${path.slice(8)}`)
+  return win32.normalize(path)
+}
+
 /** Whether `path` is `parent` or below it, by the path rules of `api`. */
 const isInside = (api: typeof posix, parent: string, path: string): boolean => {
-  const relative = api.relative(parent, path)
+  const relative = api.relative(comparableToolPath(api, parent), comparableToolPath(api, path))
   return (
     relative === "" ||
     (relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative))
@@ -153,23 +162,25 @@ export const toolPathExclusions = (
 ): ReadonlyArray<string> | undefined => {
   if (!api.isAbsolute(cwd)) return undefined
   try {
-    const physical = fs.realpathSync(cwd)
-    const roots = new Set([cwd, physical])
+    const lexical = comparableToolPath(api, cwd)
+    const physical = comparableToolPath(api, fs.realpathSync(cwd))
+    const roots = new Set([lexical, physical])
     // Launching at HOME does not make it a project. A detected checkout at HOME still is one.
     if (options.home !== undefined) {
-      const physicalHome = fs.realpathSync(options.home)
+      const home = comparableToolPath(api, options.home)
+      const physicalHome = comparableToolPath(api, fs.realpathSync(options.home))
       for (const root of roots) {
-        if (api.relative(options.home, root) === "" || api.relative(physicalHome, root) === "")
+        if (api.relative(home, root) === "" || api.relative(physicalHome, root) === "")
           roots.delete(root)
       }
     }
     if (options.includeCheckout) {
       for (const root of [
-        ...checkoutAncestors(api, cwd, fs),
+        ...checkoutAncestors(api, lexical, fs),
         ...checkoutAncestors(api, physical, fs),
       ]) {
         roots.add(root)
-        roots.add(fs.realpathSync(root))
+        roots.add(comparableToolPath(api, fs.realpathSync(root)))
       }
     }
     return [...roots]

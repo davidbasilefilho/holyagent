@@ -12,7 +12,7 @@ import {
   type DeviceToolchainOptions,
 } from "../../core/src/setup/device-toolchains.ts"
 import type { Env } from "../src/setup/environment.ts"
-import { Shell, type ShellResult, shellLive } from "../src/setup/shell.ts"
+import { comparableToolPath, Shell, type ShellResult, shellLive } from "../src/setup/shell.ts"
 
 const ok = (stdout = ""): ShellResult => ({ exitCode: 0, stdout, stderr: "" })
 const bad = (stderr = ""): ShellResult => ({ exitCode: 1, stdout: "", stderr })
@@ -386,6 +386,18 @@ test("a package appearing during the official CLI probe is preserved without run
   expect(local.calls.map(({ args }) => args)).toEqual([["--no-metrics", "-h"]])
 })
 
+test("Windows checkout containment compares extended DOS and UNC spellings to their plain roots", () => {
+  const drive = (value: string) => comparableToolPath(win32, value)
+  expect(win32.relative(drive("\\\\?\\C:\\Checkout"), drive("c:\\checkout\\sdk"))).toBe("sdk")
+  expect(
+    win32.relative(
+      drive("\\\\?\\UNC\\host\\Share\\Checkout"),
+      drive("\\\\host\\share\\checkout\\sdk"),
+    ),
+  ).toBe("sdk")
+  expect(drive("\\\\.\\C:\\Checkout")).not.toBe(drive("C:\\Checkout"))
+})
+
 test.skipIf(!["linux", "win32"].includes(process.platform) || process.arch !== "x64")(
   "a project's SDK is not trusted from subdirectories, junctions or aliases",
   async () => {
@@ -412,25 +424,29 @@ test.skipIf(!["linux", "win32"].includes(process.platform) || process.arch !== "
             return bad()
           }),
       })
-      for (const [cwd, configured, profile] of [
-        [nested, sdk, home],
-        [join(cwdAlias, "frontend", "src"), sdk, home],
-        [nested, sdkAlias, home],
-        [nested, sdk, checkout],
-        [checkout, sdk, checkout],
-      ] as const) {
-        const result = await Effect.runPromise(
-          deviceToolchains(
-            {
-              HOME: profile,
-              USERPROFILE: profile,
-              ANDROID_HOME: configured,
-              DISPLAY: ":0",
-            },
-            { mode: "apply", cwd },
-          ).pipe(Effect.provideService(Shell, shell)),
-        )
-        expect(result.lines.join(" ")).toContain("no existing SDK verified")
+      for (const marker of ["directory", "worktree file"] as const) {
+        if (marker === "worktree file") {
+          await rm(gitDir, { recursive: true })
+          await writeFile(gitDir, "gitdir: ../worktree-metadata\n")
+        }
+        for (const [sample, cwd, configured, profile] of [
+          ["nested cwd", nested, sdk, home],
+          ["cwd junction", join(cwdAlias, "frontend", "src"), sdk, home],
+          ["SDK junction", nested, sdkAlias, home],
+          ["nested cwd, HOME checkout", nested, sdk, checkout],
+          ["root cwd, HOME checkout", checkout, sdk, checkout],
+        ] as const) {
+          const result = await Effect.runPromise(
+            deviceToolchains(
+              { HOME: profile, USERPROFILE: profile, ANDROID_HOME: configured, DISPLAY: ":0" },
+              { mode: "apply", cwd },
+            ).pipe(Effect.provideService(Shell, shell)),
+          )
+          expect({ case: `${marker}: ${sample}`, output: result.lines.join(" ") }).toEqual({
+            case: `${marker}: ${sample}`,
+            output: expect.stringContaining("no existing SDK verified"),
+          })
+        }
       }
       expect(calls).toEqual([])
     } finally {
