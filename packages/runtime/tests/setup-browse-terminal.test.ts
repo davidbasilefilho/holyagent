@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, sep } from "node:path"
 
-import { Effect, Layer, Option } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option } from "effect"
 
 import { FileSystem, nodeFileSystem } from "../../core/src/ports/filesystem.ts"
 import { run } from "../src/cli/program.ts"
@@ -243,7 +243,7 @@ test("public Pi alone accepts the new flags and requires explicit terminal Brows
   const pa = (args: ReadonlyArray<string>) => Effect.runPromise(run(args, host, "public"))
   expect(await pa(["setup", "pi", "--help"])).toMatchObject({
     code: 0,
-    stdout: expect.stringContaining("--open-browse"),
+    stdout: expect.stringContaining("--no-open-browse"),
   })
   expect(await pa(["setup", "pi", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "pi", "--browse-browser", "chrome"])).toMatchObject({ code: 2 })
@@ -261,6 +261,18 @@ test("public Pi alone accepts the new flags and requires explicit terminal Brows
   ).toMatchObject({ code: 2 })
   expect(await pa(["setup", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "claude", "--open-browse"])).toMatchObject({ code: 2 })
+  expect(await pa(["setup", "claude", "--no-open-browse"])).toMatchObject({ code: 2 })
+  expect(await pa(["setup", "pi", "--no-open-browse"])).toMatchObject({
+    code: 2,
+    stderr: expect.stringContaining("--no-open-browse requires --no-tui"),
+  })
+  const skipped = ["setup", "pi", "--no-tui", "--browser-use", "on", "--no-open-browse"]
+  for (const flag of [["--open-browse"], ["--browse-browser", "chrome"]]) {
+    expect(await pa([...skipped, ...flag])).toMatchObject({
+      code: 2,
+      stderr: expect.stringContaining("--no-open-browse cannot be combined"),
+    })
+  }
 })
 
 test("the public Pi dry run respects terminal handoff flags without selecting, spawning or writing", async () => {
@@ -276,7 +288,6 @@ test("the public Pi dry run respects terminal handoff flags without selecting, s
         "--no-tui",
         "--browser-use",
         "on",
-        "--open-browse",
         "--browse-browser",
         "not-an-installed-browser",
       ],
@@ -345,10 +356,11 @@ test.skipIf(!shouldRunLinux)(
       plan,
       () => Effect.void,
       host,
+      { timeoutMs: 40, intervalMs: 10 },
     )
     expect(await Effect.runPromise(action.pipe(Effect.provide(shell.layer)))).toMatchObject({
       ok: true,
-      lines: [expect.stringContaining("Installation and pairing are pending")],
+      lines: [expect.stringContaining("installation and pairing are pending")],
     })
     expect(opened).toEqual([
       [executable(), ["--profile-directory=Default", BROWSE_EXTENSION_STORE]],
@@ -495,8 +507,12 @@ test.skipIf(!shouldRunLinux)(
     const plan = await Effect.runPromise(
       planTerminalBrowse(env(), directory, "chrome").pipe(Effect.provide(s.layer)),
     )
+    const opened: Array<string | undefined> = []
     const host: BrowseDesktopHost = {
-      open: (_command, args) => Effect.sync(() => expect(args.at(-1)).toBe(optionsUrl(id))),
+      open: (_command, args) =>
+        Effect.sync(() => {
+          opened.push(args.at(-1))
+        }),
       pair: () => Effect.die("must not replace or add pairing while one exists"),
     }
     const report = await Effect.runPromise(
@@ -508,6 +524,17 @@ test.skipIf(!shouldRunLinux)(
       ok: true,
       lines: [expect.stringContaining("did not verify a connection")],
     })
+    expect(opened).toEqual([])
+    const explicit = await Effect.runPromise(
+      runTerminalBrowse(env(), directory, root, "chrome", plan, () => Effect.void, host, {
+        reopenPaired: true,
+      }).pipe(Effect.provide(s.layer)),
+    )
+    expect(explicit).toMatchObject({
+      ok: true,
+      lines: [expect.stringContaining("did not verify a connection")],
+    })
+    expect(opened).toEqual([optionsUrl(id)])
     expect(s.calls).toEqual([])
   },
 )
@@ -614,5 +641,161 @@ test.skipIf(!shouldRunLinux)(
     expect(expired.lines.join()).toContain("pairing was not confirmed")
     expect(events).toEqual(["opened", "pair"])
     expect(await Bun.file(receipt).exists()).toBe(false)
+  },
+)
+
+test.skipIf(!shouldRunLinux)(
+  "screenless Pi applies before reporting an unavailable browser without --open-browse",
+  async () => {
+    await mkdir(join(directory, ".t3"), { recursive: true })
+    const config = join(directory, ".holyagent", "config.json")
+    await json(config, { pi: { providers: ["openai-codex"], features: { browserUse: false } } })
+    await program(executable("pi"), '#!/bin/sh\n[ "$1" != "--version" ] || echo 1.5.0\n')
+    await program(executable("node"), "#!/bin/sh\necho v26.13.1\n")
+    await program(executable("npx"), "#!/bin/sh\nexit 93\n")
+    const setup = (...flags: ReadonlyArray<string>) =>
+      Effect.runPromise(
+        run(
+          ["setup", "pi", "--scope", "project", "--skip-ctx7", "--no-tui", ...flags],
+          {
+            env: { ...env(), HOLYAGENT_HOST: "pi" },
+            cwd: directory,
+            terminal: mode.terminal!,
+            stdin: Effect.die("no terminal input requested"),
+            setupTui: () => Effect.die("no setup renderer"),
+          },
+          "public",
+        ),
+      )
+    const result = await setup("--browser-use", "on", "--browse-browser", "fixture-missing-browser")
+    expect(result).toMatchObject({
+      code: 0,
+      stdout: expect.stringContaining('OpenCode Browse pending: browser "fixture-missing-browser"'),
+    })
+    expect(await Bun.file(config).json()).toMatchObject({
+      pi: { features: { browserUse: true } },
+    })
+    const off = await setup("--browser-use", "off")
+    expect(off.code).toBe(0)
+    expect(off.stdout).not.toContain("OpenCode Browse")
+    expect(await Bun.file(config).json()).toMatchObject({ pi: { features: { browserUse: false } } })
+    const unattended = await setup("--browser-use", "on", "--non-interactive")
+    expect(unattended.code).toBe(0)
+    expect(unattended.stdout).toContain("--non-interactive never opens a browser")
+    expect(unattended.stdout).not.toContain("OpenCode Browse pending")
+  },
+)
+
+test.skipIf(!shouldRunLinux)(
+  "the same command observes only its chosen profile, then opens Options and pairs without reopening its Store on retry",
+  async () => {
+    const id = BROWSE_EXTENSION_IDS[0]!
+    const otherId = BROWSE_EXTENSION_IDS[1]!
+    const events: Array<string> = []
+    await program(executable())
+    await json(profileFile(), {})
+    const s = desktop()
+    const plan = () => planTerminalBrowse(env(), directory, "chrome")
+    const ping = (message: string) =>
+      Effect.sync(() => {
+        events.push(message)
+      })
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const store = yield* Deferred.make<void>()
+        const host: BrowseDesktopHost = {
+          open: (program, args) =>
+            Effect.gen(function* () {
+              expect(program).toBe(executable())
+              expect(args[0]).toBe("--profile-directory=Default")
+              const url = args[1]
+              if (url === BROWSE_EXTENSION_STORE) {
+                yield* ping("store")
+                yield* Deferred.succeed(store, undefined)
+              } else {
+                expect(url).toBe(optionsUrl(id))
+                yield* ping("options")
+              }
+            }),
+          pair: () =>
+            Effect.tryPromise(() => pairing()).pipe(
+              Effect.tap(() => ping("pair")),
+              Effect.orElseSucceed(() => undefined),
+              Effect.as(0),
+            ),
+        }
+        const pending = yield* runTerminalBrowse(
+          env(),
+          directory,
+          root,
+          "chrome",
+          yield* plan(),
+          () => Effect.void,
+          host,
+          { timeoutMs: 1500, intervalMs: 12 },
+        ).pipe(Effect.forkScoped)
+        yield* Deferred.await(store)
+        const profiles = join(dirname(dirname(profileFile())), "Local State")
+        yield* Effect.tryPromise(() =>
+          json(profiles, {
+            profile: { info_cache: { Default: {}, "Profile 2": {} } },
+          }),
+        )
+        yield* Effect.tryPromise(() => json(profileFile("Profile 2"), extension(otherId)))
+        yield* Effect.sleep(65)
+        expect(events).toEqual(["store"])
+        yield* Effect.tryPromise(() => json(profileFile(), extension(id)))
+        const connected = yield* Fiber.join(pending)
+        expect(connected.ok).toBe(true)
+        // With the ambiguous second fixture gone, rerunning does not mint another code.
+        yield* Effect.tryPromise(() => json(profiles, { profile: { info_cache: { Default: {} } } }))
+        const again = yield* runTerminalBrowse(
+          env(),
+          directory,
+          root,
+          "chrome",
+          yield* plan(),
+          () => Effect.void,
+          host,
+        )
+        expect(again.ok).toBe(true)
+        expect(again.lines.join()).toContain("existing pairings were kept")
+        return connected
+      }).pipe(Effect.scoped, Effect.provide(s.layer)),
+    )
+    expect(result.lines.join()).toContain("confirms code redemption")
+    expect(events).toEqual(["store", "options", "pair"])
+  },
+)
+
+test.skipIf(!shouldRunLinux)(
+  "cancelling extension installation leaves the browser open, with no pairing or version checks",
+  async () => {
+    await program(executable())
+    const s = desktop()
+    const events: Array<string> = []
+    const plan = await Effect.runPromise(
+      planTerminalBrowse(env(), directory, "chrome").pipe(Effect.provide(s.layer)),
+    )
+    expect(plan.profile).toBe("Default")
+    const host: BrowseDesktopHost = {
+      signals: Effect.succeed(Effect.succeed(130)),
+      open: (_program, args) =>
+        Effect.sync(() => {
+          expect(args).toEqual(["--profile-directory=Default", BROWSE_EXTENSION_STORE])
+          events.push("store")
+        }),
+      pair: () => Effect.die("must not start pairing"),
+    }
+    const report = await Effect.runPromise(
+      runTerminalBrowse(env(), directory, root, "chrome", plan, () => Effect.void, host, {
+        timeoutMs: 200,
+        intervalMs: 10,
+      }).pipe(Effect.provide(s.layer)),
+    )
+    expect(report.lines.join()).toContain("stopped waiting")
+    expect(events).toEqual(["store"])
+    expect(s.calls).toEqual([])
+    expect(await Bun.file(fixtureCapabilities().receipt).exists()).toBe(false)
   },
 )

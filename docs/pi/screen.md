@@ -52,14 +52,18 @@ Neither is a Pi package: Pi installs nothing for them. Browse runs as `npx` at a
 On a local desktop, this line-based setup opts in to opening the selected browser without starting the setup screen.
 
 ```sh
-holyagent setup pi --no-tui --browser-use on --open-browse --browse-browser chrome
+holyagent setup pi --no-tui --browser-use on
 ```
 
-Omit `--browse-browser` to reuse a single compatible saved browser, or to use a detected compatible system default if no preference was saved. A saved empty, multiple, stale or incompatible selection does not fall back to another browser. The flag chooses the browser for this run only. If several profiles are plausible, open the extension Options in the intended profile and pair manually.
+Setup starts with a single compatible saved browser, or a detected compatible system default if no preference was saved. A saved empty, multiple, stale or incompatible selection does not fall back to another browser. Add `--browse-browser chrome` to make an explicit choice for this run. Use `--no-open-browse` to skip the handoff while keeping Browser Use enabled. If several profiles are plausible, open the extension Options in the intended profile and pair manually. The older `--open-browse` flag is accepted but no longer needed.
 
-If the extension is missing, setup opens the official store in that browser and reports it as pending. Add it yourself, then rerun the command. If it is disabled, enable it yourself first. For an enabled extension, setup opens its Options and runs the pinned `browse pair` with the package runner that installed HolyAgent (`bunx`, npm or mise). Enter the one-time code from the terminal into those Options. Setup does not copy the code into the browser's launch arguments or its report. An existing pairing is kept, and an open Options page alone is not evidence that the selected profile is connected.
+If the extension is missing, setup opens the official store in that browser and waits up to two minutes for the extension to appear enabled in the selected profile. Add it yourself. Setup opens its Options and starts pairing in the same run after it detects installation. If the extension is disabled, enable it first. If you cancel the wait or it expires, setup reports the remaining steps without undoing Pi setup. Rerun when ready.
+
+Setup runs the pinned `browse pair` with the package runner that installed HolyAgent (`bunx`, npm or mise). Enter the one-time code from the terminal into the extension Options. Setup does not copy the code into the browser's launch arguments or its report. Rerunning setup keeps existing pairings without reopening the browser. The older explicit flag can reopen Options, but an open page or existing pairing alone is not evidence that the selected profile is connected.
 
 The handoff requires normal form and an interactive terminal on a local GUI session. It opens nothing in CI, SSH, WSL, cloud, headless, dry-run or `--non-interactive` sessions. It does not install browser extensions, change Browse's relay settings or configure other agents. If a legacy or unverified listener would have to be replaced, setup leaves it running and points to the official Browse flow. If pairing is cancelled or times out, the waiting command ends. The browser and Browse's own relay may remain open, and existing pairings are not removed.
+
+Add `--device-access on` to the same local user setup to prepare the [T3 Device Simulator toolchains](device-toolchains.md). Android SDK installation, Android emulator readiness, and full Xcode readiness are distinct. Existing licenses and preferences stay in place, and any step that requires App Store access, account sign-in or elevation is left to you.
 
 ### Headless: the browser-use MCP server
 

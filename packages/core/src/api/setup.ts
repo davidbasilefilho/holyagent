@@ -45,6 +45,8 @@ export const schemas = {
     undo: Schema.optionalKey(Schema.Boolean),
     worktrees: Schema.optionalKey(Schema.Boolean),
     deviceAccess: Schema.optionalKey(Schema.Boolean),
+    devicePreparation: Schema.optionalKey(Schema.Literals(["preview", "apply"])),
+    desktopBrowseHandoff: Schema.optionalKey(Schema.Boolean),
     capabilities: Schema.optionalKey(Choices),
     form: Schema.optionalKey(Form),
   }),

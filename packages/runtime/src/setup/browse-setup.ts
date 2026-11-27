@@ -314,9 +314,7 @@ export const configureBrowse = Effect.fn("configureBrowse")(
           }
         previous = after
         targetLines.push(
-          present(
-            `${NAME}: a new connected profile was confirmed for the ${target.target} handoff`,
-          ),
+          present(`${NAME}: a new connection was confirmed during the ${target.target} handoff`),
         )
       }
       if (ready.length === 0 && prior.state === "unpaired")

@@ -44,6 +44,12 @@ export const nodeFileSystem = {
   get readdirSync() {
     return sync.readdirSync
   },
+  get lstatSync() {
+    return sync.lstatSync
+  },
+  get realpathSync() {
+    return sync.realpathSync
+  },
   get statSync() {
     return sync.statSync
   },

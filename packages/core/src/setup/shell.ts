@@ -1,4 +1,4 @@
-import { constants, lstatSync, realpathSync } from "node:fs"
+import { constants, realpathSync } from "node:fs"
 import { delimiter, dirname, isAbsolute, join, posix, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -110,9 +110,18 @@ export interface WhichOptions {
   readonly strict?: StrictLookup
 }
 
+/** Compare Win32 filesystem aliases without treating a device namespace as an ordinary drive. */
+export const comparableToolPath = (api: typeof posix, path: string): string => {
+  if (api !== win32) return path
+  if (/^\\\\\?\\[a-z]:\\/i.test(path)) return win32.normalize(path.slice(4))
+  if (/^\\\\\?\\UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(path))
+    return win32.normalize(`\\\\${path.slice(8)}`)
+  return win32.normalize(path)
+}
+
 /** Whether `path` is `parent` or below it, by the path rules of `api`. */
 const isInside = (api: typeof posix, parent: string, path: string): boolean => {
-  const relative = api.relative(parent, path)
+  const relative = api.relative(comparableToolPath(api, parent), comparableToolPath(api, path))
   return (
     relative === "" ||
     (relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative))
@@ -120,15 +129,19 @@ const isInside = (api: typeof posix, parent: string, path: string): boolean => {
 }
 
 /** A marker cuts off executable trust, never grants it. Do not follow a .git file or link. */
-const checkoutAncestors = (api: typeof posix, cwd: string): ReadonlyArray<string> => {
+const checkoutAncestors = (
+  api: typeof posix,
+  cwd: string,
+  fs: Pick<typeof nodeFileSystem, "lstatSync">,
+): ReadonlyArray<string> => {
   const roots: Array<string> = []
   for (let dir = cwd; ; dir = api.dirname(dir)) {
     try {
       const path = api.join(dir, ".git")
-      const marker = lstatSync(path)
+      const marker = fs.lstatSync(path)
       if (marker.isDirectory()) {
         // An empty .git directory (including a sandbox placeholder) is not a checkout.
-        const head = lstatSync(api.join(path, "HEAD"))
+        const head = fs.lstatSync(api.join(path, "HEAD"))
         if (head.isFile() || head.isSymbolicLink()) roots.push(dir)
       } else if ((marker.isFile() && marker.size > 0) || marker.isSymbolicLink()) {
         roots.push(dir)
@@ -137,6 +150,42 @@ const checkoutAncestors = (api: typeof posix, cwd: string): ReadonlyArray<string
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
     }
     if (api.dirname(dir) === dir) return roots
+  }
+}
+
+/** Bound trusted executables away from a workspace, even when lookup starts below it or via a link. */
+export const toolPathExclusions = (
+  api: typeof posix,
+  cwd: string,
+  options: { readonly includeCheckout?: boolean; readonly home?: string } = {},
+  fs: Pick<typeof nodeFileSystem, "lstatSync" | "realpathSync"> = nodeFileSystem,
+): ReadonlyArray<string> | undefined => {
+  if (!api.isAbsolute(cwd)) return undefined
+  try {
+    const lexical = comparableToolPath(api, cwd)
+    const physical = comparableToolPath(api, fs.realpathSync(cwd))
+    const roots = new Set([lexical, physical])
+    // Launching at HOME does not make it a project. A detected checkout at HOME still is one.
+    if (options.home !== undefined) {
+      const home = comparableToolPath(api, options.home)
+      const physicalHome = comparableToolPath(api, fs.realpathSync(options.home))
+      for (const root of roots) {
+        if (api.relative(home, root) === "" || api.relative(physicalHome, root) === "")
+          roots.delete(root)
+      }
+    }
+    if (options.includeCheckout) {
+      for (const root of [
+        ...checkoutAncestors(api, lexical, fs),
+        ...checkoutAncestors(api, physical, fs),
+      ]) {
+        roots.add(root)
+        roots.add(comparableToolPath(api, fs.realpathSync(root)))
+      }
+    }
+    return [...roots]
+  } catch {
+    return undefined
   }
 }
 
@@ -149,23 +198,12 @@ const strictWhich = (
   const windows = (strict.platform ?? process.platform) === "win32"
   const api = windows ? win32 : posix
   if (!api.isAbsolute(strict.cwd)) return null
-  const excluded = [strict.cwd]
   // Injected lookups model non-native paths. Real lookups also exclude resolved locations.
-  if (strict.which === undefined) {
-    try {
-      const physical = realpathSync(strict.cwd)
-      excluded.push(physical)
-      if (strict.excludeCheckout) {
-        const roots = new Set([
-          ...checkoutAncestors(api, strict.cwd),
-          ...checkoutAncestors(api, physical),
-        ])
-        for (const root of roots) excluded.push(root, realpathSync(root))
-      }
-    } catch {
-      return null
-    }
-  }
+  const excluded =
+    strict.which === undefined
+      ? toolPathExclusions(api, strict.cwd, { includeCheckout: strict.excludeCheckout === true })
+      : [strict.cwd]
+  if (excluded === undefined) return null
   const excludedPath = (candidate: string) =>
     excluded.some((root) => isInside(api, root, candidate))
   const trusted = path
@@ -255,7 +293,7 @@ export class Shell extends Context.Service<
     readonly run: (
       command: string,
       args: ReadonlyArray<string>,
-      options: { readonly cwd: string; readonly env?: Env },
+      options: { readonly cwd: string; readonly env?: Env; readonly stdin?: "closed" },
     ) => Effect.Effect<ShellResult>
   }
 >()("holyagent/Shell") {

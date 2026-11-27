@@ -24,11 +24,16 @@ import {
 import type { PiInstallOptions } from "./pi-install.ts"
 import { hint, present } from "./report.ts"
 
+type BrowserReportOptions = PiInstallOptions & {
+  readonly surface?: PiExecutionSurface | undefined
+  readonly pairingHandledByCaller?: boolean
+}
+
 const reportOne = (
   env: Env,
   capability: CapabilityDefinition,
   features: Readonly<Record<string, unknown>>,
-  options: PiInstallOptions,
+  options: BrowserReportOptions,
   platform: string,
 ) =>
   Effect.gen(function* () {
@@ -63,7 +68,7 @@ const reportOne = (
     // A form with a server that drives a paired browser reports where that stands. A pairing file
     // that cannot be read is a line here, not a failure of the step; doctor fails on it.
     const pairing =
-      content?.pairing === true && withheld === undefined
+      content?.pairing === true && withheld === undefined && !options.pairingHandledByCaller
         ? yield* readBrowseState(env, platform).pipe(
             Effect.map((state) => {
               const runner =
@@ -111,7 +116,7 @@ const reportOne = (
  */
 export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
   env: Env,
-  options: PiInstallOptions & { readonly surface?: PiExecutionSurface | undefined },
+  options: BrowserReportOptions,
   platform: string = process.platform,
 ) {
   const config = yield* loadPiConfig(

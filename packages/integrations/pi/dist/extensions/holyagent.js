@@ -9101,6 +9101,12 @@ var nodeFileSystem = {
   get readdirSync() {
     return sync3.readdirSync;
   },
+  get lstatSync() {
+    return sync3.lstatSync;
+  },
+  get realpathSync() {
+    return sync3.realpathSync;
+  },
   get statSync() {
     return sync3.statSync;
   }
@@ -14548,7 +14554,7 @@ var userFiles = (env) => {
   };
 };
 
-import { constants as constants4, lstatSync, realpathSync } from "node:fs";
+import { constants as constants4, realpathSync as realpathSync2 } from "node:fs";
 import { delimiter, dirname as dirname7, isAbsolute as isAbsolute7, join as join13, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14603,18 +14609,27 @@ var pathWithBunBin = (env, options) => {
   const bunBin = join13(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
+var comparableToolPath = (api, path) => {
+  if (api !== win32)
+    return path;
+  if (/^\\\\\?\\[a-z]:\\/i.test(path))
+    return win32.normalize(path.slice(4));
+  if (/^\\\\\?\\UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(path))
+    return win32.normalize(`\\\\${path.slice(8)}`);
+  return win32.normalize(path);
+};
 var isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
+  const relative = api.relative(comparableToolPath(api, parent), comparableToolPath(api, path));
   return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
 };
-var checkoutAncestors = (api, cwd) => {
+var checkoutAncestors = (api, cwd, fs) => {
   const roots = [];
   for (let dir = cwd;; dir = api.dirname(dir)) {
     try {
       const path = api.join(dir, ".git");
-      const marker = lstatSync(path);
+      const marker = fs.lstatSync(path);
       if (marker.isDirectory()) {
-        const head = lstatSync(api.join(path, "HEAD"));
+        const head = fs.lstatSync(api.join(path, "HEAD"));
         if (head.isFile() || head.isSymbolicLink())
           roots.push(dir);
       } else if (marker.isFile() && marker.size > 0 || marker.isSymbolicLink()) {
@@ -14628,28 +14643,43 @@ var checkoutAncestors = (api, cwd) => {
       return roots;
   }
 };
+var toolPathExclusions = (api, cwd, options = {}, fs = nodeFileSystem) => {
+  if (!api.isAbsolute(cwd))
+    return;
+  try {
+    const lexical = comparableToolPath(api, cwd);
+    const physical = comparableToolPath(api, fs.realpathSync(cwd));
+    const roots = new Set([lexical, physical]);
+    if (options.home !== undefined) {
+      const home = comparableToolPath(api, options.home);
+      const physicalHome = comparableToolPath(api, fs.realpathSync(options.home));
+      for (const root of roots) {
+        if (api.relative(home, root) === "" || api.relative(physicalHome, root) === "")
+          roots.delete(root);
+      }
+    }
+    if (options.includeCheckout) {
+      for (const root of [
+        ...checkoutAncestors(api, lexical, fs),
+        ...checkoutAncestors(api, physical, fs)
+      ]) {
+        roots.add(root);
+        roots.add(comparableToolPath(api, fs.realpathSync(root)));
+      }
+    }
+    return [...roots];
+  } catch {
+    return;
+  }
+};
 var strictWhich = (command, path, strict, lookup = which) => {
   const windows = (strict.platform ?? process.platform) === "win32";
   const api = windows ? win32 : posix;
   if (!api.isAbsolute(strict.cwd))
     return null;
-  const excluded = [strict.cwd];
-  if (strict.which === undefined) {
-    try {
-      const physical = realpathSync(strict.cwd);
-      excluded.push(physical);
-      if (strict.excludeCheckout) {
-        const roots = new Set([
-          ...checkoutAncestors(api, strict.cwd),
-          ...checkoutAncestors(api, physical)
-        ]);
-        for (const root of roots)
-          excluded.push(root, realpathSync(root));
-      }
-    } catch {
-      return null;
-    }
-  }
+  const excluded = strict.which === undefined ? toolPathExclusions(api, strict.cwd, { includeCheckout: strict.excludeCheckout === true }) : [strict.cwd];
+  if (excluded === undefined)
+    return null;
   const excludedPath = (candidate) => excluded.some((root) => isInside(api, root, candidate));
   const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !excludedPath(entry));
   if (trusted.length === 0)
@@ -14661,7 +14691,7 @@ var strictWhich = (command, path, strict, lookup = which) => {
       return false;
     if (strict.which === undefined) {
       try {
-        if (excludedPath(realpathSync(found)))
+        if (excludedPath(realpathSync2(found)))
           return false;
       } catch {
         return false;
@@ -14780,6 +14810,7 @@ var CTX7_MISE_UNVERIFIED = "could not verify mise's npm:ctx7 installation; make 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
+import { release as release2 } from "node:os";
 var FORM_CHOICES = CAPABILITY_FORMS;
 var DEFAULT_FORM_CHOICE = {
   form: "normal",
@@ -14790,6 +14821,21 @@ var hasDisplay = (env, platform = process.platform) => platform === "darwin" || 
 var inCi = (env) => {
   const value = env["CI"]?.trim().toLowerCase();
   return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var localGraphicalHostUnavailable = (env, platform = process.platform, kernel = release2()) => {
+  const remote = [
+    "SSH_CLIENT",
+    "SSH_CONNECTION",
+    "SSH_TTY",
+    "WSL_DISTRO_NAME",
+    "WSL_INTEROP",
+    "CODEX_CAAS_SESSION_ID"
+  ];
+  if (inCi(env) || inCloudSession(env) || remote.some((name) => firstNonEmpty2(env[name]) !== undefined) || platform === "linux" && /microsoft|wsl/i.test(kernel))
+    return "remote";
+  if (!["darwin", "linux", "win32"].includes(platform) || !hasDisplay(env, platform) || platform === "linux" && !firstNonEmpty2(env.WAYLAND_DISPLAY) && !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "") || platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
+    return "no-display";
+  return;
 };
 var detectForm = (env, platform = process.platform) => {
   if (inCloudSession(env))
@@ -16298,7 +16344,7 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
   const chromium = launched ? findChromiumWith(yield* fileSystem, env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present(`${label}: the headless browser is the Chromium at ${chromium}`)];
-  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map4((state) => {
+  const pairing = content?.pairing === true && withheld === undefined && !options.pairingHandledByCaller ? yield* readBrowseState(env, platform).pipe(map4((state) => {
     const runner = options.installedPackageRoot === undefined ? "npm" : packageRunner(options.installedPackageRoot, env);
     const { text, fix } = describeBrowseState(state, runner);
     return state.state === "paired" ? present(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
@@ -16414,8 +16460,8 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
-import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
-import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute10, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
+import { constants as constants5 } from "node:fs";
+import { posix as posix4, win32 as win324 } from "node:path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
   return;
@@ -16426,6 +16472,318 @@ var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: (
 var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
 var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
 
+var STUDIO = "https://developer.android.com/studio";
+var DEVICES = "https://developer.android.com/studio/run/managing-avds";
+var ACCELERATION = "https://developer.android.com/studio/run/emulator-acceleration";
+var XCODE = "https://developer.apple.com/xcode/resources/";
+var RUNTIMES = "https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components";
+var RuntimeList = fromJsonString2(Struct({
+  runtimes: ArraySchema(Record(String5, Unknown2)),
+  devices: Record(String5, ArraySchema(Record(String5, Unknown2)))
+}));
+var report = (lines, ready) => ({
+  ready,
+  lines
+});
+var inside = (path, parent, full) => {
+  const relative = path.relative(comparableToolPath(path, parent), comparableToolPath(path, full));
+  return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+};
+var request = ["platform-tools", "emulator"];
+var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
+  const { mode } = options;
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const windows = platform === "win32";
+  const mac = platform === "darwin";
+  const path = windows ? win324 : posix4;
+  const androidSupported = windows || platform === "linux" ? arch === "x64" : mac && (arch === "arm64" || arch === "x64");
+  const appleSupported = mac && (arch === "arm64" || arch === "x64");
+  if (!androidSupported && !appleSupported)
+    return report([
+      hint(`device simulator: no supported toolchain for ${platform}-${arch}; check ${STUDIO}`)
+    ]);
+  if (mode === "apply" && localGraphicalHostUnavailable(env, platform) !== undefined)
+    return report([
+      hint("Device Simulator: installation requires a local graphical session outside CI, SSH, WSL and cloud")
+    ]);
+  const fs = yield* fileSystem;
+  const shell = yield* Shell;
+  const cwd = options.cwd ?? process.cwd();
+  const home = homeDirectory2(env);
+  const excluded = toolPathExclusions(path, cwd, { includeCheckout: true, home }, fs);
+  if (excluded === undefined)
+    return report([
+      hint("Device Simulator: could not verify checkout and home paths; no toolchain commands were started")
+    ]);
+  const absolute = (candidate) => path.isAbsolute(comparableToolPath(path, candidate)) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(comparableToolPath(path, candidate)));
+  const trusted = (candidate) => absolute(candidate) && excluded.every((root) => !inside(path, root, candidate));
+  const verifiedPath = (candidate, root) => trusted(candidate) ? try_2(() => fs.realpathSync(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved)) ? resolved : undefined), orElseSucceed2(() => {
+    return;
+  })) : succeed6(undefined);
+  const secure = (candidate, root) => map4(verifiedPath(candidate, root), (resolved) => resolved !== undefined);
+  const isDirectory = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isDirectory()), orElseSucceed2(() => false));
+  const absent = (candidate) => tryPromise2(() => fs.lstat(candidate)).pipe(match4({
+    onFailure: ({ cause }) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT",
+    onSuccess: () => false
+  }));
+  const regular = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() && entry.size > 0), orElseSucceed2(() => false));
+  const program = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)) || !(yield* regular(candidate)))
+      return false;
+    return yield* try_2(() => fs.accessSync(candidate, windows ? constants5.F_OK : constants5.X_OK)).pipe(as2(true), orElseSucceed2(() => false));
+  });
+  const textFile = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)))
+      return "";
+    const size = yield* tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() ? entry.size : 0), orElseSucceed2(() => 0));
+    return size <= 0 || size > 65536 ? "" : yield* tryPromise2(() => fs.readFile(candidate, "utf8")).pipe(orElseSucceed2(() => ""));
+  });
+  const standardRepositories = (directory) => gen2(function* () {
+    if (!trusted(directory))
+      return false;
+    const config = path.join(directory, "repositories.cfg");
+    return yield* tryPromise2(() => fs.lstat(config)).pipe(matchEffect3({
+      onFailure: ({ cause }) => succeed6(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "ENOENT"),
+      onSuccess: (entry) => !entry.isFile() || entry.size > 65536 ? succeed6(false) : gen2(function* () {
+        if (!(yield* secure(config, directory)))
+          return false;
+        return yield* tryPromise2(() => fs.readFile(config, "utf8")).pipe(map4((body) => body.split(/\r?\n/u).every((line) => /^(?:\s*|\s*#.*|\s*count\s*=\s*0\s*)$/u.test(line))), orElseSucceed2(() => false));
+      })
+    }));
+  });
+  const run = (binary, args, childEnv, timeout = 1e4) => shell.run(binary, args, {
+    cwd: home,
+    stdin: "closed",
+    ...childEnv === undefined ? {} : { env: childEnv }
+  }).pipe(timeoutOption2(timeout));
+  const failure = (line) => hint(line);
+  const lines = [];
+  let iosReady;
+  const resultWith = (more = [], androidReady) => report([...lines, ...more], androidReady ?? iosReady);
+  if (appleSupported) {
+    const selected = firstNonEmpty2(env["DEVELOPER_DIR"]);
+    const active = selected === undefined && mode !== "preview" ? yield* run("/usr/bin/xcode-select", ["-p"]) : none2();
+    const choice = selected ?? (isSome2(active) && active.value.exitCode === 0 ? active.value.stdout.trim() : undefined);
+    const chosen = choice ?? "/Applications/Xcode.app/Contents/Developer";
+    const developer = chosen.endsWith(".app") ? path.join(chosen, "Contents", "Developer") : chosen;
+    const platformDirectory = path.join(developer, "Platforms", "iPhoneSimulator.platform");
+    const xcodebuild = path.join(developer, "usr", "bin", "xcodebuild");
+    if (mode !== "preview" && choice === undefined || !(yield* secure(developer)) || !(yield* program(xcodebuild, developer)) || !(yield* isDirectory(platformDirectory))) {
+      const clt = path.basename(developer) === "CommandLineTools" ? " (Command Line Tools are not full Xcode)" : "";
+      lines.push(failure(`iOS: select full Xcode${clt} in Xcode > Settings > Locations; install it from ${XCODE}`));
+    } else if (mode === "preview") {
+      lines.push(present(`iOS: Xcode found at ${developer}; no runtime probe or download in preview`));
+    } else {
+      const xcodeEnv = { DEVELOPER_DIR: developer };
+      const version = yield* run(xcodebuild, ["-version"], xcodeEnv);
+      const firstLaunch = isSome2(version) && version.value.exitCode === 0 && /^Xcode \d/m.test(version.value.stdout) ? yield* run(xcodebuild, ["-checkFirstLaunchStatus"], xcodeEnv) : none2();
+      if (isNone2(firstLaunch) || firstLaunch.value.exitCode !== 0) {
+        lines.push(failure("iOS: open full Xcode, review its license and complete first launch with any requested admin access"));
+      } else {
+        const runtimes = yield* run("/usr/bin/xcrun", ["simctl", "list", "--json"], xcodeEnv);
+        const available = isSome2(runtimes) && runtimes.value.exitCode === 0 ? decodeUnknownOption2(RuntimeList)(runtimes.value.stdout) : none2();
+        const ios = isSome2(available) ? available.value.runtimes.flatMap((runtime) => {
+          const id = runtime["identifier"];
+          return typeof id === "string" && id.startsWith("com.apple.CoreSimulator.SimRuntime.iOS-") && runtime["isAvailable"] === true ? [id] : [];
+        }) : [];
+        if (isSome2(available) && ios.some((id) => available.value.devices[id]?.some((device) => device["isAvailable"] === true && typeof device["udid"] === "string"))) {
+          iosReady = `Xcode (${developer}) with an available iOS Simulator device and runtime`;
+          lines.push(present(`device simulator: ${iosReady}`));
+        } else if (ios.length > 0) {
+          lines.push(failure("iOS: runtime installed but no available iOS Simulator device found; add one in Xcode > Window > Devices and Simulators"));
+        } else {
+          lines.push(failure(`iOS: no available runtime verified; complete Xcode first launch, then install an iOS runtime in Xcode > Settings > Components (${RUNTIMES})`));
+        }
+      }
+    }
+  }
+  if (!androidSupported)
+    return resultWith();
+  const defaultSdk = mac ? path.join(home, "Library", "Android", "sdk") : windows ? path.join(firstNonEmpty2(env["LOCALAPPDATA"]) ?? path.join(home, "AppData", "Local"), "Android", "Sdk") : path.join(home, "Android", "Sdk");
+  const configured = firstNonEmpty2(env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"]);
+  const selected = configured ?? defaultSdk;
+  const root = yield* verifiedPath(selected);
+  if (root === undefined || !(yield* isDirectory(root)))
+    return resultWith([
+      failure(`Android: no existing SDK verified at ${selected}; use the Android Studio setup wizard or install the official command-line tools and set ANDROID_HOME (${STUDIO})`)
+    ]);
+  const executable = (name) => windows ? `${name}.exe` : name;
+  const adb = path.join(root, "platform-tools", executable("adb"));
+  const emulator = path.join(root, "emulator", executable("emulator"));
+  const installed = all2([program(adb, root), program(emulator, root)]);
+  const have = yield* installed;
+  const missing = [];
+  const existing = [];
+  for (const [index, name] of request.entries()) {
+    if (!have[index])
+      ((yield* absent(path.join(root, name))) ? missing : existing).push(name);
+  }
+  if (existing.length > 0)
+    lines.push(failure(`Android: kept existing but unverified SDK packages ${existing.join(", ")}; inspect or repair them in Android Studio's SDK Manager`));
+  const androidEnv = { ANDROID_HOME: root, ANDROID_SDK_ROOT: root, REPO_OS_OVERRIDE: undefined };
+  if (missing.length > 0 && mode !== "inspect") {
+    const licensed = yield* textFile(path.join(root, "licenses", "android-sdk-license"), root);
+    const writable = yield* try_2(() => fs.accessSync(root, constants5.W_OK)).pipe(as2(true), orElseSucceed2(() => false));
+    const userPrefs = firstNonEmpty2(env["ANDROID_USER_HOME"]);
+    const legacyPrefs = firstNonEmpty2(env["ANDROID_SDK_HOME"]);
+    const prefs = new Set([
+      path.join(home, ".android"),
+      ...userPrefs === undefined ? [] : [userPrefs],
+      ...legacyPrefs === undefined ? [] : [path.join(legacyPrefs, ".android")]
+    ]);
+    if (!/^[0-9a-f]{40}\r?$/im.test(licensed)) {
+      lines.push(failure("Android: review and accept any required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses"));
+    } else if (!writable) {
+      lines.push(failure("Android: this SDK is not writable; choose a user-writable SDK or ask its administrator to install the missing packages"));
+    } else if (!(yield* forEach2(prefs, standardRepositories)).every(Boolean)) {
+      lines.push(failure("Android: SDK repository settings are customized or unreadable; review them and install the missing packages in Android Studio's SDK Manager"));
+    } else {
+      const localAndroid = windows ? path.join(home, "AppData", "AndroidCLI", "android.exe") : path.join(home, ".local", "bin", "android");
+      const officialCli = (yield* absent(path.join(home, ".androidrc"))) && (yield* program(localAndroid, path.dirname(localAndroid))) ? localAndroid : undefined;
+      const toolRoot = path.join(root, "cmdline-tools");
+      const versions = yield* try_2(() => fs.readdirSync(toolRoot)).pipe(orElseSucceed2(() => []));
+      const candidates = [
+        "latest",
+        ...versions.filter((entry) => /^\d+(?:\.\d+)*$/.test(entry)).sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+      ];
+      let sdkmanager;
+      for (const version of candidates) {
+        const folder = path.join(toolRoot, version);
+        const script = path.join(folder, "bin", windows ? "sdkmanager.bat" : "sdkmanager");
+        if (!(yield* program(script, root)))
+          continue;
+        const metadata = yield* textFile(path.join(folder, "source.properties"), root);
+        const classpath = path.join(folder, "lib", "sdkmanager-classpath.jar");
+        if (/^Pkg\.Desc\s*=\s*Android SDK Command-line Tools\s*$/im.test(metadata) && /^Pkg\.Revision\s*=\s*\d/m.test(metadata) && (yield* secure(classpath, root)) && (yield* regular(classpath))) {
+          sdkmanager = script;
+          break;
+        }
+      }
+      if (mode === "preview") {
+        lines.push(officialCli !== undefined || sdkmanager !== undefined ? added(`Android: would request missing SDK packages ${missing.join(", ")} with the installed Google tool; package licenses and runtime are checked on apply`) : failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+      } else {
+        const verified = officialCli === undefined ? none2() : yield* run(officialCli, ["--no-metrics", "-h"]);
+        let installing = false;
+        const install = (command, args, childEnv) => gen2(function* () {
+          if (!(yield* forEach2(missing, (name) => absent(path.join(root, name)))).every(Boolean)) {
+            lines.push(failure("Android: SDK packages changed during setup; kept them unchanged, rerun setup to verify them"));
+            return none2();
+          }
+          installing = true;
+          yield* reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`);
+          return yield* run(command, args, childEnv, 600000);
+        });
+        let result = none2();
+        if (officialCli !== undefined && isSome2(verified) && verified.value.exitCode === 0 && /\bandroid cli\b/i.test(verified.value.stdout + verified.value.stderr)) {
+          result = yield* install(officialCli, ["--no-metrics", `--sdk=${root}`, "sdk", "install", ...missing], androidEnv);
+        } else if (sdkmanager !== undefined) {
+          const javaHome = firstNonEmpty2(env["JAVA_HOME"]);
+          const java = javaHome === undefined ? yield* shell.which("java", {
+            strict: {
+              cwd,
+              excludeCheckout: true,
+              platform: windows ? "win32" : mac ? "darwin" : "linux"
+            }
+          }) : (yield* program(path.join(javaHome, "bin", executable("java")))) ? some2(path.join(javaHome, "bin", executable("java"))) : none2();
+          const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* verifiedPath(java.value) : undefined;
+          if (resolvedJava === undefined || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
+            lines.push(failure("Android: sdkmanager needs a compatible JDK; set JAVA_HOME to your JDK or Android Studio JBR"));
+          } else {
+            const args = [`--sdk_root=${root}`, "--install", ...missing];
+            const javaEnv = {
+              ...androidEnv,
+              JAVA_HOME: path.dirname(path.dirname(resolvedJava)),
+              JAVA_TOOL_OPTIONS: undefined,
+              _JAVA_OPTIONS: undefined,
+              JDK_JAVA_OPTIONS: undefined,
+              CLASSPATH: undefined
+            };
+            if (windows) {
+              const cmd = path.join(firstNonEmpty2(env["SystemRoot"], env["WINDIR"]) ?? "C:\\Windows", "System32", "cmd.exe");
+              const invocation = cmdExeArguments(sdkmanager, args);
+              if (invocation.ok && (yield* program(cmd))) {
+                result = yield* install(cmd, invocation.args, javaEnv);
+              } else
+                lines.push(failure("Android: the sdkmanager batch command could not be started safely; use Android Studio's SDK Manager"));
+            } else {
+              result = yield* install(sdkmanager, args, javaEnv);
+            }
+          }
+        } else {
+          lines.push(failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+        }
+        if (installing && isNone2(result))
+          lines.push(failure("Android: the SDK package manager timed out; finish in Android Studio's SDK Manager or rerun once the network is available"));
+        if (isSome2(result)) {
+          if (result.value.exitCode === 0 && (yield* installed).every(Boolean))
+            lines.push(added(`Android: installed ${missing.join(", ")} into ${root}`));
+          else {
+            const output = result.value.stdout + result.value.stderr;
+            lines.push(/licen[cs]e/i.test(output) ? failure("Android: review the required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses") : /java|jdk|classfile/i.test(output) ? failure("Android: SDK package manager could not use Java; set JAVA_HOME to a compatible JDK") : failure("Android: SDK packages were not verified after installation; check SDK Manager, disk space, network and permissions"));
+          }
+        }
+      }
+    }
+  }
+  const verified = yield* installed;
+  if (!verified.every(Boolean))
+    return resultWith([
+      failure(`Android: SDK at ${root} is missing verified platform-tools or Emulator binaries`)
+    ]);
+  if (mode === "preview")
+    return resultWith([
+      present(`Android: SDK tools at ${root}; no AVD or acceleration probe in preview`)
+    ]);
+  const avds = yield* run(emulator, ["-list-avds"], androidEnv);
+  const avdRoots = [
+    firstNonEmpty2(env["ANDROID_AVD_HOME"]),
+    ...["ANDROID_EMULATOR_HOME", "ANDROID_USER_HOME"].flatMap((key) => env[key] === undefined ? [] : [path.join(env[key], "avd")]),
+    path.join(home, ".android", "avd")
+  ].filter((entry) => entry !== undefined);
+  let avdReady = false;
+  const names = isSome2(avds) && avds.value.exitCode === 0 ? avds.value.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[\w][\w.-]*$/.test(line)) : [];
+  for (const name of names) {
+    for (const directory of avdRoots) {
+      const pointerFile = path.join(directory, `${name}.ini`);
+      if (yield* absent(pointerFile))
+        continue;
+      const pointer = yield* textFile(pointerFile, directory);
+      const avd = /^path\s*=\s*([^\r\n]+)$/m.exec(pointer)?.[1]?.trim();
+      if (avd === undefined)
+        break;
+      const avdPath = yield* verifiedPath(avd);
+      if (avdPath === undefined)
+        break;
+      const config = yield* textFile(path.join(avdPath, "config.ini"), avdPath);
+      const imagePath = /^image\.sysdir\.1\s*=\s*([^\r\n]+)$/m.exec(config)?.[1]?.trim();
+      if (imagePath === undefined)
+        break;
+      const image = path.resolve(root, imagePath, "system.img");
+      if ((yield* secure(image, root)) && (yield* regular(image))) {
+        avdReady = true;
+      }
+      break;
+    }
+    if (avdReady)
+      break;
+  }
+  if (!avdReady)
+    return resultWith([
+      failure(`Android: SDK available at ${root}, but no Android Virtual Device verified; create an AVD with a system image in Android Studio's Device Manager (${DEVICES})`)
+    ]);
+  const acceleration = yield* run(emulator, ["-accel-check"], androidEnv);
+  if (isNone2(acceleration) || acceleration.value.exitCode !== 0 || !/^accel:\s*\n0(?:\s|$)/m.test(acceleration.value.stdout + `
+` + acceleration.value.stderr))
+    return resultWith([
+      failure(`Android: AVD configured, but hardware acceleration not verified; check ${windows ? "WHPX" : mac ? "Hypervisor.Framework" : "KVM and its permissions"} (${ACCELERATION})`)
+    ]);
+  const ready = `the Android SDK (${root}) with a configured AVD and hardware acceleration`;
+  return resultWith([present(`device simulator: ${ready}`)], ready);
+});
+
+import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
+import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute10, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -16793,6 +17151,14 @@ var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
 });
 var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join23(homeDirectory2(env), ".t3");
 var t3SettingsFile = (env) => join23(t3Home(env), "userdata", "settings.json");
+var devicePreparationRefusal = fn2("t3DevicePreparationRefusal")(function* (env) {
+  const snapshot = yield* readJsonObjectSnapshot(t3SettingsFile(env));
+  for (const key of ["enableDeviceSupport", "enableAgentDeviceAccess"]) {
+    if (snapshot.value?.[key] !== undefined && snapshot.value[key] !== true)
+      return `T3 Code's ${key} setting is not enabled; kept it unchanged`;
+  }
+  return;
+});
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory2(env);
@@ -16988,9 +17354,9 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
     return {
       line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
     };
-  const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
+  const host = config.pi.t3.deviceAccess ? options.deviceReadiness === undefined ? yield* deviceHost(env, options.platform ?? process.platform) : options.deviceReadiness ?? undefined : undefined;
   const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
-  const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
+  const deviceNote = wantsDevices && host === undefined ? options.deviceReadiness === null ? "device access left out: simulator readiness was not verified" : "device access left out: no Xcode or Android SDK found" : undefined;
   return {
     target: {
       file: t3SettingsFile(env),
@@ -17220,6 +17586,7 @@ var setup = fn2("setup")(function* (env, options) {
       };
   }
   let piSteps = true;
+  let deviceReadiness;
   const whenPiSaved = () => piSteps;
   const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
   const report = (lines) => ({ lines });
@@ -17241,14 +17608,45 @@ var setup = fn2("setup")(function* (env, options) {
       ]),
       phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
       phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
-      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, {
+        ...piOptions,
+        surface,
+        pairingHandledByCaller: options.desktopBrowseHandoff === true
+      })), whenPiSaved),
       ...scope === "user" ? [
-        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+        ...piOnly && options.deviceAccess === true && options.devicePreparation !== undefined ? [
+          phase("Device Simulator tools", gen2(function* () {
+            const config = yield* loadPiConfig(env, piOptions.cwd, "user", choices, options.piProviders).pipe(orElseSucceed2(() => {
+              return;
+            }));
+            if (config?.pi.enable !== true || !config.pi.t3.deviceAccess || config.pi.t3.scope === "project")
+              return [
+                hint("Device Simulator: skipped by the existing Pi or T3 Code settings")
+              ];
+            deviceReadiness = null;
+            const t3 = yield* result2(devicePreparationRefusal(env));
+            if (t3._tag === "Failure")
+              return [
+                hint("Device Simulator: not prepared because T3 Code settings could not be read")
+              ];
+            if (t3.success !== undefined)
+              return [hint(`Device Simulator: ${t3.success}`)];
+            const mode = options.dryRun || form.form !== "normal" ? "preview" : options.devicePreparation ?? "preview";
+            const prepared = yield* deviceToolchains(env, {
+              mode,
+              cwd: piOptions.cwd
+            });
+            deviceReadiness = prepared.ready ?? null;
+            return prepared.lines;
+          }), whenPiSaved)
+        ] : [],
+        phase("T3 Code settings", asStep("t3 settings", suspend2(() => installT3Settings(env, piOptions.cwd, {
           dryRun: options.dryRun,
           ...options.piProviders === undefined ? {} : { providers: options.piProviders },
           ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-        })), whenPiSaved)
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess },
+          ...deviceReadiness === undefined ? {} : { deviceReadiness }
+        }))), whenPiSaved)
       ] : []
     ] : Object.keys(choices).length === 0 ? [] : [
       report(() => [
@@ -17395,6 +17793,8 @@ var schemas4 = {
     undo: optionalKey2(Boolean3),
     worktrees: optionalKey2(Boolean3),
     deviceAccess: optionalKey2(Boolean3),
+    devicePreparation: optionalKey2(Literals(["preview", "apply"])),
+    desktopBrowseHandoff: optionalKey2(Boolean3),
     capabilities: optionalKey2(Choices),
     form: optionalKey2(Form)
   }),
@@ -28951,9 +29351,9 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
   }))))));
   return { changes, summary: summarise(changes) };
 });
-import { lstatSync as lstatSync2, realpathSync as realpathSync2 } from "node:fs";
+import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
-import { posix as posix4, win32 as win324 } from "node:path";
+import { posix as posix5, win32 as win325 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var REVIEW_MODEL = "gpt-6-luna";
 var REVIEW_TIMEOUT_MS = 90000;
@@ -29345,7 +29745,7 @@ var PROTECTED_FOLDERS = [
   ".agents"
 ];
 var currentHost = () => ({ platform: process.platform, home: homedir3() });
-var pathsOf2 = (host) => host.platform === "win32" ? win324 : posix4;
+var pathsOf2 = (host) => host.platform === "win32" ? win325 : posix5;
 var UNICODE_SPACES = /[  -   　]/g;
 var SHELL_DRIVE_PATH = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i;
 var shellDrivePath = (path) => {
@@ -29383,7 +29783,7 @@ var throughLinks = (path, host) => {
   const tail = [];
   let current = path;
   for (;; ) {
-    const real = probe(() => realpathSync2(current));
+    const real = probe(() => realpathSync3(current));
     if (real.found)
       return paths.join(real.value, ...tail);
     if (real.code !== "ENOENT")

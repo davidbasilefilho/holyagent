@@ -92,6 +92,8 @@ export interface T3SettingsOptions {
   readonly worktrees?: boolean
   /** Whether agents may use devices (a later setup choice); `true` when absent. */
   readonly deviceAccess?: boolean
+  /** The screenless setup's verified simulator readiness. Null means checked but not ready. */
+  readonly deviceReadiness?: string | null
   /** The operating system, `process.platform` when absent; only Xcode detection reads it. */
   readonly platform?: string
   /**
@@ -184,6 +186,18 @@ export const t3Home = (env: Env) =>
 
 /** The file T3 Code's server settings live in: `userdata/settings.json` under its home. */
 export const t3SettingsFile = (env: Env) => join(t3Home(env), "userdata", "settings.json")
+
+/** Check T3's explicit choices before touching an external device toolchain. */
+export const devicePreparationRefusal = Effect.fn("t3DevicePreparationRefusal")(function* (
+  env: Env,
+) {
+  const snapshot = yield* readJsonObjectSnapshot(t3SettingsFile(env))
+  for (const key of ["enableDeviceSupport", "enableAgentDeviceAccess"]) {
+    if (snapshot.value?.[key] !== undefined && snapshot.value[key] !== true)
+      return `T3 Code's ${key} setting is not enabled; kept it unchanged`
+  }
+  return undefined
+})
 
 const isDirectory = (path: string) =>
   fileSystem.pipe(
@@ -489,7 +503,7 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
   cwd: string,
   options: Pick<
     T3SettingsOptions,
-    "worktrees" | "deviceAccess" | "platform" | "config" | "providers"
+    "worktrees" | "deviceAccess" | "deviceReadiness" | "platform" | "config" | "providers"
   >,
 ) {
   const config =
@@ -510,12 +524,16 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
       ),
     } satisfies Outcome
   const host = config.pi.t3.deviceAccess
-    ? yield* deviceHost(env, options.platform ?? process.platform)
+    ? options.deviceReadiness === undefined
+      ? yield* deviceHost(env, options.platform ?? process.platform)
+      : (options.deviceReadiness ?? undefined)
     : undefined
   const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess
   const deviceNote =
     wantsDevices && host === undefined
-      ? "device access left out: no Xcode or Android SDK found"
+      ? options.deviceReadiness === null
+        ? "device access left out: simulator readiness was not verified"
+        : "device access left out: no Xcode or Android SDK found"
       : undefined
   return {
     target: {

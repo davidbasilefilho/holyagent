@@ -8,7 +8,6 @@ import {
   discoverBrowsers,
   systemDefaultBrowser,
 } from "../../../core/src/setup/browser-discovery.ts"
-import { inCloudSession } from "../../../core/src/vcs/identity.ts"
 import { cmdExeArguments, isBatchFile } from "../pi/bash/cmd.ts"
 import { liveHost, stopGroup } from "../pi/browser-launch.ts"
 import {
@@ -24,26 +23,20 @@ import {
   readBrowsePairing,
 } from "./browse.ts"
 import { readBrowserPreference } from "./browser-preferences.ts"
-import { definedEnv, type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
+import { definedEnv, type Env, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
-import { type FormChoice, hasDisplay, inCi } from "./form.ts"
+import { type FormChoice, localGraphicalHostUnavailable } from "./form.ts"
 import { hint, type Report } from "./report.ts"
 import { findCommand, pathWithBunBin, Shell } from "./shell.ts"
 import type { Terminal } from "./tui/session.ts"
 
 const NAME = "OpenCode Browse"
 const WAIT_SECONDS = 180
+const INSTALL_WAIT_MS = 120_000
+const PROFILE_CHECK_MS = 2_000
 const BrowserId = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,99}$/))
 const isBrowserId = Schema.is(BrowserId)
 const isKnownExtension = Schema.is(Schema.Literals(BROWSE_EXTENSION_IDS))
-const remoteVariables = [
-  "SSH_CLIENT",
-  "SSH_CONNECTION",
-  "SSH_TTY",
-  "WSL_DISTRO_NAME",
-  "WSL_INTEROP",
-  "CODEX_CAAS_SESSION_ID",
-] as const
 
 const failure = (message: string) => new SetupFailure({ message })
 const failed = (detail: string): Report => ({ ok: false, lines: [`! ${NAME}: ${detail}`] })
@@ -69,22 +62,9 @@ export const terminalBrowseUnavailable = (
   if (mode.form.form !== "normal") return "desktop Browse requires normal form"
   if (!mode.terminal?.stdin || !mode.terminal.stdout || env.TERM?.toLowerCase() === "dumb")
     return "desktop Browse requires an interactive terminal"
-  if (
-    inCi(env) ||
-    inCloudSession(env) ||
-    remoteVariables.some((name) => firstNonEmpty(env[name]) !== undefined) ||
-    (platform === "linux" && /microsoft|wsl/i.test(kernel))
-  )
-    return "desktop Browse is not opened in CI, SSH, WSL or a cloud session"
-  if (
-    !["darwin", "linux", "win32"].includes(platform) ||
-    !hasDisplay(env, platform) ||
-    (platform === "linux" &&
-      !firstNonEmpty(env.WAYLAND_DISPLAY) &&
-      !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "")) ||
-    (platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
-  )
-    return "desktop Browse requires a local graphical session"
+  const host = localGraphicalHostUnavailable(env, platform, kernel)
+  if (host === "remote") return "desktop Browse is not opened in CI, SSH, WSL or a cloud session"
+  if (host === "no-display") return "desktop Browse requires a local graphical session"
   return undefined
 }
 
@@ -95,7 +75,7 @@ export interface TerminalBrowsePlan {
   readonly executable: string
   /** Recheck identity without resolving a wrapper name away when launching it. */
   readonly executableIdentity: string
-  readonly profile?: string
+  readonly profile: string
   readonly extensionId?: string
   readonly next: "extension" | "disabled" | "pair"
 }
@@ -103,12 +83,18 @@ export interface TerminalBrowsePlan {
 const safeProfile = (profile: string) =>
   profile !== "." && profile !== ".." && !/[\p{Cc}/\\]/u.test(profile) && profile.trim() === profile
 
-/** Select one compatible executable and at most one profile, without opening anything. */
+const browserProfiles = (env: Env, browser: string, platform: string = process.platform) =>
+  findBrowseProfiles(env, platform, true).pipe(
+    Effect.map((profiles) => profiles.filter(({ browser: name }) => name === browser)),
+  )
+
+/** Select a compatible executable and a single local profile, without opening anything. */
 export const planTerminalBrowse = Effect.fn("planTerminalBrowse")(function* (
   env: Env,
   cwd: string,
   requested: string | undefined,
   platform: string = process.platform,
+  pinnedProfile?: string,
 ) {
   if (requested !== undefined && !isBrowserId(requested))
     return yield* failure("use a detected browser id with --browse-browser, for example chrome")
@@ -155,17 +141,24 @@ export const planTerminalBrowse = Effect.fn("planTerminalBrowse")(function* (
     file.mtimeMs,
     file.ctimeMs,
   ])
-  const profiles = (yield* findBrowseProfiles(env, platform, true)).filter(
-    ({ browser: name }) => name === browser.name,
-  )
+  const profiles = yield* browserProfiles(env, browser.name, platform)
   const enabled = profiles.filter(({ extension }) => extension === "enabled")
   const profile =
-    enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined
-  if (profile === undefined && profiles.length > 1)
+    pinnedProfile !== undefined
+      ? profiles.find(({ profile: name }) => name === pinnedProfile)
+      : enabled.length === 1
+        ? enabled[0]
+        : profiles.length === 1
+          ? profiles[0]
+          : undefined
+  if (pinnedProfile === undefined && profile === undefined && profiles.length > 1)
     return yield* failure(
       `${browser.name} has multiple possible profiles. Open the extension's Options in the intended profile and pair manually.`,
     )
-  if (profile !== undefined && (!safeProfile(profile.profile) || profile.profile === ""))
+  // When there are no existing profiles, open the standard Default profile explicitly and wait
+  // only for installation there. A different profile appearing later is not authorization.
+  const profileName = profile?.profile ?? pinnedProfile ?? "Default"
+  if (!safeProfile(profileName) || profileName === "")
     return yield* failure("the detected profile cannot be opened safely; open it manually")
   if (profile?.extension === "enabled" && !isKnownExtension(profile.extensionId))
     return yield* failure(
@@ -176,13 +169,13 @@ export const planTerminalBrowse = Effect.fn("planTerminalBrowse")(function* (
     name: browser.name,
     executable,
     executableIdentity,
+    profile: profileName,
     next:
       profile?.extension === "enabled"
         ? "pair"
         : profile?.extension === "disabled"
           ? "disabled"
           : "extension",
-    ...(profile === undefined ? {} : { profile: profile.profile }),
     ...(profile?.extensionId === undefined ? {} : { extensionId: profile.extensionId }),
   } satisfies TerminalBrowsePlan
 })
@@ -197,6 +190,16 @@ export interface BrowseDesktopHost {
   readonly pair: BrowsePair
   /** A read-only compatibility check before the native pairing command. */
   readonly probeRelay?: BrowseRelayProbe
+  /** Interrupt waiting for the user's installation without closing their browser. */
+  readonly signals?: typeof liveHost.signals
+}
+
+/** Time budget for the local profile check, injectable by tests without a real desktop. */
+export interface BrowseHandoffOptions {
+  readonly timeoutMs?: number
+  readonly intervalMs?: number
+  /** A legacy explicit flag may reopen verified Options without starting another pairing. */
+  readonly reopenPaired?: boolean
 }
 
 // The browser needs the desktop session and its own profile, not credentials in the invoking
@@ -285,10 +288,35 @@ export const liveBrowseDesktop: BrowseDesktopHost = {
     }),
   pair: livePair,
   probeRelay: browseRelaySafe,
+  signals: liveHost.signals,
 }
 
-const label = (plan: TerminalBrowsePlan) =>
-  plan.profile === undefined ? plan.name : `${plan.name}, ${plan.profile}`
+const label = (plan: TerminalBrowsePlan) => `${plan.name}, ${plan.profile}`
+
+const waitForInstall = (
+  env: Env,
+  target: TerminalBrowsePlan,
+  host: BrowseDesktopHost,
+  wait: BrowseHandoffOptions,
+) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const received = yield* host.signals ?? Effect.succeed(Effect.never)
+      const check = Effect.gen(function* () {
+        while (true) {
+          const installed = (yield* browserProfiles(env, target.name)).find(
+            ({ profile, extension }) => profile === target.profile && extension === "enabled",
+          )
+          if (isKnownExtension(installed?.extensionId)) return installed.extensionId
+          yield* Effect.sleep(wait.intervalMs ?? PROFILE_CHECK_MS)
+        }
+      })
+      return yield* Effect.raceFirst(
+        check.pipe(Effect.timeoutOption(wait.timeoutMs ?? INSTALL_WAIT_MS)),
+        received.pipe(Effect.as("cancelled" as const)),
+      )
+    }),
+  )
 
 /** Open a verified store/Options destination after successful Pi setup and recheck before pairing. */
 export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
@@ -299,48 +327,69 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
   expected: TerminalBrowsePlan,
   notify: (line: string) => Effect.Effect<void>,
   host: BrowseDesktopHost = liveBrowseDesktop,
+  wait: BrowseHandoffOptions = {},
 ) {
   const shell = yield* Shell
   const checkLocalRelay = checkLocalBrowseRelay(
     env,
     host.probeRelay ?? (() => Effect.succeed(true)),
   )
-  const check = Effect.gen(function* () {
-    const current = yield* planTerminalBrowse(env, cwd, requested)
-    if (JSON.stringify(current) !== JSON.stringify(expected))
-      return yield* failure("the browser or selected profile changed; run setup again")
-  })
-  const profile = label(expected)
-  const open = (url: string) =>
-    host.open(
-      expected.executable,
-      [...(expected.profile === undefined ? [] : [`--profile-directory=${expected.profile}`]), url],
-      {
-        cwd: homeDirectory(env),
+  const check = (snapshot: TerminalBrowsePlan, pin: boolean) =>
+    Effect.gen(function* () {
+      const current = yield* planTerminalBrowse(
         env,
-      },
-    )
+        cwd,
+        requested,
+        process.platform,
+        pin ? snapshot.profile : undefined,
+      )
+      if (JSON.stringify(current) !== JSON.stringify(snapshot))
+        return yield* failure("the browser or selected profile changed; run setup again")
+    })
+  const profile = label(expected)
+  const kept = `existing pairings were kept. Setup did not verify a connection for ${profile}.`
+  const open = (url: string) =>
+    host.open(expected.executable, [`--profile-directory=${expected.profile}`, url], {
+      cwd: homeDirectory(env),
+      env,
+    })
   const report = yield* Effect.gen(function* () {
-    yield* check
+    yield* check(expected, false)
     if (expected.next === "disabled")
       return pending(
         `extension is disabled in ${profile}. Enable it in the browser and rerun setup.`,
       )
-    if (expected.next === "extension") {
+    yield* checkLocalRelay
+    if (!wait.reopenPaired && (yield* readBrowsePairing(env)).state === "paired")
+      return pending(kept)
+    const ready = yield* Effect.gen(function* () {
+      if (expected.next !== "extension") return expected
       yield* open(BROWSE_EXTENSION_STORE)
-      return pending(
-        `opened the official extension store in ${profile}. Installation and pairing are pending. Add the extension, then rerun setup.`,
+      yield* notify(
+        `${NAME}: add the official extension in ${profile}. Setup will wait for it, then pair. Ctrl+C stops waiting.`,
       )
-    }
-    if (!isKnownExtension(expected.extensionId)) return yield* failure("unsupported extension")
-    const options = `chrome-extension://${expected.extensionId}/settings.html`
+      const installed = yield* waitForInstall(env, expected, host, wait)
+      if (installed === "cancelled") return undefined
+      if (Option.isNone(installed)) return null
+      return { ...expected, next: "pair", extensionId: installed.value } as const
+    })
+    if (ready === undefined)
+      return pending(
+        `stopped waiting for installation in ${profile}. Pairing did not start. Rerun setup when ready.`,
+      )
+    if (ready === null)
+      return pending(
+        `installation and pairing are pending in ${profile}. Setup did not confirm the extension. Add it in that profile, then rerun setup.`,
+      )
+    yield* check(ready, true)
+    if (!isKnownExtension(ready.extensionId)) return yield* failure("unsupported extension")
+    const options = `chrome-extension://${ready.extensionId}/settings.html`
     yield* checkLocalRelay
     const pairing = yield* readBrowsePairing(env)
     if (pairing.state === "paired") {
+      if (!wait.reopenPaired) return pending(kept)
       yield* open(options)
-      return pending(
-        `opened extension Options in ${profile}. Existing pairings were kept. Setup did not verify a connection for this profile.`,
-      )
+      return pending(`opened extension Options in ${profile}; ${kept}`)
     }
     const plan = yield* planBrowse(env, packageRoot)
     if (plan.action === undefined || plan.next !== "pair")
@@ -348,7 +397,7 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
     let handoffFailure: string | undefined
     const pair: BrowsePair = (command, args, processOptions) =>
       Effect.gen(function* () {
-        yield* check
+        yield* check(ready, true)
         yield* checkLocalRelay
         if ((yield* readBrowsePairing(env)).state !== "unpaired")
           return yield* failure("pairing state changed; existing pairings were kept")
@@ -378,7 +427,10 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
         }
       : result
   }).pipe(
-    Effect.timeoutOption((WAIT_SECONDS + 55) * 1000),
+    Effect.timeoutOption(
+      (WAIT_SECONDS + 55) * 1000 +
+        (expected.next === "extension" ? (wait.timeoutMs ?? INSTALL_WAIT_MS) : 0),
+    ),
     Effect.map(Option.getOrElse(() => failed("handoff timed out; pairing was not confirmed"))),
     Effect.catchTag("SetupFailure", ({ message }) => Effect.succeed(failed(message))),
   )
