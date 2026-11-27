@@ -38,4 +38,5 @@ jobs:
     uses: ./.github/workflows/dev.yml
     permissions:
       contents: write
+      actions: read
       id-token: write

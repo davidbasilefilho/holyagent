@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { Cause, Effect, Exit } from "effect"
 
 import { type NpmResult, type NpmRunner, publishArtifact, PublishError } from "./npm-publishing.ts"
+import { DevPublicationError, type verifyDevPublication } from "./verify-dev-publication.ts"
 
 // Refuse fixtures under an existing repository, even when the system temp directory is overridden.
 const mkdtempSync = (prefix: string) => {
@@ -236,6 +237,240 @@ describe("packed npm publication", () => {
           (await exercise([...absent(), devHead()], [missing, fail("", "publish denied")])).result,
         ),
       ).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("protected dev publication recovery", () => {
+  const version = "0.4.0-dev.2026-11-27.20-54-33.ga371bbd"
+  const devCommit = `a371bbd${"a".repeat(33)}`
+  const devContext = {
+    repository: "davidbasilefilho/holyagent",
+    tag: `holyagent-${version}`,
+    commit: devCommit,
+    token: "test",
+  }
+  const staged = (
+    value = version,
+    code = "E409",
+    registry = "https://registry.npmjs.org/holyagent",
+  ) =>
+    fail(
+      "",
+      `npm error code ${code}\nnpm error 409 Conflict - PUT ${registry} - Cannot publish over previously staged version "${value}".\nnpm error A complete log of this run can be found in: /tmp/npm-debug.log\n`,
+    )
+  const missing = fail(JSON.stringify({ error: { code: "E404" } }))
+
+  test("only resumes an exact immutable dev publication on the current protected head", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "npm-dev-recovery-"))
+    try {
+      const manifest = {
+        name: "holyagent",
+        version,
+        repository: {
+          type: "git",
+          url: `https://github.com/${devContext.repository}`,
+          directory: "packages/integrations/pi/dist",
+        },
+      }
+      writeFileSync(join(dir, "package.json"), JSON.stringify(manifest))
+      expect(
+        Bun.spawnSync(["bun", "pm", "pack", "--destination", dir], { cwd: dir }).exitCode,
+      ).toBe(0)
+      const path = join(dir, `holyagent-${version}.tgz`)
+      const contents = await Bun.file(path).arrayBuffer()
+      const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(contents).digest("base64")}`
+      const metadata = { name: manifest.name, version, dist: { integrity } }
+      const existing = ok(JSON.stringify(metadata))
+      type Scenario = {
+        responses?: NpmResult[]
+        channels?: string[]
+        branches?: Response[]
+        refs?: Response[]
+        errors?: DevPublicationError[]
+        tag?: string
+        context?: typeof devContext
+      }
+      const exercise = async ({
+        responses = [existing],
+        channels = [],
+        branches = [],
+        refs = [],
+        errors = [],
+        tag = "dev",
+        context: target = devContext,
+      }: Scenario = {}) => {
+        const calls: string[][] = []
+        const requests: string[] = []
+        const verified: Parameters<typeof verifyDevPublication>[] = []
+        let waits = 0
+        const run: NpmRunner = (args) => {
+          calls.push([...args])
+          return Effect.succeed(responses.shift() ?? fail("", "unexpected command"))
+        }
+        const request = (url: string, init: RequestInit) => {
+          expect(init.method ?? "GET").toBe("GET")
+          requests.push(url)
+          if (url.endsWith("/branches/dev"))
+            return Promise.resolve(branches.shift() ?? devHead(devCommit))
+          if (url.endsWith("/dist-tags"))
+            return Promise.resolve(devTag(channels.shift() ?? version))
+          if (url.includes("/git/ref/tags/"))
+            return Promise.resolve(refs.shift() ?? new Response("", { status: 404 }))
+          if (url === `https://api.github.com/repos/${target.repository}`)
+            return Promise.resolve(new Response("{}"))
+          return Promise.reject(new Error(`Unexpected request ${url}`))
+        }
+        const verify: typeof verifyDevPublication = (file, identity) => {
+          verified.push([file, identity])
+          const error = errors.shift()
+          return error === undefined
+            ? Effect.succeed({ runId: 123, attempt: 1, sha256: "0".repeat(64) })
+            : Effect.fail(error)
+        }
+        const exit = await Effect.runPromiseExit(
+          publishArtifact(
+            path,
+            tag,
+            target,
+            run,
+            request,
+            Effect.sync(() => {
+              waits++
+            }),
+            verify,
+          ),
+        )
+        const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
+        return { calls, error, requests, verified, waits }
+      }
+      const view = ["view", `holyagent@${version}`, "--json"]
+      const publish = ["publish", path, "--tag", "dev", "--provenance", "--ignore-scripts"]
+      const verification: Parameters<typeof verifyDevPublication> = [
+        path,
+        { repository: devContext.repository, commit: devCommit, version },
+      ]
+      const retained = await exercise()
+      expect(retained.error).toBeUndefined()
+      expect(retained.calls).toEqual([view])
+      expect(retained.waits).toBe(0)
+      expect(retained.verified).toEqual([verification])
+      expect(
+        retained.requests.filter((url) => url.endsWith(`/git/ref/tags/${devContext.tag}`)),
+      ).toHaveLength(2)
+      expect(retained.requests.at(-1)).toEndWith("/branches/dev")
+
+      const delayed = await exercise({
+        responses: [missing, staged()],
+        channels: ["old", version, version, version],
+        errors: [
+          new DevPublicationError({
+            detail: "Exact version still returning HTTP 404",
+            pending: true,
+          }),
+        ],
+        refs: [object("commit", devCommit), object("commit", devCommit)],
+      })
+      expect(delayed.error).toBeUndefined()
+      expect(delayed.calls).toEqual([view, publish])
+      expect(delayed.verified).toEqual([verification, verification])
+      expect(delayed.waits).toBe(2)
+
+      const invisible = await exercise({
+        responses: [missing, staged()],
+        channels: Array<string>(17).fill("old"),
+      })
+      expect(invisible.error).toMatchObject({
+        detail: expect.stringContaining("within the readback window"),
+      })
+      expect(invisible.calls).toEqual([view, publish])
+      expect(invisible.verified).toEqual([])
+      expect(invisible.waits).toBe(16)
+
+      for (const rejected of [
+        staged(`${version}-other`),
+        staged(version, "E403"),
+        staged(version, "E409", "https://other.example/holyagent"),
+        fail("", "npm error code E409\nnpm error 409 arbitrary conflict"),
+      ]) {
+        const result = await exercise({ responses: [missing, rejected] })
+        expect(result.error).toMatchObject({
+          detail: expect.stringContaining("npm publish failed"),
+        })
+        expect(result.calls).toEqual([view, publish])
+        expect(result.verified).toEqual([])
+        expect(result.requests.filter((url) => url.endsWith("/branches/dev"))).toHaveLength(1)
+      }
+
+      for (const candidate of [
+        { ...metadata, name: "other" },
+        { ...metadata, version: `${version}-other` },
+        { ...metadata, dist: { integrity: "sha512-something-else" } },
+      ]) {
+        const result = await exercise({ responses: [ok(JSON.stringify(candidate))] })
+        expect(result.error).toBeInstanceOf(PublishError)
+        expect(result.calls).toEqual([view])
+        expect(result.verified).toEqual([])
+      }
+
+      for (const scenario of [
+        { tag: "latest" },
+        { tag: "custom" },
+        { context: { ...devContext, tag: "holyagent-other-version" } },
+        { context: { ...devContext, commit: other } },
+      ]) {
+        const result = await exercise(scenario)
+        expect(result.error).toMatchObject({
+          detail: expect.stringContaining("trusted provenance cannot currently be established"),
+        })
+        expect(result.calls).toEqual([view])
+        expect(result.verified).toEqual([])
+      }
+
+      const unaudited = await exercise({
+        errors: [
+          new DevPublicationError({ detail: "signed provenance commit mismatch", pending: false }),
+        ],
+      })
+      expect(unaudited.error).toMatchObject({
+        detail: expect.stringContaining("signed provenance commit mismatch"),
+      })
+      expect(unaudited.calls).toEqual([view])
+      expect(unaudited.waits).toBe(0)
+      expect(unaudited.verified).toEqual([verification])
+
+      for (const branches of [[devHead(other)], [devHead(devCommit, false)]]) {
+        const result = await exercise({ branches })
+        expect(result.error).toBeDefined()
+        expect(result.calls).toEqual([view])
+        expect(result.verified).toEqual([])
+      }
+
+      for (const scenario of [
+        { branches: [devHead(devCommit), devHead(other)], detail: "The dev head moved" },
+        {
+          refs: [object("commit", devCommit), object("commit", other)],
+          detail: "conflicts with expected commit",
+        },
+        { channels: [version, "other"], detail: "The npm dev channel moved" },
+      ]) {
+        const result = await exercise(scenario)
+        expect(result.error).toMatchObject({ detail: expect.stringContaining(scenario.detail) })
+        expect(result.calls).toEqual([view])
+        expect(result.verified).toEqual([verification])
+      }
+
+      const drift = await exercise({
+        responses: [missing, staged()],
+        channels: ["old"],
+        branches: [devHead(devCommit), devHead(devCommit), devHead(other)],
+      })
+      expect(drift.error).toMatchObject({ detail: expect.stringContaining("The dev head moved") })
+      expect(drift.calls).toEqual([view, publish])
+      expect(drift.verified).toEqual([])
+      expect(drift.waits).toBe(1)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

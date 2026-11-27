@@ -205,6 +205,48 @@ describe("publication authority", () => {
       )
     },
   )
+
+  test("dev recovery can write only GitHub state from the protected push and never masks a failed publish", () => {
+    const dev = parse(".github/workflows/dev.yml") as {
+      on: Record<string, unknown>
+      jobs: Record<
+        string,
+        {
+          needs?: string
+          if?: string
+          environment?: string
+          permissions?: Record<string, unknown>
+          steps?: Array<{ name?: string; if?: string; env?: Record<string, unknown>; run?: string }>
+        }
+      >
+    }
+    expect(Object.keys(dev.on)).toEqual(["workflow_call"])
+    const release = dev.jobs["prerelease"]
+    expect(release?.if).toContain("!cancelled()")
+    expect(release?.if).toContain("github.event_name == 'push'")
+    expect(release?.if).toContain("github.ref == 'refs/heads/dev' && github.ref_protected")
+    expect(release?.needs).toBe("publish")
+    expect(release?.environment).toBeUndefined()
+    expect(release?.permissions).toEqual({ contents: "write", actions: "read" })
+    const previous = release?.steps?.find(
+      ({ name }) => name === "Reconcile the previous protected dev prerelease",
+    )
+    expect(previous?.env?.PREVIOUS_DEV).toBe("${{ github.event.before }}")
+    expect(previous?.run).toBe('bun scripts/dev-prerelease-recovery.ts previous "$PREVIOUS_DEV"')
+    const current = release?.steps?.find(
+      ({ name }) => name === "Reconcile the current protected dev prerelease",
+    )
+    expect(current?.if).toBe("needs.publish.result == 'success'")
+    expect(
+      release?.steps?.some(
+        ({ if: condition, run }) =>
+          condition?.includes("needs.publish.result != 'success'") && run === "exit 1",
+      ),
+    ).toBe(true)
+    expect(release?.steps?.map(({ run }) => run).join("\n")).not.toMatch(
+      /npm (publish|dist-tag)|--clobber/,
+    )
+  })
 })
 
 describe("release lookup", () => {
@@ -298,6 +340,7 @@ describe("publish.yml", () => {
       needs: "validation",
       if: "github.ref == 'refs/heads/dev' && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
+      permissions: { contents: "write", actions: "read", "id-token": "write" },
     })
   })
 

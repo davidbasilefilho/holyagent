@@ -1,6 +1,8 @@
 import { $ } from "bun"
 import { Console, Data, Effect, Schema } from "effect"
 
+import { verifyDevPublication } from "./verify-dev-publication.ts"
+
 const RecordOfUnknown = Schema.Record(Schema.String, Schema.Unknown)
 const open = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
   Schema.StructWithRest(Schema.Struct(fields), [RecordOfUnknown])
@@ -24,7 +26,8 @@ const DevHead = open({
   protected: Schema.Literal(true),
   commit: open({ sha: Schema.String }),
 })
-const DevTag = open({ dev: Schema.String })
+const DevTag = open({ dev: Schema.optionalKey(Schema.String) })
+const readbackAttempts = 17
 
 /** A publication cannot safely proceed. */
 export class PublishError extends Data.TaggedError("PublishError")<{ readonly detail: string }> {}
@@ -167,9 +170,9 @@ const currentProtectedDev = (
     ),
   )
 
-const checkDevReadback = (
+/** Read the public dev channel without permitting a registry write. */
+export const readDevChannel = (
   name: string,
-  version: string,
   request: (url: string, init: RequestInit) => Promise<Response>,
 ) =>
   Effect.tryPromise({
@@ -182,29 +185,108 @@ const checkDevReadback = (
           signal: AbortSignal.timeout(10000),
         },
       )
-      if (!response.ok) throw new Error("Dist-tag lookup failed")
+      if (response.status === 404) return {}
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       return response.json()
     },
-    catch: () =>
-      new PublishError({
-        detail:
-          "npm publish returned success but dev channel readback failed; inspect registry state before any retry",
-      }),
+    catch: (cause) =>
+      new PublishError({ detail: `npm dev channel readback failed: ${String(cause)}` }),
   }).pipe(
     Effect.flatMap((input) => decode(DevTag, input)),
-    Effect.flatMap(({ dev }) =>
-      dev === version
-        ? Effect.void
-        : Effect.fail(
-            new PublishError({
-              detail:
-                "npm publish returned success but dev resolves to a different version; inspect registry state before any retry",
-            }),
-          ),
-    ),
+    Effect.map(({ dev }) => dev),
   )
 
-/** Publishes a fresh packed artifact after checking the intended GitHub tag. */
+const isDevArtifact = (name: string, version: string, tag: string, context: TagContext) =>
+  tag === "dev" &&
+  name === "holyagent" &&
+  context.repository === "davidbasilefilho/holyagent" &&
+  context.tag === `holyagent-${version}` &&
+  /^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)-dev\.\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\.([01]\d|2[0-3])-[0-5]\d-[0-5]\d\.g[a-f0-9]{7}$/.test(
+    version,
+  ) &&
+  version.endsWith(`.g${context.commit.slice(0, 7)}`)
+
+const exactStagedConflict = (result: NpmResult, version: string) => {
+  const lines = result.stderr.split(/\r?\n/)
+  return (
+    lines.includes("npm error code E409") &&
+    lines.includes(
+      `npm error 409 Conflict - PUT https://registry.npmjs.org/holyagent - Cannot publish over previously staged version "${version}".`,
+    )
+  )
+}
+
+const confirmExistingPackage = (
+  path: string,
+  name: string,
+  version: string,
+  found: typeof RegistryVersion.Type,
+) =>
+  Effect.gen(function* () {
+    if (found.name !== name || found.version !== version)
+      return yield* new PublishError({
+        detail: `Registry lookup did not return exact package ${name}@${version}`,
+      })
+    const integrity = yield* Effect.tryPromise({
+      try: async () =>
+        `sha512-${new Bun.CryptoHasher("sha512").update(await Bun.file(path).arrayBuffer()).digest("base64")}`,
+      catch: (cause) =>
+        new PublishError({
+          detail: `Cannot read tarball for integrity verification: ${String(cause)}`,
+        }),
+    })
+    if (found.dist.integrity !== integrity)
+      return yield* new PublishError({
+        detail: `Existing ${name}@${version} has different npm integrity from the packed artifact`,
+      })
+  })
+
+const observeDevPublication = (
+  path: string,
+  version: string,
+  context: TagContext,
+  request: (url: string, init: RequestInit) => Promise<Response>,
+  waitForReadback: Effect.Effect<void>,
+  verify: typeof verifyDevPublication,
+) =>
+  Effect.gen(function* () {
+    const expected = { repository: context.repository, commit: context.commit, version }
+    for (let attempt = 0; attempt < readbackAttempts; attempt++) {
+      if (attempt > 0) yield* waitForReadback
+      yield* currentProtectedDev(context, request)
+      if ((yield* readDevChannel("holyagent", request)) !== version) continue
+      const confirmed = yield* verify(path, expected).pipe(
+        Effect.as(true),
+        Effect.catch((error) =>
+          error.pending
+            ? Effect.succeed(false)
+            : Effect.fail(
+                new PublishError({ detail: `Cannot reuse holyagent@${version}: ${error.detail}` }),
+              ),
+        ),
+      )
+      if (!confirmed) continue
+      yield* preflightTag(context, (url, init) =>
+        request(url, {
+          ...init,
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+        }),
+      )
+      if ((yield* readDevChannel("holyagent", request)) !== version)
+        return yield* new PublishError({
+          detail: `The npm dev channel moved during verification of ${version}`,
+        })
+      yield* currentProtectedDev(context, request)
+      return
+    }
+    return yield* new PublishError({
+      detail: `Existing holyagent@${version} was not confirmed on the npm dev channel with trusted provenance within the readback window`,
+    })
+  })
+
+/** Publishes a fresh packed artifact or verifies an immutable publication on the current dev head. */
 export const publishArtifact = (
   path: string,
   tag: string,
@@ -212,6 +294,7 @@ export const publishArtifact = (
   run: NpmRunner = npm,
   request: (url: string, init: RequestInit) => Promise<Response> = fetch,
   waitForReadback: Effect.Effect<void> = Effect.sleep("15 seconds"),
+  verify: typeof verifyDevPublication = verifyDevPublication,
 ) =>
   Effect.gen(function* () {
     if (!path || !/^[a-z][a-z0-9-]*$/.test(tag))
@@ -235,6 +318,7 @@ export const publishArtifact = (
       })
     yield* preflightTag(context, request)
     const spec = `${manifest.name}@${manifest.version}`
+    const canResume = isDevArtifact(manifest.name, manifest.version, tag, context)
     const lookup = yield* run(["view", spec, "--json"])
     if (lookup.exitCode !== 0) {
       const missing = yield* Effect.option(
@@ -253,10 +337,20 @@ export const publishArtifact = (
         "--provenance",
         ...(tag === "dev" ? ["--ignore-scripts"] : []),
       ])
-      if (published.exitCode !== 0)
+      if (published.exitCode !== 0) {
+        if (canResume && exactStagedConflict(published, manifest.version))
+          return yield* observeDevPublication(
+            path,
+            manifest.version,
+            context,
+            request,
+            waitForReadback,
+            verify,
+          )
         return yield* new PublishError({
           detail: `npm publish failed: ${published.stderr || published.stdout}`,
         })
+      }
       if (tag === "dev") {
         const postcheck = currentProtectedDev(context, request).pipe(
           Effect.mapError(
@@ -267,15 +361,13 @@ export const publishArtifact = (
               }),
           ),
         )
-        for (let attempt = 0; attempt < 17; attempt++) {
+        for (let attempt = 0; attempt < readbackAttempts; attempt++) {
           if (attempt > 0) {
             yield* waitForReadback
             yield* postcheck
           }
-          const visible = yield* checkDevReadback(manifest.name, manifest.version, request).pipe(
-            Effect.option,
-          )
-          if (visible._tag === "Some") {
+          const visible = yield* readDevChannel(manifest.name, request).pipe(Effect.option)
+          if (visible._tag === "Some" && visible.value === manifest.version) {
             yield* postcheck
             return
           }
@@ -287,7 +379,18 @@ export const publishArtifact = (
       }
       return
     }
-    yield* decode(Schema.fromJsonString(RegistryVersion), lookup.stdout)
+    const found = yield* decode(Schema.fromJsonString(RegistryVersion), lookup.stdout)
+    if (canResume) {
+      yield* confirmExistingPackage(path, manifest.name, manifest.version, found)
+      return yield* observeDevPublication(
+        path,
+        manifest.version,
+        context,
+        request,
+        waitForReadback,
+        verify,
+      )
+    }
     return yield* new PublishError({
       detail: `Cannot reuse existing ${spec}: trusted provenance cannot currently be established. Investigate the registry and release state before proceeding; no tag changes were made.`,
     })
