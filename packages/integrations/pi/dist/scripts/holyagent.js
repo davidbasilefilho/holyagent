@@ -33990,7 +33990,7 @@ Use the repository's gates. Verify each material claim at its real entry point w
 var init_SKILL2 = () => {};
 
 var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CODEX_MODEL = "gpt-6.2-sol", CODEX_DEFAULT_EFFORT = "medium", CODEX_STARTUP_GUIDANCE, json = (value) => `${JSON.stringify(value, null, 2)}
-`, plugin = "plugins/holyagent", codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
+`, plugin = "plugins/holyagent", codexSkillFiles, codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
   {
     path: ".agents/plugins/marketplace.json",
     content: json({
@@ -34015,8 +34015,7 @@ var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CO
       interface: { displayName: "HolyAgent" }
     })
   },
-  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: SKILL_default2 },
-  { path: `${plugin}/skills/hillclimb-iteration/SKILL.md`, content: SKILL_default }
+  ...codexSkillFiles.map(({ path, content }) => ({ path: `${plugin}/${path}`, content }))
 ], roleProfiles, codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independence }) => {
   const [effort, purpose] = roleProfiles[roleTask];
   const name = `holyagent-${agent}`;
@@ -34051,6 +34050,10 @@ If you are the root, handle straightforward work directly. For independent work 
 
 ${recover_work_default.trim()}
 `;
+  codexSkillFiles = [
+    { path: "skills/holyagent-workflow/SKILL.md", content: SKILL_default2 },
+    { path: "skills/hillclimb-iteration/SKILL.md", content: SKILL_default }
+  ];
   roleProfiles = {
     "Explorer.map": ["low", "Map the requested code paths and point to the files that own them."],
     "Explorer.lookup": ["low", "Find a specific fact in the codebase and cite its source."],
@@ -34659,6 +34662,148 @@ var init_setup2 = __esm(() => {
 `));
     })));
     return { ok: true, lines, fingerprint };
+  });
+});
+
+import { lstat as lstat12, realpath as realpath9, stat as stat8, writeFile as writeFile9 } from "fs/promises";
+import { basename as basename10, dirname as dirname17, extname, isAbsolute as isAbsolute15, join as join36, relative as relative7, resolve as resolve15, sep as sep8 } from "path";
+var failed5 = (message) => new SetupFailure({ message }), portableFiles = (version) => [
+  {
+    path: "plugin.json",
+    content: `${JSON.stringify({
+      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      name: "holyagent",
+      version,
+      description: "Scope, ownership and evidence for Codex work.",
+      extensions: { "com.openai": { interface: { displayName: "HolyAgent" } } }
+    }, null, 2)}
+`
+  },
+  ...codexSkillFiles
+], DOS_EPOCH = 33, UTF8 = 2048, MAX_ARCHIVE_CONTENT, zip2 = (files) => {
+  const body = [];
+  const directory = [];
+  let offset = 0;
+  for (const { path, content } of files) {
+    const name = Buffer.from(path);
+    const data = Buffer.from(content);
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(67324752, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(UTF8, 6);
+    local.writeUInt16LE(DOS_EPOCH, 12);
+    local.writeUInt32LE(Bun.hash.crc32(data), 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    name.copy(local, 30);
+    const entry = Buffer.alloc(46 + name.length);
+    entry.writeUInt32LE(33639248, 0);
+    entry.writeUInt16LE(20, 4);
+    local.copy(entry, 6, 4, 28);
+    entry.writeUInt32LE(offset, 42);
+    name.copy(entry, 46);
+    directory.push(entry);
+    body.push(local, data);
+    offset += local.length + data.length;
+  }
+  const central = Buffer.concat(directory);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(101010256, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...body, central, end]);
+}, inside3 = (root, path) => {
+  const rest = relative7(root, path);
+  return rest !== ".." && !rest.startsWith(`..${sep8}`) && !isAbsolute15(rest);
+}, isOrdinaryZip = (path) => !/\p{Cc}/u.test(path) && !/[/\\]$/.test(path) && extname(path).toLowerCase() === ".zip" && (process.platform !== "win32" || !/^[/\\]{2}/.test(path) && !/^\w:(?![/\\])/.test(path) && !/[:<>|?*"]/.test(path.replace(/^[a-z]:/i, "")) && !/^(?:con|prn|aux|nul|com[1-9\u00B9\u00B2\u00B3]|lpt[1-9\u00B9\u00B2\u00B3])(?:\.|$)/iu.test(basename10(path))), existsAt = (path, failure) => tryPromise2({ try: () => lstat12(path).then(() => true), catch: (cause) => cause }).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed6(false) : fail5(failed5(failure)))), canonicalHome, destination, exportCodexCloud;
+var init_cloud = __esm(() => {
+  init_dist();
+  init_files();
+  init_environment3();
+  init_errors10();
+  init_report3();
+  init_assets();
+  init_setup2();
+  MAX_ARCHIVE_CONTENT = 1024 * 1024;
+  canonicalHome = fn2("codexCloudCanonicalHome")(function* (home) {
+    const failure = "A Codex profile path could not be resolved safely.";
+    let ancestor = home;
+    const missing = [];
+    while (true) {
+      const canonical = yield* tryPromise2({
+        try: () => realpath9(ancestor),
+        catch: (cause) => cause
+      }).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed6(undefined) : fail5(failed5(failure))));
+      if (canonical !== undefined)
+        return join36(canonical, ...missing);
+      if (yield* existsAt(ancestor, failure))
+        return yield* failed5(failure);
+      const parent = dirname17(ancestor);
+      if (parent === ancestor)
+        return yield* failed5(failure);
+      missing.unshift(basename10(ancestor));
+      ancestor = parent;
+    }
+  });
+  destination = fn2("codexCloudArchiveDestination")(function* (env, cwd, output) {
+    if (!isOrdinaryZip(output))
+      return yield* failed5("Choose a local .zip file after --output.");
+    const requested = resolve15(cwd, output);
+    if (!isOrdinaryZip(requested))
+      return yield* failed5("Choose a local directory for the plugin ZIP.");
+    const directory = yield* tryPromise2({
+      try: () => realpath9(dirname17(requested)),
+      catch: () => failed5("The output directory must already exist.")
+    });
+    const metadata = yield* tryPromise2({
+      try: () => stat8(directory),
+      catch: () => failed5("The output directory could not be inspected.")
+    });
+    if (!metadata.isDirectory())
+      return yield* failed5("The output parent must be a directory.");
+    if (process.platform === "win32" && directory.startsWith("\\\\"))
+      return yield* failed5("Choose a local directory for the plugin ZIP.");
+    const target = join36(directory, basename10(requested));
+    const homes = [
+      join36(homeDirectory2(env), ".codex"),
+      defaultCodexHome(env),
+      ...env["CODEX_HOME"] ? [resolve15(cwd, env["CODEX_HOME"])] : []
+    ];
+    for (const home of homes) {
+      if (inside3(home, requested))
+        return yield* failed5("Choose an output path outside Codex profile directories.");
+      const canonical = yield* canonicalHome(home);
+      if (inside3(canonical, target))
+        return yield* failed5("Choose an output path outside Codex profile directories.");
+    }
+    const exists = yield* existsAt(target, "The output path could not be inspected.");
+    if (exists)
+      return yield* failed5("The output path already exists. Choose a new .zip file.");
+    return target;
+  });
+  exportCodexCloud = fn2("exportCodexCloud")(function* (env, cwd, output, dryRun, version = CODEX_ASSET_VERSION) {
+    const path = yield* destination(env, cwd, output);
+    const files = portableFiles(version);
+    const size = files.reduce((total, { content }) => total + Buffer.byteLength(content), 0);
+    if (size > MAX_ARCHIVE_CONTENT)
+      return yield* failed5("The bundled plugin exceeds the export limit.");
+    if (!dryRun)
+      yield* tryPromise2({
+        try: () => writeFile9(path, zip2(files), { flag: "wx", mode: 384 }),
+        catch: (cause) => hasCode(cause, "EEXIST") ? failed5("The output path already exists. Choose a new .zip file.") : failed5(`Could not write the plugin ZIP at ${path}. If a partial file was created, choose a new output path.`)
+      });
+    return {
+      ok: true,
+      lines: [
+        added(dryRun ? `Would export the HolyAgent plugin ZIP to ${path}` : `Exported the HolyAgent plugin ZIP to ${path}`),
+        hint("Workspace availability was not checked. An eligible workspace administrator can upload the ZIP in Admin console \u2192 Plugins \u2192 Add \u2192 Upload plugin, subject to the workspace's permissions."),
+        hint("If HolyAgent is available to your account and the Cloud task offers plugin selection, select it in Sources \u2192 Use plugins when starting a new task."),
+        hint("Cloud activation is unverified. Check that the new task can see the HolyAgent skills. This export does not change a Cloud environment or a running task.")
+      ]
+    };
   });
 });
 
@@ -35401,7 +35546,7 @@ var init_session = __esm(() => {
   });
 });
 
-import { join as join36 } from "path";
+import { join as join37 } from "path";
 var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => ({
   cwd,
   env,
@@ -35410,11 +35555,11 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
   authorize: () => true
 }), CAPABILITY_FLAGS, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]", PublicManifest, codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]", PublicManifest, installedVersion2 = (installedPackageRoot) => installedPackageRoot === undefined ? succeed6(undefined) : tryPromise2(() => Bun.file(join37(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map5(({ version }) => Bun.semver.satisfies(version, version) ? version : undefined), orElseSucceed2(() => {
+  return;
+})), codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
-  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join36(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map5((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
-    return;
-  }));
+  const version = yield* installedVersion2(installedPackageRoot);
   return yield* setupCodex(env, {
     home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
     dryRun,
@@ -35436,7 +35581,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       fingerprint = "fingerprint" in plan ? plan.fingerprint : undefined;
     return plan;
   });
-}, codexCommand, CAPABILITY_NAMES, switchFlag, capabilitySwitches, formOf, DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]", setupCommand = (target, usage = SETUP_USAGE) => {
+}, CLOUD_USAGE = "setup codex cloud --output <path.zip> [--dry-run]", codexCloudCommand, codexCommand, CAPABILITY_NAMES, switchFlag, capabilitySwitches, formOf, DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]", setupCommand = (target, usage = SETUP_USAGE) => {
   return {
     path: target === undefined ? ["setup"] : ["setup", target],
     usage,
@@ -35694,6 +35839,7 @@ var init_setup3 = __esm(() => {
   init_capabilities3();
   init_directive2();
   init_browse_handoff();
+  init_cloud();
   init_setup2();
   init_errors10();
   init_form2();
@@ -35719,6 +35865,24 @@ var init_setup3 = __esm(() => {
   });
   PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--no-open-browse|--browse-browser <id>]");
   PublicManifest = Struct({ name: Literal2("holyagent"), version: String6 });
+  codexCloudCommand = {
+    path: ["setup", "codex", "cloud"],
+    usage: CLOUD_USAGE,
+    summary: "Export HolyAgent as a portable skills plugin for workspace import",
+    output: "The ZIP path and the separate workspace import and Cloud task selection steps",
+    notes: [
+      "--output is a new local ZIP path. Relative paths use the selected project directory; the parent directory must already exist. Existing paths are kept.",
+      "--dry-run plans the export without writing files. Neither mode connects to a workspace or changes a Codex profile."
+    ],
+    flags: { output: "string", "dry-run": "boolean" },
+    stateless: true,
+    positionals: 0,
+    run: ({ args, env, cwd, installedPackageRoot }) => gen2(function* () {
+      const output = yield* requiredFlag(args, "output", CLOUD_USAGE);
+      const version = yield* installedVersion2(installedPackageRoot);
+      return yield* exportCodexCloud(env, cwd, output, booleanFlag(args, "dry-run"), version).pipe(map5(printed), catchTag2("SetupFailure", ({ message }) => succeed6(printed({ ok: false, lines: [`! Codex Cloud export: ${message}`] }))));
+    })
+  };
   codexCommand = {
     path: ["setup", "codex"],
     usage: CODEX_USAGE,
@@ -35731,7 +35895,8 @@ var init_setup3 = __esm(() => {
       "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
       "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
       "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
-      "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide."
+      "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide.",
+      "Use holyagent setup codex cloud --help to export a skills ZIP for managed Cloud."
     ],
     flags: {
       "codex-home": "string",
@@ -35834,6 +35999,7 @@ var init_setup3 = __esm(() => {
     }
   ];
   PUBLIC_SETUP_COMMANDS = [
+    codexCloudCommand,
     codexCommand,
     publicPiSetup("pi"),
     {
@@ -36069,7 +36235,7 @@ var init_json_file2 = __esm(() => {
   init_json_file();
 });
 
-import { isAbsolute as isAbsolute15, join as join37, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute16, join as join38, relative as relative8 } from "path";
 var RELEASE, VERSION_RESPONSE, REGISTRY = "https://registry.npmjs.org/", USAGE = "update [--version <0.x.y>] [--dry-run]", failure2 = (message, result) => {
   const details = result?.stderr.trim() || result?.stdout.trim();
   return new Verbatim("", details ? `${message}
@@ -36108,7 +36274,7 @@ var init_public_maintenance = __esm(() => {
         continue;
       }
       const local = piLocalSourcePath(env, settings, source);
-      if (local !== undefined && installedPackageRoot !== undefined && isAbsolute15(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
+      if (local !== undefined && installedPackageRoot !== undefined && isAbsolute16(installedPackageRoot) && relative8(installedPackageRoot, local) === "") {
         managed++;
         continue;
       }
@@ -36123,7 +36289,7 @@ var init_public_maintenance = __esm(() => {
       if (root.exitCode !== 0)
         return failure2("Could not verify npm's global installation path.", root);
       const location = root.stdout.trim();
-      if (!isAbsolute15(location) || relative7(registeredRoot, join37(location, "holyagent")) !== "")
+      if (!isAbsolute16(location) || relative8(registeredRoot, join38(location, "holyagent")) !== "")
         return failure2("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
     }
     const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -36161,7 +36327,7 @@ var init_public_maintenance = __esm(() => {
       source
     ], { cwd });
     if (registeredRoot !== undefined) {
-      const manifest = yield* readJsonObject(join37(registeredRoot, "package.json")).pipe(option2);
+      const manifest = yield* readJsonObject(join38(registeredRoot, "package.json")).pipe(option2);
       if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
         return failure2(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
     } else if (npm.exitCode !== 0)
@@ -36187,8 +36353,8 @@ var init_public_maintenance = __esm(() => {
 });
 
 import { constants as constants8, fstatSync } from "fs";
-import { open as open8, stat as stat8 } from "fs/promises";
-import { resolve as resolve15 } from "path";
+import { open as open8, stat as stat9 } from "fs/promises";
+import { resolve as resolve16 } from "path";
 var PackageIdentity, cliVersion = (manifest) => manifest === undefined ? succeed6(version) : tryPromise2(() => Bun.file(manifest).json()).pipe(flatMap2(decodeUnknownEffect2(PackageIdentity)), map5(({ version: version2 }) => Bun.semver.satisfies(version2, version2) ? version2 : version), orElseSucceed2(() => version)), renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}
@@ -36267,7 +36433,7 @@ ${plainText(output.text)}
   return;
 } }).pipe(map5((stdin) => stdin.isFile() && stdin.dev === file.dev && stdin.ino === file.ino), orElseSucceed2(() => false)), readAgentReport = (path) => gen2(function* () {
   const fail = () => agentReportError(path);
-  const file = yield* tryPromise2({ try: () => stat8(path), catch: fail });
+  const file = yield* tryPromise2({ try: () => stat9(path), catch: fail });
   if (!file.isFile() || (yield* aliasesStdin(file)))
     return yield* fail();
   return yield* acquireUseRelease2(tryPromise2({
@@ -36336,9 +36502,9 @@ ${plainText(output.text)}
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve15(host.cwd, directory);
+  const cwd = resolve16(host.cwd, directory);
   const location = yield* tryPromise2({
-    try: () => stat8(cwd),
+    try: () => stat9(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
   });
   if (!location.isDirectory())
@@ -36414,10 +36580,10 @@ ${plainText(output.text)}
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve15(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve16(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve15(host.cwd, args.positionals[0] ?? "");
-    const source = yield* tryPromise2(() => stat8(path)).pipe(orElseSucceed2(() => {
+    const path = resolve16(host.cwd, args.positionals[0] ?? "");
+    const source = yield* tryPromise2(() => stat9(path)).pipe(orElseSucceed2(() => {
       return;
     }));
     if (source !== undefined && (yield* aliasesStdin(source)))
@@ -36462,7 +36628,7 @@ ${plainText(output.text)}
   if (tag === "InsufficientAcceptance")
     return "Save the corrected specialist report to a regular file and pass it with --report-file to assignment close or assignment accept.";
   return agentCommandNames(hint);
-}, failed5 = (error, env, surface) => hostForText(env).pipe(map5((agent) => {
+}, failed6 = (error, env, surface) => hostForText(env).pipe(map5((agent) => {
   const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   if (surface === "agent")
     return toon({ error: { tag, message, hint: agentHint(tag, hint), code } }, code);
@@ -36473,7 +36639,7 @@ ${hint}
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-})), run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed5(error, host.env, surface)), catchCause2((cause) => failed5({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
+})), run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed6(error, host.env, surface)), catchCause2((cause) => failed6({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
 var init_program = __esm(() => {
   init_dist();
   init_package();

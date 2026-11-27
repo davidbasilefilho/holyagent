@@ -11,6 +11,7 @@ import {
   runTerminalBrowse,
   terminalBrowseUnavailable,
 } from "../setup/browse-handoff.ts"
+import { exportCodexCloud } from "../setup/codex/cloud.ts"
 import { defaultCodexHome, setupCodex } from "../setup/codex/setup.ts"
 import type { Env } from "../setup/environment.ts"
 import { SetupFailure } from "../setup/errors.ts"
@@ -37,7 +38,7 @@ import { Shell, shellLive } from "../setup/shell.ts"
 import type { SetupTarget } from "../setup/steps.ts"
 import { saveSetupResult } from "../setup/tui/result-file.ts"
 import { runInteractive } from "../setup/tui/session.ts"
-import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
+import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { Usage } from "./errors.ts"
 import { type Command, Verbatim } from "./types.ts"
 
@@ -93,6 +94,17 @@ const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replac
 const CODEX_USAGE =
   "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]"
 const PublicManifest = Schema.Struct({ name: Schema.Literal("holyagent"), version: Schema.String })
+const installedVersion = (installedPackageRoot: string | undefined) =>
+  installedPackageRoot === undefined
+    ? Effect.succeed(undefined)
+    : Effect.tryPromise((): Promise<unknown> =>
+        Bun.file(join(installedPackageRoot, "package.json")).json(),
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(PublicManifest)),
+        Effect.map(({ version }) => (Bun.semver.satisfies(version, version) ? version : undefined)),
+        Effect.orElseSucceed(() => undefined),
+      )
+
 const codexPlan = (
   args: Parameters<typeof stringFlag>[0],
   env: Env,
@@ -103,20 +115,7 @@ const codexPlan = (
 ) =>
   Effect.gen(function* () {
     const catalog = stringFlag(args, "root-only-catalog")
-    const version =
-      installedPackageRoot === undefined
-        ? undefined
-        : yield* Effect.tryPromise((): Promise<unknown> =>
-            Bun.file(join(installedPackageRoot, "package.json")).json(),
-          ).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(PublicManifest)),
-            Effect.map((manifest) =>
-              Bun.semver.satisfies(manifest.version, manifest.version)
-                ? manifest.version
-                : undefined,
-            ),
-            Effect.orElseSucceed(() => undefined),
-          )
+    const version = yield* installedVersion(installedPackageRoot)
     return yield* setupCodex(env, {
       home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
       dryRun,
@@ -159,6 +158,33 @@ const reviewedCodexPlan = (
     })
 }
 
+const CLOUD_USAGE = "setup codex cloud --output <path.zip> [--dry-run]"
+
+const codexCloudCommand: Command = {
+  path: ["setup", "codex", "cloud"],
+  usage: CLOUD_USAGE,
+  summary: "Export HolyAgent as a portable skills plugin for workspace import",
+  output: "The ZIP path and the separate workspace import and Cloud task selection steps",
+  notes: [
+    "--output is a new local ZIP path. Relative paths use the selected project directory; the parent directory must already exist. Existing paths are kept.",
+    "--dry-run plans the export without writing files. Neither mode connects to a workspace or changes a Codex profile.",
+  ],
+  flags: { output: "string", "dry-run": "boolean" },
+  stateless: true,
+  positionals: 0,
+  run: ({ args, env, cwd, installedPackageRoot }) =>
+    Effect.gen(function* () {
+      const output = yield* requiredFlag(args, "output", CLOUD_USAGE)
+      const version = yield* installedVersion(installedPackageRoot)
+      return yield* exportCodexCloud(env, cwd, output, booleanFlag(args, "dry-run"), version).pipe(
+        Effect.map(printed),
+        Effect.catchTag("SetupFailure", ({ message }) =>
+          Effect.succeed(printed({ ok: false, lines: [`! Codex Cloud export: ${message}`] })),
+        ),
+      )
+    }),
+}
+
 const codexCommand: Command = {
   path: ["setup", "codex"],
   usage: CODEX_USAGE,
@@ -172,6 +198,7 @@ const codexCommand: Command = {
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
     "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
     "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide.",
+    "Use holyagent setup codex cloud --help to export a skills ZIP for managed Cloud.",
   ],
   flags: {
     "codex-home": "string",
@@ -718,6 +745,7 @@ const publicPiSetup = (target?: "pi"): Command => {
 
 /** Explicit harness selectors share the public setup handler and precede the bare command. */
 export const PUBLIC_SETUP_COMMANDS: ReadonlyArray<Command> = [
+  codexCloudCommand,
   codexCommand,
   publicPiSetup("pi"),
   {
