@@ -34,7 +34,12 @@ describe("the setup interface, capability rows", () => {
     expect(rows.map((row) => row.replace(/^[❯ ] /, "").split(/\s{2,}/)[0])).toEqual(
       CAPABILITIES.map((capability) => capability.name),
     )
-    expect(rows.every((row) => row.endsWith("[x] enabled"))).toBe(true)
+    expect(rows.find((row) => row.includes("browser-use"))?.trim()).toBe("browser-use")
+    expect(
+      rows
+        .filter((row) => !row.includes("browser-use"))
+        .every((row) => row.endsWith("[x] enabled")),
+    ).toBe(true)
   })
 
   test("Enter toggles the focused capability, and the review and apply get the switches", async () => {

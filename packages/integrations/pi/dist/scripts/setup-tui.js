@@ -3945,8 +3945,8 @@ var providerName = {
 };
 var providerOf = (row, offer) => offer.providers?.find((provider) => row === `provider:${provider}`);
 var labelOf = (row, offer) => {
-  if (row === BROWSER_USE && offer.browse !== undefined)
-    return "Browser Use";
+  if (row === BROWSER_USE)
+    return "browser-use";
   const provider = providerOf(row, offer);
   if (provider !== undefined)
     return providerName[provider];
@@ -3960,7 +3960,7 @@ var rowsOf = (offer, state) => {
         ...offer.harnesses.onlyCodex === true ? [] : ["enableCodex"],
         ...selected.codex !== true || offer.harnesses.codexDesktop === undefined ? [] : [
           "codexInAppBrowser",
-          ...(offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) > 0 ? ["codexBrowserExtension"] : []
+          ...(offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) + (offer.harnesses.codexDesktop.extensionUnavailableBrowsers?.length ?? 0) > 0 ? ["codexBrowserExtension"] : []
         ]
       ];
     if (state?.tab === "claude")
@@ -4025,17 +4025,16 @@ var toggled = (choices, row) => {
     return { ...choices, deviceAccess: !choices.deviceAccess };
   if (row === "worktrees")
     return { ...choices, worktrees: !choices.worktrees };
-  if (!row.startsWith(CAPABILITY_ROW))
+  if (!row.startsWith(CAPABILITY_ROW) || row === BROWSER_USE)
     return choices;
   const feature = row.slice(CAPABILITY_ROW.length);
   return {
     ...choices,
-    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true },
-    ...feature === "browserUse" && choices.capabilities[feature] === true ? { browseSetup: false } : {}
+    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true }
   };
 };
-var settingsFor = (row, offer) => {
-  if (row === BROWSER_USE && offer?.browse !== undefined)
+var settingsFor = (row) => {
+  if (row === BROWSER_USE)
     return "browser-use";
   if (row === "codexInAppBrowser")
     return "codex-iab";
@@ -4045,39 +4044,21 @@ var settingsFor = (row, offer) => {
 };
 var browserOptions = (offer) => offer?.browse?.browsers ?? [];
 var extensionBrowsers = (offer) => offer?.harnesses?.codexDesktop?.extensionBrowsers ?? [];
-var selectedProfiles = (choices, offer) => {
-  const ids = choices.browseBrowserIds;
-  const profiles = (offer?.browse?.profiles ?? []).map((profile, index) => ({ ...profile, index }));
-  if (ids === undefined)
-    return profiles;
-  const names = browserOptions(offer).filter(({ id }) => ids.includes(id)).map(({ name }) => name);
-  return profiles.filter(({ browser }) => names.includes(browser));
-};
+var browserEnabled = (choices) => choices.capabilities["browserUse"] === true;
+var compatibleBrowsers = (offer) => browserOptions(offer).filter(({ browseCompatibility }) => browseCompatibility === "supported");
 var settingsOptions = (state, offer) => state.settings === "codex-extension" ? [
-  "extension-skip",
+  ...extensionBrowsers(offer).length === 0 ? [] : ["extension-skip"],
   ...extensionBrowsers(offer).map(({ id }) => `extension:${id}`),
   "back"
-] : state.settings === "browser-selection" ? [
-  ...browserOptions(offer).map(({ id }) => `browser:${id}`),
-  "confirm",
-  "back"
 ] : state.settings === "browser-use" ? [
-  ...offer?.browse?.action === undefined ? [] : ["configure", "skip"],
-  ...browserOptions(offer).length > 0 ? ["browsers"] : [],
-  ...selectedProfiles(state.choices, offer).length > 0 ? ["profile"] : [],
   "capability",
+  ...browserEnabled(state.choices) ? compatibleBrowsers(offer).map(({ id }) => `browser:${id}`) : [],
   "back"
 ] : ["back"];
-var settingsBack = (state, offer) => {
-  if (state.settings === "browser-selection") {
-    const parent = { ...state, settings: "browser-use" };
-    return { ...parent, action: Math.max(0, settingsOptions(parent, offer).indexOf("browsers")) };
-  }
-  return { ...state, screen: "choose", action: 0 };
-};
+var settingsBack = (state) => ({ ...state, screen: "choose", action: 0 });
 var selectSetting = (state, option, offer) => {
   if (option === "back")
-    return settingsBack(state, offer);
+    return settingsBack(state);
   const choices = state.choices;
   if (option === "extension-skip") {
     const { codexBrowserHandoff: _previous, ...kept } = choices;
@@ -4087,54 +4068,29 @@ var selectSetting = (state, option, offer) => {
     const id = option.slice("extension:".length);
     return extensionBrowsers(offer).some((entry) => entry.id === id) ? { ...state, choices: { ...choices, codexBrowserHandoff: id } } : state;
   }
-  if (option === "browsers")
-    return {
-      ...state,
-      settings: "browser-selection",
-      action: 0,
-      browserDraft: choices.browseBrowserIds ?? []
-    };
-  if (option === "confirm") {
-    const selected = { ...choices, browseBrowserIds: state.browserDraft ?? [] };
-    const profile = selectedProfiles(selected, offer).find(({ index }) => index === choices.browseProfile) ?? selectedProfiles(selected, offer)[0];
-    return settingsBack({
-      ...state,
-      choices: {
-        ...selected,
-        ...profile === undefined ? {} : { browseProfile: profile.index }
-      }
-    }, offer);
-  }
   if (option.startsWith("browser:")) {
     const id = option.slice("browser:".length);
-    const candidate = browserOptions(offer).find((entry) => entry.id === id);
-    if (candidate === undefined || candidate.browseCompatibility === "unsupported")
+    if (!browserEnabled(choices) || !compatibleBrowsers(offer).some((entry) => entry.id === id))
       return state;
-    const marked = state.browserDraft ?? [];
-    return {
-      ...state,
-      browserDraft: marked.includes(id) ? marked.filter((entry) => entry !== id) : [...marked, id]
-    };
-  }
-  if (option === "configure")
+    const marked = choices.browseBrowserIds ?? [];
     return {
       ...state,
       choices: {
         ...choices,
-        capabilities: { ...choices.capabilities, browserUse: true },
-        browseSetup: true
+        browseBrowserIds: marked.includes(id) ? marked.filter((entry) => entry !== id) : [...marked, id]
       }
     };
-  if (option === "skip")
-    return { ...state, choices: { ...choices, browseSetup: false } };
-  if (option === "capability")
-    return { ...state, choices: toggled(choices, BROWSER_USE) };
-  const profiles = selectedProfiles(choices, offer);
-  const index = profiles.findIndex(({ index }) => index === (choices.browseProfile ?? 0));
-  const profile = profiles[wrapped(index, 1, Math.max(1, profiles.length))];
+  }
+  if (option !== "capability")
+    return state;
+  const enabled = !browserEnabled(choices);
   return {
     ...state,
-    choices: profile === undefined ? choices : { ...choices, browseProfile: profile.index }
+    choices: {
+      ...choices,
+      capabilities: { ...choices.capabilities, browserUse: enabled },
+      browseSetup: enabled
+    }
   };
 };
 var pagedBy = (state, key, scroll) => {
@@ -4162,10 +4118,10 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, offer) => {
     if (isEnter(key) && !key.ctrl) {
       const row = rows[state.focus];
       if (row !== undefined) {
-        const settings = settingsFor(row, offer);
+        const settings = settingsFor(row);
         if (settings !== undefined) {
           const opened = { ...state, screen: "settings", settings, action: 0 };
-          const preferred = settings === "codex-extension" ? state.choices.codexBrowserHandoff === undefined ? "extension-skip" : `extension:${state.choices.codexBrowserHandoff}` : state.choices.browseSetup === true ? "configure" : "skip";
+          const preferred = state.choices.codexBrowserHandoff === undefined ? "extension-skip" : `extension:${state.choices.codexBrowserHandoff}`;
           const focus = settingsOptions(opened, offer).indexOf(preferred);
           return { state: { ...opened, action: Math.max(0, focus) } };
         }
@@ -4195,24 +4151,15 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }, offer) => {
     if (key.ctrl && key.name === "c")
       return { state, command: "cancel" };
     if (key.name === "escape" || !key.ctrl && key.name === "backspace")
-      return { state: settingsBack(state, offer) };
+      return { state: settingsBack(state) };
     const options = settingsOptions(state, offer);
     const step = stepOf(key);
     if (step !== 0)
       return { state: { ...state, action: wrapped(state.action, step, options.length) } };
     if (!key.ctrl && key.name === "end")
       return {
-        state: {
-          ...state,
-          action: options.length - (state.settings === "browser-selection" ? 2 : 1)
-        }
+        state: { ...state, action: options.length - 1 }
       };
-    if (state.settings === "browser-selection" && !key.ctrl && (key.name === "space" || key.name === " ")) {
-      const option = options[state.action];
-      return {
-        state: option?.startsWith("browser:") ? selectSetting(state, option, offer) : state
-      };
-    }
     if (!key.ctrl && isEnter(key)) {
       const option = options[state.action];
       if (option !== undefined)
@@ -4325,8 +4272,8 @@ var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [se
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
 var hintOf = (row, offer) => {
-  if (row === BROWSER_USE && offer.browse !== undefined)
-    return "Open settings to configure OpenCode Browse.";
+  if (row === BROWSER_USE)
+    return "Open browser-use settings.";
   if (row === "enablePi")
     return "Include Pi and T3 Code in the combined review.";
   if (row === "enableCodex")
@@ -4354,8 +4301,6 @@ var checkbox = (row, choices, offer) => {
     return { box: "", word: "Built-in" };
   if (row === "codexBrowserExtension")
     return choices.codexBrowserHandoff === undefined ? { box: "[ ]", word: "Skip" } : { box: "[x]", word: "Open guide" };
-  if (row === BROWSER_USE && offer.browse?.action !== undefined)
-    return choices.browseSetup === true ? { box: "[x]", word: offer.browse.action } : { box: "[ ]", word: "Skip" };
   const provider = providerOf(row, offer);
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider))
@@ -4369,11 +4314,13 @@ var chooseLines = (state, context) => {
   const { rows, offer, width, look } = context;
   const g = glyphs(look);
   const values = rows.map((row) => {
+    if (row === BROWSER_USE)
+      return "";
     const { box, word } = checkbox(row, state.choices, offer);
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = cells(offer.browse?.action === "Configure" ? "[x] Configure" : "[ ] disabled");
+  const valueWidth = cells("[ ] disabled");
   const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
@@ -4438,15 +4385,10 @@ var chooseLines = (state, context) => {
 var settingsLines = (state, context) => {
   const { width, look, offer } = context;
   const g = glyphs(look);
-  const profile = offer.browse?.profiles?.[state.choices.browseProfile ?? 0];
-  const picker = state.settings === "browser-selection";
+  const browserPage = state.settings === "browser-use";
   const nativeBrowser = state.settings === "codex-iab";
   const browserExtension = state.settings === "codex-extension";
-  const enabled = state.choices.capabilities["browserUse"] === true;
-  const configure = state.choices.browseSetup === true && enabled;
-  const candidates = browserOptions(offer);
-  const picked = state.choices.browseBrowserIds;
-  const selected = candidates.filter(({ id }) => picked?.includes(id)).map(({ name }) => name);
+  const enabled = browserEnabled(state.choices);
   const box = (checked) => checked ? "[x]" : "[ ]";
   const optionText = (option) => {
     if (option === "extension-skip")
@@ -4454,35 +4396,24 @@ var settingsLines = (state, context) => {
     if (option.startsWith("extension:")) {
       const id = option.slice("extension:".length);
       const candidate = extensionBrowsers(offer).find((entry) => entry.id === id);
-      return `${box(state.choices.codexBrowserHandoff === id)} Open official guide in ${candidate?.name ?? ""}`;
+      const name = candidate?.name ?? "";
+      return `Install in ${name}${state.choices.codexBrowserHandoff === id ? " (selected)" : ""}`;
     }
-    if (option === "configure")
-      return `${box(configure)} ${offer.browse?.action ?? "Configure"}`;
-    if (option === "skip")
-      return `${box(!configure)} Skip`;
-    if (option === "browsers")
-      return `Browsers: ${picked === undefined ? "Automatic profile" : selected.join(", ") || "None selected"}`;
-    if (option === "profile")
-      return `Browser profile: ${profile === undefined ? "automatic" : `${profile.browser}, ${profile.profile}`}`;
     if (option === "capability")
-      return `${box(enabled)} Allow Browser Use for visual specialists`;
-    if (option === "confirm")
-      return "Done";
+      return enabled ? "Disable browser-use" : "Enable browser-use";
     if (option.startsWith("browser:")) {
-      const candidate = candidates.find(({ id }) => id === option.slice("browser:".length));
-      if (candidate !== undefined) {
-        const availability = candidate.browseCompatibility === "unsupported" ? " \u2014 not supported by Browse" : candidate.browseCompatibility === "unverified" ? " \u2014 compatibility unverified" : "";
-        return `${box(state.browserDraft?.includes(candidate.id) === true)} ${candidate.name}${availability}`;
-      }
+      const candidate = compatibleBrowsers(offer).find(({ id }) => id === option.slice("browser:".length));
+      if (candidate !== undefined)
+        return `${box(state.choices.browseBrowserIds?.includes(candidate.id) === true)} ${candidate.name}`;
     }
     return "Back";
   };
   const options = settingsOptions(state, offer).map((option, index) => ({ option, index }));
-  const shortcuts = keyLines([`${g.arrows} or j/k focus`, ...picker ? ["Space mark"] : [], "Enter select", "Esc back"], width);
+  const shortcuts = keyLines([`${g.arrows} or j/k focus`, "Enter select", "Esc back"], width);
   const capacity = Math.max(1, context.height - shortcuts.length - 9);
-  const start = Math.max(0, Math.min(candidates.length - capacity, state.action - capacity + 1));
-  const visible = picker ? [...options.slice(0, -2).slice(start, start + capacity), ...options.slice(-2)] : options;
-  const optionLines = ({ option, index }) => (picker ? [clip(optionText(option), width - 2, g.ellipsis)] : wrap(optionText(option), width - 2)).map((part, line) => [
+  const candidates = browserPage ? options.slice(1, -1) : [];
+  const start = Math.max(0, Math.min(candidates.length - capacity, state.action - capacity));
+  const optionLines = ({ option, index }) => (option.startsWith("browser:") ? [clip(optionText(option), width - 2, g.ellipsis)] : wrap(optionText(option), width - 2)).map((part, line) => [
     {
       text: `${line === 0 && index === state.action ? g.focus : " "} ${part}`,
       tone: index === state.action ? "focus" : "option",
@@ -4492,14 +4423,22 @@ var settingsLines = (state, context) => {
   const controls = [
     ...shortcuts,
     blank,
-    ...heading(picker ? "Select browsers" : nativeBrowser ? "Codex In-App Browser" : browserExtension ? "ChatGPT browser extension" : "Browser Use", width),
-    ...visible.flatMap(optionLines)
+    ...heading(nativeBrowser ? "Codex In-App Browser" : browserExtension ? "ChatGPT browser extension" : "Browser Use", width),
+    ...browserPage ? [
+      ...options.slice(0, 1).flatMap(optionLines),
+      ...enabled && offer.browse !== undefined ? [
+        blank,
+        ...heading("Browsers", width),
+        ...candidates.slice(start, start + capacity).flatMap(optionLines),
+        ...candidates.length === 0 ? hintLines("No compatible browsers detected.", width) : []
+      ] : [],
+      ...options.slice(-1).flatMap(optionLines)
+    ] : options.flatMap(optionLines)
   ];
-  const hint = picker ? hintLines("Mark any number. Done keeps the selection. Back discards these edits.", width) : nativeBrowser ? hintLines("Use @Browser in the ChatGPT desktop app. The built-in browser has its own profile, and setup does not change its permissions.", width) : browserExtension ? hintLines("Open OpenAI\u2019s installation guide only after you review and apply. The extension connects your existing browser profile. Setup does not install it or grant access.", width) : [
-    ...hintLines("OpenCode Browse connects a selected Chromium-family browser profile. Each browser needs its own extension and pairing.", width),
-    ...offer.browse === undefined ? [] : hintLines(offer.browse.state, width),
-    ...hintLines("Nothing runs here. Review all choices before applying setup.", width)
-  ];
+  const hint = nativeBrowser ? hintLines("Use @Browser in the ChatGPT desktop app. The built-in browser has its own profile, and setup does not change its permissions.", width) : browserExtension ? [
+    ...hintLines("Open OpenAI\u2019s installation guide only after you review and apply. The extension connects your existing browser profile. Setup does not install it or grant access.", width),
+    ...(offer.harnesses?.codexDesktop?.extensionUnavailableBrowsers ?? []).flatMap(({ name, reason }) => hintLines(`${name} \u2014 ${reason}`, width))
+  ] : enabled ? browserOptions(offer).flatMap(({ name, browseCompatibility }) => browseCompatibility === "supported" ? [] : hintLines(`${name} \u2014 ${browseCompatibility === "unsupported" ? "not supported by Browse" : "compatibility unverified"}`, width)) : [];
   const room = Math.max(0, context.height - controls.length - 2);
   return [...controls, ...room === 0 ? [] : [blank, ...hint.slice(0, room)]];
 };

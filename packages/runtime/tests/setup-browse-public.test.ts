@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -31,6 +31,7 @@ const env = () => ({
   HOLYAGENT_HOST: "pi",
 })
 const receipt = () => join(home, ".holyagent", "browse-setup.json")
+const selectionFile = () => join(home, ".holyagent", "browse-selection.json")
 const terminal = { stdin: true, stdout: true }
 const NORMAL = { form: "normal", source: "flag", reason: "--form normal" } as const
 
@@ -80,6 +81,11 @@ const choiceSession = async (options: {
   readonly select?: boolean
   readonly profile?: number
   readonly browserIds?: ReadonlyArray<string>
+  readonly useInitial?: boolean
+  readonly defaultDesktop?: string
+  readonly beforeApply?: () => Promise<void>
+  readonly browserUseEnabled?: boolean
+  readonly scope?: "user" | "project"
   readonly dryRun?: boolean
   readonly cancel?: boolean
   readonly noTui?: boolean
@@ -89,11 +95,23 @@ const choiceSession = async (options: {
   readonly pairExits?: readonly number[]
   readonly combined?: boolean
 }) => {
-  const shell = fixtureShell()
+  const shell =
+    options.defaultDesktop === undefined
+      ? fixtureShell()
+      : fakeShell({
+          commands: ["pi", "xdg-settings"],
+          respond: (line) => ({
+            stdout: line.includes("xdg-settings get")
+              ? `${options.defaultDesktop}\n`
+              : `${BROWSE_VERSION}\n`,
+          }),
+        })
+  const bin = join(home, "bin")
   const calls: Array<string> = []
   const notices: Array<string> = []
   let review: ReadonlyArray<string> | undefined
   let displayed = false
+  let initialBrowserIds: ReadonlyArray<string> | undefined
   let closed = false
   const pair: BrowsePair = (command, args, { cwd, env: childEnv }) =>
     Effect.gen(function* () {
@@ -101,7 +119,7 @@ const choiceSession = async (options: {
       const exit = options.pairExits?.[calls.length] ?? options.pairExit ?? 0
       if (options.pairWrites !== false && exit === 0)
         yield* Effect.promise(() =>
-          options.browserIds === undefined
+          (options.browserIds?.length ?? 0) < 2
             ? paired()
             : json(
                 browsePairingFile(env()),
@@ -121,15 +139,24 @@ const choiceSession = async (options: {
   const apply = () => Effect.succeed({ ok: true, lines: ["= Pi fixture configured"] })
   const drive: SetupTuiModule["runSetupTui"] = async (input: TuiInput) => {
     displayed = true
+    initialBrowserIds = input.initial.browseBrowserIds
     const choices: Choices = {
       ...input.initial,
+      ...(options.browserUseEnabled === undefined
+        ? {}
+        : {
+            capabilities: { ...input.initial.capabilities, browserUse: options.browserUseEnabled },
+          }),
       piProviders: { providers: ["kimi-coding-global"] },
       ...(options.select === undefined ? {} : { browseSetup: options.select }),
       ...(options.profile === undefined ? {} : { browseProfile: options.profile }),
-      ...(options.browserIds === undefined ? {} : { browseBrowserIds: options.browserIds }),
+      ...(options.useInitial === true
+        ? {}
+        : { browseBrowserIds: options.browserIds ?? (options.select === false ? [] : ["chrome"]) }),
     }
     review = (await input.review(choices)).browse
     if (options.cancel === true) return { _tag: "Cancelled" }
+    await options.beforeApply?.()
     const applied = await input.apply(choices, new AbortController().signal)
     expect(calls).toEqual([])
     closed = true
@@ -137,9 +164,9 @@ const choiceSession = async (options: {
   }
   const result = await Effect.runPromise(
     runInteractive({
-      env: env(),
+      env: { ...env(), PATH: bin },
       cwd: home,
-      scope: "user",
+      scope: options.scope ?? "user",
       undo: false,
       dryRun: options.dryRun ?? false,
       terminal,
@@ -155,7 +182,16 @@ const choiceSession = async (options: {
       ...(options.combined === true ? { combined: { run: apply } } : {}),
     }).pipe(Effect.provide(shell.layer)),
   )
-  return { result, calls, review, displayed, notices, versions: shell.lines() }
+  return {
+    result,
+    calls,
+    review,
+    displayed,
+    notices,
+    initialBrowserIds,
+    defaultQueries: shell.lines().filter((line) => line.includes("xdg-settings")),
+    versions: shell.lines().filter((line) => line.includes("browse --version")),
+  }
 }
 
 describe("public setup's OpenCode Browse choice", () => {
@@ -234,8 +270,8 @@ describe("public setup's OpenCode Browse choice", () => {
     async (combined) => {
       const chrome = await profiles()
       const run = await choiceSession({ combined })
-      expect(run.review?.join("\n")).toContain(`${chrome}, Profile 1`)
-      expect(run.review?.join("\n")).toContain(`${chrome}, Profile 2`)
+      expect(run.review?.join("\n")).toContain(`${chrome}, Profile 1: enter its own one-time code`)
+      expect(run.review?.join("\n")).not.toContain(`${chrome}, Profile 2: enter`)
       expect(run.review?.join("\n")).toContain(`Configure ${PIN} with bunx`)
       expect(run.calls).toEqual([`bunx --package ${PIN} browse pair`])
       expect(run.versions).toEqual([`bunx --package ${PIN} browse --version`])
@@ -253,12 +289,12 @@ describe("public setup's OpenCode Browse choice", () => {
     const chrome = await profiles()
     const run = await choiceSession({ select: true, profile: 1 })
     expect(run.review?.join("\n")).toContain(
-      `add the official Browse extension in ${chrome}, Profile 2`,
+      `${chrome}, Profile 2: add the official Browse extension`,
     )
     expect(run.calls).toEqual([])
     expect(run.versions).toEqual([`bunx --package ${PIN} browse --version`])
     expect(await Bun.file(receipt()).exists()).toBe(false)
-    expect(JSON.stringify(run.result)).toContain("pairing is not complete")
+    expect(JSON.stringify(run.result)).toContain("then review setup again")
   })
 
   test.each([0, 1])(
@@ -298,7 +334,7 @@ describe("public setup's OpenCode Browse choice", () => {
   test("skipping, cancelling, dry-run, headless and unattended never invoke Browse", async () => {
     await profiles()
     const skip = await choiceSession({ select: false })
-    expect(skip.review?.join("\n")).toContain("Skip Browser Use setup")
+    expect(skip.review?.join("\n")).toContain("no browser selected")
     const cancel = await choiceSession({ select: true, cancel: true })
     const dry = await choiceSession({ select: true, dryRun: true })
     const unattended = await choiceSession({ select: true, noTui: true })
@@ -316,7 +352,7 @@ describe("public setup's OpenCode Browse choice", () => {
     await profiles()
     const unverified = await choiceSession({ select: true, pairWrites: false })
     expect(unverified.result).toMatchObject({ kind: "applied", report: { ok: false } })
-    expect(JSON.stringify(unverified.result)).toContain("no browser pairing was found")
+    expect(JSON.stringify(unverified.result)).toContain("no new connected profile was confirmed")
     const timedOut = await choiceSession({ select: true, pairExit: 1, pairWrites: false })
     expect(timedOut.result).toMatchObject({ kind: "applied", report: { ok: false } })
     expect(JSON.stringify(timedOut.result)).toContain("pairing was not confirmed (exit 1)")
@@ -366,87 +402,258 @@ describe("public setup's OpenCode Browse choice", () => {
     expect(shell.lines()).toEqual([command])
   })
 
-  test("one Browser Use row opens a dedicated configuration page and keeps the profile on Back", async () => {
-    await profiles()
-    const browse = await offer()
+  test("the main row only navigates; one page toggles the feature and independent browser checkboxes", async () => {
     open = await mount({
-      width: 50,
-      height: 16,
+      width: 64,
+      height: 21,
+      env: { TERM: "vt100", LC_ALL: "C" },
       t3: false,
-      browse,
-      capabilities: capabilityOffers(NORMAL).filter(({ feature }) => feature === "browserUse"),
-    })
-    const screen = open
-    const contains = (text: string) => screen.lines().find((line) => line.includes(text))
-    const click = async (text: string) => {
-      const y = screen.lines().findIndex((line) => line.includes(text))
-      expect(y).toBeGreaterThan(0)
-      await screen.click(4, y)
-    }
-    expect(screen.lines().filter((line) => line.includes("Browser Use"))).toHaveLength(1)
-    expect(contains("Browser Use")).toContain("[x] Configure")
-    expect(contains("Browser profile:")).toBeUndefined()
-    expect(screen.reviews).toHaveLength(0)
-    await screen.keys("enter")
-    expect(contains("[Review choices]")).toBeUndefined()
-    expect(screen.lines().join("\n")).toContain("[x] Configure")
-    expect(contains("[ ] Skip")).toBeDefined()
-    await click("Browser profile:")
-    expect(contains("Profile 2")).toBeDefined()
-    await click("Back")
-    expect(contains("Browser Use")).toContain("[x] Configure")
-    expect(contains("Browser profile:")).toBeUndefined()
-    await click("Browser Use")
-    expect(contains("Profile 2")).toBeDefined()
-    await screen.keys("down", "enter", "escape")
-    expect(contains("Browser Use")).toContain("[ ] Skip")
-    expect(screen.reviews).toHaveLength(0)
-    expect(screen.applies).toHaveLength(0)
-    await screen.keys("end", "enter")
-    expect(screen.reviews[0]).toMatchObject({ browseSetup: false, browseProfile: 1 })
-  })
-
-  test("the browser picker confirms more than one target, keeps its marks, and labels unsupported installs", async () => {
-    await profiles()
-    const browse = await offer()
-    open = await mount({
-      width: 50,
-      height: 16,
-      t3: false,
+      browserUseEnabled: false,
+      browserIds: [],
       browse: {
-        ...browse,
+        ...(await offer()),
         browsers: [
           { id: "chrome", name: "Google Chrome", browseCompatibility: "supported" },
           { id: "edge", name: "Microsoft Edge", browseCompatibility: "supported" },
           { id: "firefox", name: "Firefox", browseCompatibility: "unsupported" },
+          { id: "aurora", name: "Aurora Browser", browseCompatibility: "unverified" },
         ],
       },
       capabilities: capabilityOffers(NORMAL).filter(({ feature }) => feature === "browserUse"),
     })
     const screen = open
-    const click = async (text: string) => {
-      const y = screen.lines().findIndex((line) => line.includes(text))
+    const text = () => screen.lines().join("\n")
+    const click = async (label: string) => {
+      const y = screen.lines().findIndex((line) => line.includes(label))
       expect(y).toBeGreaterThan(0)
       await screen.click(4, y)
     }
+    expect(screen.lines().find((line) => line.includes("browser-use"))).not.toContain("[")
     await screen.keys("enter")
-    await click("Browsers:")
-    expect(screen.lines().join("\n")).toContain("SELECT BROWSERS")
-    expect(screen.lines().join("\n")).toContain("Firefox — not supported by Browse")
-    await screen.keys("enter")
-    await click("Microsoft Edge")
-    expect(screen.lines().join("\n")).toContain("[x] Google Chrome")
-    expect(screen.lines().join("\n")).toContain("[x] Microsoft Edge")
-    await click("Firefox")
-    expect(screen.lines().join("\n")).toContain("[ ] Firefox")
-    await screen.keys("end", "enter")
-    expect(screen.lines().join("\n")).toContain("Browsers: Google Chrome, Microsoft Edge")
-    await click("Browsers:")
-    await screen.keys("enter", "escape")
-    expect(screen.lines().join("\n")).toContain("Browsers: Google Chrome, Microsoft Edge")
+    expect(text()).toContain("Enable browser-use")
+    expect(text()).not.toContain("Google Chrome")
+    expect(text()).not.toContain("Microsoft Edge")
     await screen.keys("escape")
-    expect(screen.applies).toHaveLength(0)
-    await screen.keys("end", "enter")
-    expect(screen.reviews[0]).toMatchObject({ browseBrowserIds: ["chrome", "edge"] })
+    await click("browser-use")
+    expect(text()).toContain("Enable browser-use")
+    expect(screen.reviews).toHaveLength(0)
+
+    await screen.keys("enter")
+    expect(text()).toContain("Disable browser-use")
+    expect(text()).toContain("[ ] Google Chrome")
+    expect(text()).toContain("[ ] Microsoft Edge")
+    expect(text()).toContain("Firefox")
+    expect(text()).toContain("not supported by Browse")
+    expect(text()).toContain("Aurora Browser")
+    expect(text()).toContain("compatibility unverified")
+    expect(text()).not.toMatch(
+      /automatic profile|select browsers|browser profile|\[.\] (Firefox|Aurora)/i,
+    )
+    await screen.keys("down", "enter")
+    await click("Microsoft Edge")
+    expect(text()).toContain("[x] Google Chrome")
+    expect(text()).toContain("[x] Microsoft Edge")
+    await click("Firefox")
+    expect(text()).toContain("[x] Google Chrome")
+    expect(text()).toContain("[x] Microsoft Edge")
+    await screen.keys("escape")
+    await click("browser-use")
+    expect(text()).toContain("[x] Google Chrome")
+    expect(text()).toContain("[x] Microsoft Edge")
+    await click("Google Chrome")
+    expect(text()).toContain("[ ] Google Chrome")
+    expect(text()).toContain("[x] Microsoft Edge")
+    await screen.keys("escape", "end", "enter")
+    expect(screen.reviews[0]).toMatchObject({
+      capabilities: { browserUse: true },
+      browseBrowserIds: ["edge"],
+    })
+    expect(screen.applies).toEqual([])
+    await click("Back")
+    await click("browser-use")
+    await screen.keys("enter")
+    expect(text()).toContain("Enable browser-use")
+    expect(text()).not.toContain("Google Chrome")
+    expect(text()).not.toContain("Microsoft Edge")
+    await screen.keys("escape", "end", "enter")
+    expect(screen.reviews.at(-1)).toMatchObject({
+      capabilities: { browserUse: false },
+      browseBrowserIds: ["edge"],
+    })
+  })
+
+  test("Codex hands off to each named browser independently and shows unavailable candidates without install actions", async () => {
+    open = await mount({
+      width: 90,
+      height: 30,
+      t3: false,
+      combined: true,
+      onlyCodex: true,
+      codexHome: "/tmp/fixture-codex",
+      codexDesktop: {
+        name: "ChatGPT",
+        extensionBrowsers: [
+          { id: "chrome", name: "Google Chrome" },
+          { id: "edge", name: "Microsoft Edge" },
+        ],
+        extensionUnavailableBrowsers: [
+          { id: "firefox", name: "Firefox", reason: "not supported by OpenAI" },
+        ],
+      },
+    })
+    const screen = open
+    const text = () => screen.lines().join("\n")
+    const click = async (label: string) => {
+      const y = screen.lines().findIndex((line) => line.includes(label))
+      expect(y).toBeGreaterThan(0)
+      await screen.click(4, y)
+    }
+    expect(text()).toContain("Codex In-App Browser")
+    await click("ChatGPT browser extension")
+    expect(text()).toContain("Install in Google Chrome")
+    expect(text()).toContain("Install in Microsoft Edge")
+    expect(text()).toContain("Firefox")
+    expect(text()).toContain("not supported by OpenAI")
+    expect(text()).not.toContain("Install in Firefox")
+    await click("Install in Microsoft Edge")
+    expect(text()).toContain("Install in Microsoft Edge (selected)")
+    await click("Install in Google Chrome")
+    expect(text()).toContain("Install in Google Chrome (selected)")
+    expect(text()).not.toContain("Install in Microsoft Edge (selected)")
+    await click("Firefox")
+    expect(text()).toContain("Install in Google Chrome (selected)")
+    await screen.keys("escape", "end", "enter")
+    expect(screen.reviews[0]).toMatchObject({ codexBrowserHandoff: "chrome" })
+    expect(screen.applies).toEqual([])
+  })
+
+  test("the Codex extension page remains visible with only an unsupported installed browser", async () => {
+    open = await mount({
+      width: 80,
+      height: 21,
+      t3: false,
+      combined: true,
+      onlyCodex: true,
+      codexHome: "/tmp/fixture-codex",
+      codexDesktop: {
+        name: "ChatGPT",
+        extensionUnavailableBrowsers: [
+          { id: "firefox", name: "Firefox", reason: "not supported by OpenAI" },
+        ],
+      },
+    })
+    const screen = open
+    await screen.keys("down", "enter")
+    expect(screen.lines().join("\n")).toContain("not supported by OpenAI")
+    expect(screen.lines().join("\n")).not.toContain("Install in")
+    expect(screen.reviews).toEqual([])
+  })
+
+  test.skipIf(process.platform !== "linux")(
+    "defaults once from the detected supported OS browser and restores the saved list including empty",
+    async () => {
+      await profiles()
+      const bin = join(home, "bin")
+      await mkdir(bin)
+      for (const name of ["google-chrome", "microsoft-edge", "firefox"])
+        await writeFile(join(bin, name), "#!/bin/sh\nexit 1\n", { mode: 0o700 })
+
+      const first = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "microsoft-edge.desktop",
+        cancel: true,
+      })
+      expect(first.initialBrowserIds).toEqual(["edge"])
+      expect(first.defaultQueries).toHaveLength(1)
+      expect(await Bun.file(selectionFile()).exists()).toBe(false)
+      const notDetected = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "brave-browser.desktop",
+        cancel: true,
+      })
+      expect(notDetected.initialBrowserIds).toEqual([])
+      const incompatible = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "firefox.desktop",
+        cancel: true,
+      })
+      expect(incompatible.initialBrowserIds).toEqual([])
+      await choiceSession({
+        useInitial: true,
+        defaultDesktop: "brave-browser.desktop",
+        browserUseEnabled: false,
+      })
+      expect(await Bun.file(selectionFile()).exists()).toBe(false)
+      await choiceSession({
+        useInitial: true,
+        defaultDesktop: "brave-browser.desktop",
+        scope: "project",
+      })
+      expect(await Bun.file(selectionFile()).exists()).toBe(false)
+
+      const firstEmpty = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "brave-browser.desktop",
+      })
+      expect(firstEmpty.initialBrowserIds).toEqual([])
+      expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: [] })
+      const retainedEmpty = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "microsoft-edge.desktop",
+        cancel: true,
+      })
+      expect(retainedEmpty.initialBrowserIds).toEqual([])
+      expect(retainedEmpty.defaultQueries).toEqual([])
+      await rm(selectionFile())
+
+      const unchanged = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "microsoft-edge.desktop",
+        select: false,
+      })
+      expect(unchanged.initialBrowserIds).toEqual(["edge"])
+      expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: ["edge"] })
+      const retainedDefault = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "google-chrome.desktop",
+        cancel: true,
+      })
+      expect(retainedDefault.initialBrowserIds).toEqual(["edge"])
+      expect(retainedDefault.defaultQueries).toEqual([])
+
+      await choiceSession({ browserIds: ["chrome", "edge"], select: false })
+      expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: ["chrome", "edge"] })
+      const restored = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "microsoft-edge.desktop",
+        cancel: true,
+      })
+      expect(restored.initialBrowserIds).toEqual(["chrome", "edge"])
+      expect(restored.defaultQueries).toEqual([])
+      const dryRun = await choiceSession({ browserIds: [], dryRun: true })
+      expect(dryRun.result).toMatchObject({ kind: "applied", report: { ok: true } })
+      expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: ["chrome", "edge"] })
+      await choiceSession({ browserIds: [] })
+      const empty = await choiceSession({
+        useInitial: true,
+        defaultDesktop: "microsoft-edge.desktop",
+        cancel: true,
+      })
+      expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: [] })
+      expect(empty.initialBrowserIds).toEqual([])
+      expect(empty.defaultQueries).toEqual([])
+    },
+  )
+
+  test("an edit between selection review and Apply keeps the other writer's saved selection", async () => {
+    await profiles()
+    await json(selectionFile(), { browsers: ["chrome"] })
+    const raced = await choiceSession({
+      browserIds: [],
+      beforeApply: () => json(selectionFile(), { browsers: ["chrome", "edge"] }),
+    })
+    expect(raced.result).toMatchObject({ kind: "applied", report: { ok: false } })
+    expect(raced.calls).toEqual([])
+    expect(await Bun.file(selectionFile()).json()).toEqual({ browsers: ["chrome", "edge"] })
   })
 })

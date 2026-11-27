@@ -6,7 +6,11 @@ import { Effect, Layer } from "effect"
 
 import { FileSystem, nodeFileSystem } from "../../core/src/ports/filesystem.ts"
 import { BROWSE_EXTENSION_IDS, findBrowseProfiles } from "../../core/src/setup/browse.ts"
-import { checkBrowserExecutable, discoverBrowsers } from "../../core/src/setup/browser-discovery.ts"
+import {
+  checkBrowserExecutable,
+  discoverBrowsers,
+  systemDefaultBrowser,
+} from "../../core/src/setup/browser-discovery.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
 
 const WIN = {
@@ -31,6 +35,7 @@ let home: string
 let remove: () => Promise<void>
 let files: Map<string, string>
 let reads: string[]
+let directories: Map<string, string[]>
 
 beforeEach(async () => {
   const made = await scratch("holyagent-browser-discovery-")
@@ -38,6 +43,7 @@ beforeEach(async () => {
   remove = made.remove
   files = new Map()
   reads = []
+  directories = new Map()
 })
 afterEach(() => remove())
 
@@ -59,9 +65,8 @@ const filesystem = () =>
           ? nodeFileSystem.readFile(fixturePath(file), "utf8")
           : nodeFileSystem.readFile(fixturePath(file))) as typeof nodeFileSystem.readFile,
       accessSync: (file, mode) => nodeFileSystem.accessSync(fixturePath(String(file)), mode),
-      readdirSync: () => {
-        throw new Error("browser directory enumeration is not allowed")
-      },
+      readdirSync: ((dir: string) =>
+        directories.get(key(dir)) ?? []) as typeof nodeFileSystem.readdirSync,
     }),
   )
 
@@ -192,8 +197,116 @@ describe("read-only discovery of installed browsers", () => {
     expect(shell.calls.every(({ command, args }) => command === REG && args[0] === "query")).toBe(
       true,
     )
-    expect(shell.lines().some((line) => line.includes("Unknown Client"))).toBe(false)
+    expect(
+      shell.lines().some((line) => line.includes("Unknown Client\\shell\\open\\command")),
+    ).toBe(true)
     expect(reads.some((file) => file.startsWith("\\\\"))).toBe(false)
+  })
+
+  test("an unknown Windows registered derivative is detected from installed Chromium engine files without claiming compatibility", async () => {
+    const root = "D:\\Fixture\\Aurora\\Application"
+    const binary = `${root}\\aurora.exe`
+    await touch(REG)
+    await touch(binary)
+    directories.set(key(root), ["120.0.0.1", "other"])
+    await touch(`${root}\\120.0.0.1\\chrome.dll`)
+    await touch(FIREFOX)
+    const shell = fakeShell({
+      commands: [],
+      respond: (line) => {
+        if (line.endsWith(`${HKCU} /reg:64`)) return { stdout: `${HKCU}\\New Vendor Client\r\n` }
+        if (line.includes("New Vendor Client\\shell\\open\\command"))
+          return { stdout: `  (Default)  REG_SZ  "${binary}" -- "%1"\r\n` }
+        if (line.endsWith(`${HKCU}\\New Vendor Client /ve /reg:64`))
+          return { stdout: "  (Default)  REG_SZ  Aurora Browser\n" }
+        return { exitCode: 1 }
+      },
+    })
+    expect(await lookup(shell)).toMatchObject([
+      { id: "firefox", executable: FIREFOX, family: "gecko", browseCompatibility: "unsupported" },
+      {
+        id: "registered-new-vendor-client",
+        name: "Aurora Browser",
+        executable: binary,
+        family: "chromium",
+        browseCompatibility: "unverified",
+      },
+    ])
+    expect(shell.calls.every(({ command }) => command === REG)).toBe(true)
+  })
+
+  test("an unknown desktop entry is found without executing its command, and a non-browser is ignored", async () => {
+    const data = "/fixture/data/applications"
+    const bin = "/fixture/vendor/aurora"
+    directories.set(data, ["aurora.desktop", "editor.desktop", "firefox.desktop"])
+    await touch(bin)
+    await touch("/fixture/vendor/resources.pak")
+    await touch("/fixture/vendor/chrome-sandbox")
+    await touch("/fixture/bin/firefox")
+    await touch(
+      `${data}/aurora.desktop`,
+      `[Desktop Entry]\nType=Application\nName=Aurora Browser\nCategories=WebBrowser;Network;\nExec=${bin} %U\n`,
+    )
+    await touch(
+      `${data}/editor.desktop`,
+      `[Desktop Entry]\nType=Application\nName=Not a browser\nCategories=Editor;\nExec=${bin} %U\n`,
+    )
+    await touch(
+      `${data}/firefox.desktop`,
+      "[Desktop Entry]\nType=Application\nName=Firefox\nMimeType=x-scheme-handler/https;\nExec=/fixture/bin/firefox %U\n",
+    )
+    const shell = fakeShell({ commands: [] })
+    const found = await Effect.runPromise(
+      discoverBrowsers(
+        { HOME: "/fixture", XDG_DATA_HOME: "/fixture/data", PATH: "/fixture/bin" },
+        "linux",
+      ).pipe(Effect.provide(shell.layer), Effect.provide(filesystem())),
+    )
+    expect(found).toMatchObject([
+      { id: "firefox", family: "gecko", browseCompatibility: "unsupported" },
+      {
+        id: "desktop-aurora",
+        name: "Aurora Browser",
+        executable: bin,
+        family: "chromium",
+        browseCompatibility: "unverified",
+      },
+    ])
+    expect(shell.calls).toEqual([])
+  })
+
+  test("Windows default resolves only by exact installed compatible executable, never launches its command", async () => {
+    await touch(REG)
+    await touch(CHROME)
+    await touch(HELIUM)
+    await touch(FIREFOX)
+    const detect = async (registered: string) => {
+      const shell = fakeShell({
+        commands: [],
+        respond: (line) => {
+          if (line.includes("\\https\\UserChoice /v ProgId"))
+            return { stdout: "    ProgId    REG_SZ    Fixture.URL\r\n" }
+          if (line.includes("HKEY_CLASSES_ROOT\\Fixture.URL\\shell\\open\\command"))
+            return { stdout: `    (Default)    REG_SZ    "${registered}" "%1"\r\n` }
+          return { exitCode: 1 }
+        },
+      })
+      const found = await lookup(shell)
+      const chosen = await Effect.runPromise(
+        systemDefaultBrowser(WIN, WIN.USERPROFILE, found, "win32").pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(filesystem()),
+        ),
+      )
+      expect(shell.calls.every(({ command, args }) => command === REG && args[0] === "query")).toBe(
+        true,
+      )
+      return chosen
+    }
+    expect(await detect(CHROME.toLowerCase())).toBe("chrome")
+    expect(await detect(HELIUM)).toBeUndefined()
+    expect(await detect(FIREFOX)).toBeUndefined()
+    expect(await detect("C:\\fixture\\missing\\chrome.exe")).toBeUndefined()
   })
 
   test("App Paths cannot misattribute a generic chrome.exe or a removed browser to Chrome", async () => {
@@ -244,6 +357,63 @@ describe("read-only discovery of installed browsers", () => {
       { id: "librewolf", source: "path", family: "gecko", browseCompatibility: "unsupported" },
     ])
     expect(shell.calls).toEqual([])
+  })
+
+  test("macOS recognizes a vendor Chromium bundle but selects the verified LaunchServices default only when supported", async () => {
+    directories.set("/Applications", [
+      "Aurora Browser.app",
+      "Google Chrome.app",
+      "Desktop Client.app",
+    ])
+    directories.set("/Applications/Aurora Browser.app/Contents/Frameworks", [
+      "Aurora Browser Framework.framework",
+    ])
+    directories.set("/Applications/Desktop Client.app/Contents/Frameworks", [
+      "Electron Framework.framework",
+    ])
+    await touch("/Applications/Aurora Browser.app/Contents/MacOS/Aurora Browser")
+    await touch(
+      "/Applications/Aurora Browser.app/Contents/Frameworks/Aurora Browser Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler",
+    )
+    await touch("/Applications/Desktop Client.app/Contents/MacOS/Desktop Client")
+    await touch(
+      "/Applications/Desktop Client.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler",
+    )
+    await touch("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    await touch("/usr/bin/osascript")
+    const env = { HOME: "/fixture" }
+    const shell = fakeShell({ commands: [] })
+    const found = await Effect.runPromise(
+      discoverBrowsers(env, "darwin").pipe(
+        Effect.provide(shell.layer),
+        Effect.provide(filesystem()),
+      ),
+    )
+    expect(found).toMatchObject([
+      { id: "chrome", family: "chromium", browseCompatibility: "supported" },
+      { id: "app-aurora-browser", family: "chromium", browseCompatibility: "unverified" },
+    ])
+    expect(shell.calls).toEqual([])
+    const query = async (name: string) => {
+      const shell = fakeShell({
+        commands: [],
+        respond: () => ({ stdout: `/Applications/${name}.app\n` }),
+      })
+      const selected = await Effect.runPromise(
+        systemDefaultBrowser(env, "/fixture", found, "darwin").pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(filesystem()),
+        ),
+      )
+      expect(shell.calls).toHaveLength(1)
+      expect(shell.calls[0]).toMatchObject({
+        command: "/usr/bin/osascript",
+        args: ["-l", "JavaScript", "-e", expect.stringContaining("URLForApplicationToOpenURL")],
+      })
+      return selected
+    }
+    expect(await query("Google Chrome")).toBe("chrome")
+    expect(await query("Aurora Browser")).toBeUndefined()
   })
 
   test("portable manual choice checks one absolute executable and cannot claim Browse support", async () => {

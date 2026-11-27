@@ -31646,7 +31646,13 @@ var BROWSERS, envOf = (env, name, windows) => env[name] ?? (windows ? Object.ent
       return localPath(exe, true);
   }
   return;
-}, windowsRegistrations, discoverBrowsers, checkBrowserExecutable;
+}, registryReader, localNames = (directory) => gen2(function* () {
+  const fs = yield* fileSystem;
+  return yield* try_2(() => fs.readdirSync(directory)).pipe(orElseSucceed2(() => []));
+}), identityKey = (name) => name.toLowerCase().replaceAll(/[^a-z\d]+/g, "-").replace(/^-|-$/g, "").slice(0, 80), registeredBrowser, windowsRegistrations, linuxRegistrations, macRegistrations, discoverBrowsers, HTTPS_CHOICE = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice", LINUX_BROWSER_IDS, MAC_DEFAULT = `/** Read the LaunchServices handler without opening the URL. */
+ObjC.import("AppKit");
+var app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.URLWithString("https://example.invalid/"));
+if (app) ObjC.unwrap(app.path);`, systemDefaultBrowser, checkBrowserExecutable;
 var init_browser_discovery = __esm(() => {
   init_dist();
   init_filesystem();
@@ -31771,23 +31777,57 @@ var init_browser_discovery = __esm(() => {
   ];
   hives = ["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"];
   RegistryValue = String6.check(isPattern2(/^\s*.+?\s+REG_(?:EXPAND_)?SZ\s+.+$/i));
-  windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
+  registryReader = fn2("registryReader")(function* (env) {
     const root = envOf(env, "SystemRoot", true) ?? envOf(env, "WINDIR", true);
     const local = root === undefined ? undefined : localPath(root, true);
     if (local === undefined)
-      return new Map;
+      return;
     const reg = win323.join(local, "System32", "reg.exe");
     if (!(yield* checkFile(reg, true, true)))
-      return new Map;
+      return;
     const shell = yield* Shell;
-    const views = ["/reg:64", "/reg:32"];
-    const query = (key, view, value) => shell.run(reg, ["query", key, ...value ? ["/ve"] : [], view], { cwd: local }).pipe(map5(({ exitCode, stdout }) => exitCode === 0 ? stdout : ""));
+    return (key, args) => shell.run(reg, ["query", key, ...args], { cwd: local }).pipe(map5(({ exitCode, stdout }) => exitCode === 0 ? stdout : ""));
+  });
+  registeredBrowser = fn2("registeredBrowser")(function* (key, name, executable, source, platform) {
+    const windows = platform === "win32";
+    const path = windows ? win323 : posix3;
+    const folder = path.dirname(executable);
+    const isFile = (file) => checkFile(file, false, windows);
+    const isLibrary = (base) => isFile(path.join(folder, base));
+    const gecko = yield* isLibrary(windows ? "xul.dll" : "libxul.so");
+    const chromium = gecko ? false : yield* gen2(function* () {
+      if (windows) {
+        if (yield* isLibrary("chrome.dll"))
+          return true;
+        const versions = (yield* localNames(folder)).filter((entry) => /^\d+(?:\.\d+){2,4}$/.test(entry)).slice(0, 12);
+        const version = yield* findFirst2(versions, (entry) => isFile(path.join(folder, entry, "chrome.dll")));
+        if (version._tag === "Some")
+          return true;
+      }
+      return (yield* isLibrary("resources.pak")) && ((yield* isLibrary("chrome_100_percent.pak")) || (yield* isLibrary("chrome-sandbox")));
+    });
+    return {
+      id: `${source === "registry" ? "registered" : "desktop"}-${identityKey(key)}`,
+      name,
+      executable,
+      source,
+      family: gecko ? "gecko" : chromium ? "chromium" : "unknown",
+      browseCompatibility: gecko ? "unsupported" : "unverified"
+    };
+  });
+  windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
+    const read = yield* registryReader(env);
     const registered = new Map;
+    const extra = [];
+    if (read === undefined)
+      return { registered, extra };
+    const views = ["/reg:64", "/reg:32"];
+    const query = (key, view, value) => read(key, [...value ? ["/ve"] : [], view]);
     const roots = hives.flatMap((hive) => views.map((view) => ({ hive, view })));
     const all = yield* forEach2(roots, ({ hive, view }) => query(`${hive}\\${Clients}`, view, false).pipe(map5((text) => ({ hive, view, text }))), { concurrency: 4 });
     for (const { hive, view, text } of all) {
       const prefix = `${hive}\\${Clients}\\`;
-      const children = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.toLowerCase().startsWith(prefix.toLowerCase())).map((line) => line.slice(prefix.length)).filter((child) => /^[\w .-]{1,80}$/.test(child));
+      const children = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.toLowerCase().startsWith(prefix.toLowerCase())).map((line) => line.slice(prefix.length)).filter((child) => /^[\w .-]{1,80}$/.test(child) && identityKey(child) !== "").slice(0, 48);
       const chosen = children.flatMap((client) => {
         const name = client.toLowerCase();
         const browser = BROWSERS.find(({ clients }) => clients?.some((entry) => {
@@ -31796,16 +31836,29 @@ var init_browser_discovery = __esm(() => {
             return true;
           return name.startsWith(registeredName + "-") && /^[a-f\d]{6,}$/i.test(name.slice(registeredName.length + 1));
         }));
-        return browser === undefined || registered.has(browser.id) ? [] : [{ client, browser }];
+        return browser !== undefined && registered.has(browser.id) ? [] : [{ client, browser }];
       });
       const verified = yield* forEach2(chosen, ({ client, browser }) => gen2(function* () {
         const output = yield* query(`${prefix}${client}\\shell\\open\\command`, view, true);
         const path = registryExecutable(output, env);
-        return path !== undefined && browser.winExe?.some((exe) => exe.toLowerCase() === win323.basename(path).toLowerCase()) && (yield* checkFile(path, true, true)) ? { id: browser.id, path } : undefined;
+        if (path === undefined || !(yield* checkFile(path, true, true)))
+          return;
+        if (browser === undefined) {
+          const display = yield* query(`${prefix}${client}`, view, true);
+          const name = /^\s*\(Default\)\s+REG_SZ\s+([^\p{Cc}]{1,100})$/imu.exec(display)?.[1]?.trim() || client;
+          return yield* registeredBrowser(client, name, path, "registry", "win32");
+        }
+        return browser.winExe?.some((exe) => exe.toLowerCase() === win323.basename(path).toLowerCase()) ? { id: browser.id, path } : undefined;
       }), { concurrency: 4 });
-      for (const entry of verified)
-        if (entry !== undefined && !registered.has(entry.id))
-          registered.set(entry.id, entry.path);
+      for (const entry of verified) {
+        if (entry === undefined)
+          continue;
+        if ("path" in entry) {
+          if (!registered.has(entry.id))
+            registered.set(entry.id, entry.path);
+        } else if (!extra.some((browser) => browser.id === entry.id))
+          extra.push(entry);
+      }
     }
     const missing = BROWSERS.filter((browser) => !registered.has(browser.id));
     const appNames = ["chrome.exe", "firefox.exe", "helium.exe"].filter((exe) => missing.some(({ winExe }) => winExe?.includes(exe)));
@@ -31817,17 +31870,95 @@ var init_browser_discovery = __esm(() => {
       if (browser !== undefined && !registered.has(browser.id))
         registered.set(browser.id, path);
     }
-    return registered;
+    return { registered, extra };
+  });
+  linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
+    const home = homeDirectory2(env);
+    const roots = [
+      ...new Set([
+        env.XDG_DATA_HOME ?? posix3.join(home, ".local/share"),
+        ...(env.XDG_DATA_DIRS ?? "/usr/local/share:/usr/share").split(":")
+      ])
+    ].flatMap((root) => {
+      const local = localPath(root, false);
+      return local === undefined ? [] : [posix3.join(local, "applications")];
+    });
+    const fs = yield* fileSystem;
+    const shell = yield* Shell;
+    const seen = new Set;
+    const extra = [];
+    for (const root of roots) {
+      for (const entry of (yield* localNames(root)).filter((file) => /^[\w.-]{1,120}\.desktop$/.test(file)).slice(0, 500)) {
+        if (seen.has(entry))
+          continue;
+        seen.add(entry);
+        const file = posix3.join(root, entry);
+        const metadata = yield* tryPromise2(() => fs.stat(file)).pipe(option2);
+        if (metadata._tag === "None" || !metadata.value.isFile() || metadata.value.size > 64 * 1024)
+          continue;
+        const source = yield* tryPromise2(() => fs.readFile(file, "utf8")).pipe(orElseSucceed2(() => ""));
+        const group = source.split(/^\[Desktop Entry\]\s*$/m)[1]?.split(/^\[/m)[0] ?? "";
+        const values = (field) => group.split(/\r?\n/).find((line) => line.startsWith(`${field}=`))?.slice(field.length + 1).split(";") ?? [];
+        if (!/^Type=Application\s*$/m.test(group) || /^Hidden=true\s*$/im.test(group) || !values("Categories").includes("WebBrowser") && !values("MimeType").includes("x-scheme-handler/https"))
+          continue;
+        const name = /^Name=([^\p{Cc}]{1,100})$/mu.exec(group)?.[1]?.trim();
+        const match = /^Exec=(?:"([^"\r\n]+)"|([^\s"=]+))/m.exec(group);
+        const binary = match?.[1] ?? match?.[2];
+        if (!name || binary === undefined)
+          continue;
+        const path = localPath(binary, false);
+        const located = path === undefined && /^[\w.-]+$/.test(binary) ? yield* shell.which(binary, { strict: { cwd: home } }) : undefined;
+        const executable = path ?? (located?._tag === "Some" ? located.value : undefined);
+        if (executable === undefined || !(yield* checkFile(executable, true, false)))
+          continue;
+        if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix3.basename(executable)))
+          continue;
+        extra.push(yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"));
+      }
+    }
+    return extra;
+  });
+  macRegistrations = fn2("macRegistrations")(function* (env) {
+    const home = homeDirectory2(env);
+    const extra = [];
+    for (const root of ["/Applications", posix3.join(home, "Applications")].filter(posix3.isAbsolute)) {
+      const bundles = (yield* localNames(root)).filter((name) => /^[^/\p{Cc}]{1,120}\.app$/u.test(name)).slice(0, 160);
+      for (const bundle of bundles) {
+        const name = bundle.slice(0, -4);
+        if (identityKey(name) === "" || BROWSERS.some(({ app }) => app === name))
+          continue;
+        const contents = posix3.join(root, bundle, "Contents");
+        const resources = posix3.join(contents, "Resources");
+        const macos = posix3.join(contents, "MacOS");
+        const executables = (yield* localNames(macos)).filter((entry) => /^[^/\p{Cc}]{1,120}$/u.test(entry));
+        const executable = posix3.join(macos, executables.find((entry) => entry.toLowerCase() === name.toLowerCase()) ?? name);
+        if (!(yield* checkFile(executable, true, false)))
+          continue;
+        const gecko = (yield* checkFile(posix3.join(macos, "XUL"), false, false)) && (yield* checkFile(posix3.join(resources, "browser", "omni.ja"), false, false));
+        const frameworks = posix3.join(contents, "Frameworks");
+        const engine = gecko ? undefined : yield* findFirst2((yield* localNames(frameworks)).filter((entry) => /^[^/\p{Cc}]{1,120} Framework\.framework$/u.test(entry) && entry !== "Electron Framework.framework"), (entry) => checkFile(posix3.join(frameworks, entry, "Versions/Current/Helpers/chrome_crashpad_handler"), false, false));
+        if (gecko || engine?._tag === "Some")
+          extra.push({
+            id: `app-${identityKey(name)}`,
+            name,
+            executable,
+            source: "known-path",
+            family: gecko ? "gecko" : "chromium",
+            browseCompatibility: gecko ? "unsupported" : "unverified"
+          });
+      }
+    }
+    return extra;
   });
   discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = process.platform) {
     const windows = platform === "win32";
     const path = windows ? win323 : posix3;
     if (!windows && platform !== "linux" && platform !== "darwin")
       return [];
-    const registry = windows ? yield* windowsRegistrations(env) : new Map;
+    const registry = windows ? yield* windowsRegistrations(env) : undefined;
     const browsers = yield* forEach2(BROWSERS, (browser) => gen2(function* () {
       const profileDirectory = profileRoot(browser, env, platform);
-      const registered = registry.get(browser.id);
+      const registered = registry?.registered.get(browser.id);
       if (registered !== undefined)
         return evidence(browser, "registry", platform, profileDirectory, registered);
       const known = yield* oneFile(knownPaths(browser, env, platform), windows);
@@ -31844,7 +31975,69 @@ var init_browser_discovery = __esm(() => {
           return evidence(browser, "profile", platform, profileDirectory);
       return;
     }), { concurrency: 4 });
-    return browsers.filter((browser) => browser !== undefined);
+    const extra = registry?.extra ?? (platform === "linux" ? yield* linuxRegistrations(env) : yield* macRegistrations(env));
+    const found = browsers.filter((browser) => browser !== undefined);
+    const identity = (file) => windows ? file?.toLowerCase() : file;
+    for (const browser of extra) {
+      if (!found.some((entry) => entry.id === browser.id || identity(entry.executable) === identity(browser.executable)))
+        found.push(browser);
+    }
+    return found;
+  });
+  LINUX_BROWSER_IDS = new Map([
+    ["google-chrome.desktop", "chrome"],
+    ["com.google.Chrome.desktop", "chrome"],
+    ["google-chrome-beta.desktop", "chrome-beta"],
+    ["google-chrome-unstable.desktop", "chrome-unstable"],
+    ["chromium.desktop", "chromium"],
+    ["chromium-browser.desktop", "chromium"],
+    ["org.chromium.Chromium.desktop", "chromium"],
+    ["microsoft-edge.desktop", "edge"],
+    ["microsoft-edge-stable.desktop", "edge"],
+    ["brave-browser.desktop", "brave"],
+    ["com.brave.Browser.desktop", "brave"],
+    ["opera.desktop", "opera"],
+    ["vivaldi-stable.desktop", "vivaldi"],
+    ["helium.desktop", "helium"],
+    ["net.imput.helium.desktop", "helium"]
+  ]);
+  systemDefaultBrowser = fn2("systemDefaultBrowser")(function* (env, cwd, detected, platform = process.platform) {
+    const candidates = detected.filter(({ executable, browseCompatibility }) => executable !== undefined && browseCompatibility === "supported");
+    if (candidates.length === 0)
+      return;
+    if (platform === "win32") {
+      const read = yield* registryReader(env);
+      if (read === undefined)
+        return;
+      const choice = yield* read(HTTPS_CHOICE, ["/v", "ProgId"]);
+      const progId = /^\s*ProgId\s+REG_SZ\s+([\w.-]{1,128})\s*$/im.exec(choice)?.[1];
+      if (progId === undefined)
+        return;
+      const command = yield* read(`HKEY_CLASSES_ROOT\\${progId}\\shell\\open\\command`, ["/ve"]);
+      const path = registryExecutable(command, env)?.toLowerCase();
+      return path === undefined ? undefined : candidates.find(({ executable }) => executable?.toLowerCase() === path)?.id;
+    }
+    const shell = yield* Shell;
+    if (platform === "linux") {
+      const command = yield* shell.which("xdg-settings", { strict: { cwd } });
+      if (command._tag === "None")
+        return;
+      const result = yield* shell.run(command.value, ["get", "default-web-browser"], { cwd });
+      const id = result.exitCode === 0 ? LINUX_BROWSER_IDS.get(result.stdout.trim()) : undefined;
+      return candidates.find((candidate) => candidate.id === id)?.id;
+    }
+    if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {
+      const result = yield* shell.run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_DEFAULT], {
+        cwd
+      });
+      if (result.exitCode !== 0)
+        return;
+      const app = localPath(result.stdout.trim(), false);
+      if (app === undefined || !app.endsWith(".app"))
+        return;
+      return candidates.find(({ executable }) => executable?.startsWith(`${app}/Contents/MacOS/`))?.id;
+    }
+    return;
   });
   checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absolutePath, platform = process.platform) {
     const windows = platform === "win32";
@@ -32969,19 +33162,7 @@ var init_load3 = __esm(() => {
 
 import { dirname as dirname15, join as join33 } from "path";
 var {$: $2 } = globalThis.Bun;
-var NAME = "OpenCode Browse", PACKAGE, Receipt2, receiptFile2 = (env) => join33(dirname15(userConfigFile(env)), "browse-setup.json"), browseEnv, planBrowse, browseProfileLabel = ({ browser, profile }) => `${browser}, ${profile}`, targetNeeds = ({ target, guidance }) => `${NAME}: ${target}: ${guidance ?? "verify the browser and its extension manually"}`, browseForProfile = (plan, index) => {
-  if (plan.next === "none" || plan.next === "paired")
-    return plan;
-  const profile = plan.profiles?.[index];
-  const target = profile === undefined ? "a compatible Chromium-family browser profile" : browseProfileLabel(profile);
-  const guidance = profile?.extension === "enabled" ? undefined : profile?.extension === "disabled" ? `enable the Browse extension in ${target}` : `add the official Browse extension in ${target} from ${BROWSE_EXTENSION_STORE}`;
-  return {
-    ...plan,
-    next: profile?.extension === "enabled" ? "pair" : "extension",
-    target,
-    ...guidance === undefined ? {} : { guidance }
-  };
-}, browseReview = (plan, selected, dryRun = false) => [
+var NAME = "OpenCode Browse", PACKAGE, Receipt2, receiptFile2 = (env) => join33(dirname15(userConfigFile(env)), "browse-setup.json"), browseEnv, planBrowse, browseProfileLabel = ({ browser, profile }) => `${browser}, ${profile}`, targetNeeds = ({ target, guidance }) => `${NAME}: ${target}: ${guidance ?? "verify the browser and its extension manually"}`, browseReview = (plan, selected, dryRun = false) => [
   present(`${NAME}: ${plan.state}`),
   ...(plan.profiles?.length ?? 0) === 0 ? [] : [
     present(`${NAME}: detected profiles ${plan.profiles?.map(browseProfileLabel).join("; ") ?? ""}`)
@@ -33164,6 +33345,27 @@ var init_browse_setup = __esm(() => {
   })));
 });
 
+import { dirname as dirname16, join as join34 } from "path";
+var Selection, readBrowserPreference, writeBrowserPreference = (preference, browsers) => writeJsonObjectIfUnchanged(preference.file, { browsers }, preference.text, { mode: 384 }).pipe(flatMap2((written) => written ? void_3 : fail5(new SetupFailure({ message: "Browser selection changed since it was read" }))));
+var init_browser_preferences = __esm(() => {
+  init_dist();
+  init_json_file();
+  init_load2();
+  init_errors10();
+  Selection = Struct({
+    browsers: ArraySchema(String6.check(isPattern2(/^[a-z][a-z0-9-]{0,99}$/)))
+  });
+  readBrowserPreference = fn2("readBrowserPreference")(function* (env) {
+    const file = join34(dirname16(userConfigFile(env)), "browse-selection.json");
+    const { value, text } = yield* readJsonObjectSnapshot(file);
+    if (text === undefined)
+      return { file, text, browsers: undefined };
+    if (!is2(Selection)(value) || new Set(value.browsers).size !== value.browsers.length)
+      return yield* new SetupFailure({ message: "Invalid HolyAgent browser selection record" });
+    return { file, text, browsers: value.browsers };
+  });
+});
+
 import { posix as posix5, win32 as win325 } from "path";
 var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension", browserIds, desktopPlatforms, decodeBrowser, decodePlatform, labels, windowsDesktop, windowsDrivePath, powershell = (env) => {
   const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
@@ -33260,22 +33462,36 @@ var init_codex_browser_handoff = __esm(() => {
         reason: "No supported local ChatGPT desktop installation was detected."
       };
     const choices = [];
+    const unavailable = new Map;
     for (const browser of browsers) {
       const id = getOrUndefined(decodeBrowser(browser.id));
-      if (id === undefined || platform === "linux" && id !== "chrome" || !browserPath(browser.executable, platform) || choices.some((choice) => choice.id === id))
+      if (choices.some((choice) => choice.id === id))
         continue;
+      const unsupported = id === undefined ? "OpenAI does not document extension support for this browser." : platform === "linux" && id !== "chrome" ? "The Linux preview documents browser actions in Chrome only." : undefined;
+      if (id === undefined || unsupported !== undefined || !browserPath(browser.executable, platform)) {
+        unavailable.set(browser.id, {
+          id: browser.id,
+          name: browser.name ?? (id === undefined ? browser.id : labels[id]),
+          reason: unsupported ?? "No local executable could be verified."
+        });
+        continue;
+      }
       choices.push({ id, name: labels[id], executable: browser.executable });
+      unavailable.delete(id);
     }
+    const unavailableBrowsers = unavailable.size === 0 ? {} : { unavailableBrowsers: [...unavailable.values()] };
     if (choices.length === 0)
       return {
         status: "unavailable",
         desktop,
+        ...unavailableBrowsers,
         reason: platform === "linux" ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions." : "No documented local browser installation was detected."
       };
     return {
       status: "candidate",
       desktop,
       browsers: choices,
+      ...unavailableBrowsers,
       url: CODEX_BROWSER_GUIDE,
       detail: "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
       steps
@@ -33303,7 +33519,7 @@ var init_codex_browser_handoff = __esm(() => {
     return result.exitCode === 0 ? {
       ok: true,
       lines: [
-        `~ browser extension: requested the setup guide in ${labels[selected]}. Finish in ChatGPT desktop.`
+        `= browser extension: requested the setup guide in ${target.name}. Finish in ChatGPT desktop.`
       ]
     } : {
       ok: false,
@@ -33435,7 +33651,9 @@ var init_session = __esm(() => {
   init_identity2();
   init_browse_setup();
   init_browse2();
+  init_browser_preferences();
   init_codex_browser_handoff();
+  init_errors10();
   init_form2();
   init_pi_check2();
   init_report3();
@@ -33485,6 +33703,9 @@ var init_session = __esm(() => {
     const explicit = options.browse?.executable;
     const manual = browse === undefined || explicit === undefined ? undefined : yield* checkBrowserExecutable(options.env, explicit);
     const browsers = manual === undefined ? detected : [...detected.filter(({ id }) => id !== manual.id), manual];
+    const preference = browse === undefined ? undefined : yield* readBrowserPreference(options.env).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+    const defaultBrowser = preference !== undefined && !(preference instanceof SetupFailure) && preference.browsers === undefined ? yield* systemDefaultBrowser(options.env, options.cwd, detected) : undefined;
+    const initialBrowsers = preference === undefined ? undefined : preference instanceof SetupFailure ? [] : preference.browsers ?? (defaultBrowser === undefined ? [] : [defaultBrowser]);
     const codexHandoff = detectDesktop ? yield* detectCodexBrowserHandoff(options.env, detected, desktopOptions) : undefined;
     const desktop = codexHandoff?.desktop;
     if (onlyCodex && desktop === undefined)
@@ -33496,23 +33717,21 @@ var init_session = __esm(() => {
       return fail(`unavailable (${loaded.reason})`);
     const requestedHandoff = (choices) => choices.harnesses?.codex === true && codexHandoff?.status === "candidate" ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff) : undefined;
     const browserOptions = browsers.map(({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }));
-    const selectedBrowsers = (choices) => browserOptions.filter(({ id }) => choices.browseBrowserIds?.includes(id));
+    const selectedBrowsers = (choices) => browserOptions.filter(({ id, browseCompatibility }) => browseCompatibility === "supported" && choices.browseBrowserIds?.includes(id));
+    const browserSelectionToSave = (choices) => {
+      const chosen = choices.browseBrowserIds;
+      const enabled = choices.capabilities["browserUse"] === true;
+      const saved = preference !== undefined && !(preference instanceof SetupFailure) && preference.browsers !== undefined;
+      return options.scope === "user" && choices.harnesses?.pi !== false && (enabled || saved) && preference !== undefined && initialBrowsers !== undefined && chosen !== undefined && (enabled && !(preference instanceof SetupFailure) && !saved || chosen.length !== initialBrowsers.length || chosen.some((id) => !initialBrowsers.includes(id))) ? chosen : undefined;
+    };
     const browseFor = (choices) => {
       if (browse === undefined || choices.harnesses?.pi === false || choices.capabilities["browserUse"] !== true)
         return;
-      if (choices.browseBrowserIds === undefined)
-        return browseForProfile(browse, choices.browseProfile ?? 0);
       const selected = selectedBrowsers(choices);
       if (selected.length === 0)
         return;
       const requested = browse.profiles?.[choices.browseProfile ?? -1];
-      const targets = selected.map(({ name, browseCompatibility }) => {
-        if (browseCompatibility !== "supported")
-          return {
-            target: name,
-            next: "manual",
-            guidance: "compatibility is unverified; nothing will be started"
-          };
+      const targets = selected.map(({ name }) => {
         const profile = requested?.browser === name ? requested : browse.profiles?.find(({ browser }) => browser === name);
         const target = profile === undefined ? name : `${name}, ${profile.profile}`;
         if (profile?.extension === "enabled") {
@@ -33605,7 +33824,8 @@ var init_session = __esm(() => {
                     id,
                     name
                   }))
-                } : {}
+                } : {},
+                ...codexHandoff?.unavailableBrowsers === undefined ? {} : { extensionUnavailableBrowsers: codexHandoff.unavailableBrowsers }
               }
             }
           }
@@ -33614,6 +33834,7 @@ var init_session = __esm(() => {
       initial: {
         ...DEFAULT_CHOICES,
         capabilities: initialSwitches,
+        ...initialBrowsers === undefined ? {} : { browseBrowserIds: initialBrowsers },
         ...browse?.action === undefined || initialSwitches["browserUse"] !== true ? {} : { browseSetup: true },
         ...providerChoices === undefined ? {} : { piProviders: providerChoices },
         ...combined === undefined ? {} : {
@@ -33631,10 +33852,11 @@ var init_session = __esm(() => {
           reviewedChoices = undefined;
           return yield* fail5(noProvider());
         }
+        const sequence = ++reviewSequence;
         const plan = browseFor(choices);
         const selection = selectedBrowsers(choices);
-        const selectedNotes = browse === undefined || choices.harnesses?.pi === false || choices.browseBrowserIds === undefined ? [] : [
-          hint(`Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name, browseCompatibility }) => browseCompatibility === "supported" ? name : `${name} (compatibility unverified)`).join(", ")}`),
+        const selectedNotes = browse === undefined || choices.harnesses?.pi === false || choices.capabilities["browserUse"] !== true ? [] : [
+          hint(`Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name }) => name).join(", ")}`),
           ...plan === undefined ? [hint("OpenCode Browse: no compatible selected profile will be paired")] : []
         ];
         const browserReview = plan === undefined && selectedNotes.length === 0 ? {} : {
@@ -33644,7 +33866,6 @@ var init_session = __esm(() => {
           ].map(plain)
         };
         if (combined !== undefined) {
-          const sequence = ++reviewSequence;
           reviewedChoices = undefined;
           const targets = selectionOf(choices);
           if (targets.length === 0)
@@ -33699,7 +33920,6 @@ var init_session = __esm(() => {
         }
         const chosen = withProviderChanges(choices);
         if (options.previewPi !== undefined) {
-          const sequence = ++reviewSequence;
           reviewedChoices = undefined;
           const { report, registration } = yield* previewRegistration(options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities)));
           if (!report.ok)
@@ -33729,6 +33949,8 @@ var init_session = __esm(() => {
         });
         if (preview !== undefined && (next === undefined || ("line" in next)))
           return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
+        if (sequence === reviewSequence)
+          reviewedChoices = choices;
         return {
           ...reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form)),
           ...browserReview
@@ -33738,7 +33960,8 @@ var init_session = __esm(() => {
         if (needsProvider(choices))
           return runPromise2(fail5(noProvider()));
         const chosen = withProviderChanges(choices);
-        if ((combined !== undefined || options.previewPi !== undefined || chosen.piProviders !== undefined || choices.browseSetup === true && browseFor(choices)?.action !== undefined) && reviewedChoices !== choices)
+        const browserChanges = browserSelectionToSave(choices);
+        if ((combined !== undefined || options.previewPi !== undefined || chosen.piProviders !== undefined || browserChanges !== undefined || choices.browseSetup === true && browseFor(choices)?.action !== undefined) && reviewedChoices !== choices)
           return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
         const registration = reviewedChoices === choices ? reviewedPi : undefined;
         const codexConflict = reviewedChoices === choices && reviewedCodexConflict;
@@ -33755,6 +33978,8 @@ var init_session = __esm(() => {
         const changed = changedSwitches(initialSwitches, choices.capabilities);
         const targets = selectionOf(choices).filter((target) => !(target === "pi" && keepPi) && !(target === "codex" && keepCodex));
         const validate = gen2(function* () {
+          if (!keepPi && browserChanges !== undefined && preference instanceof SetupFailure)
+            return yield* fail5(new Error("The saved HolyAgent browser selection is invalid. It was not changed."));
           if (!keepPi) {
             const preview = combined === undefined ? options.previewPi?.(chosen, changed) : targets.includes("pi") ? combined.run("pi", chosen, changed, true, false, true) : undefined;
             if (preview !== undefined) {
@@ -33790,7 +34015,20 @@ var init_session = __esm(() => {
             ...keepCodex ? [skippedConflicts("codex")] : [],
             ...reports.flatMap(({ lines }) => lines)
           ]
-        })))), map5((report) => {
+        })))), flatMap2((report) => {
+          if (!report.ok || options.dryRun || keepPi || browserChanges === undefined || preference === undefined || preference instanceof SetupFailure)
+            return succeed6(report);
+          return writeBrowserPreference(preference, browserChanges).pipe(map5(() => ({
+            ...report,
+            lines: [...report.lines, hint("Browser selection saved")]
+          })), catchTag2("SetupFailure", () => succeed6({
+            ok: false,
+            lines: [
+              ...report.lines,
+              "! Browser selection could not be saved. Existing selection was not replaced."
+            ]
+          })));
+        }), map5((report) => {
           if (report.ok && handoff !== undefined && !options.dryRun)
             stagedHandoff = handoff;
           const lines = [
@@ -33853,7 +34091,7 @@ var init_session = __esm(() => {
   });
 });
 
-import { join as join34 } from "path";
+import { join as join35 } from "path";
 var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => ({
   cwd,
   env,
@@ -33864,7 +34102,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
 `)}
 `, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]", PublicManifest, codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
-  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join34(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map5((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
+  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join35(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map5((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
     return;
   }));
   return yield* setupCodex(env, {
@@ -33908,7 +34146,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "in graphical Pi setup, open browser-use to enable or disable it and mark compatible detected browsers. If nothing was saved, only a compatible detected system default is selected. Apply saves the selection. Setup runs the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
     ],
     flags: {
@@ -34460,7 +34698,7 @@ var init_json_file2 = __esm(() => {
   init_json_file();
 });
 
-import { isAbsolute as isAbsolute12, join as join35, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute12, join as join36, relative as relative7 } from "path";
 var RELEASE, VERSION_RESPONSE, REGISTRY = "https://registry.npmjs.org/", USAGE = "update [--version <0.x.y>] [--dry-run]", failure = (message, result) => {
   const details = result?.stderr.trim() || result?.stdout.trim();
   return new Verbatim("", details ? `${message}
@@ -34514,7 +34752,7 @@ var init_public_maintenance = __esm(() => {
       if (root.exitCode !== 0)
         return failure("Could not verify npm's global installation path.", root);
       const location = root.stdout.trim();
-      if (!isAbsolute12(location) || relative7(registeredRoot, join35(location, "holyagent")) !== "")
+      if (!isAbsolute12(location) || relative7(registeredRoot, join36(location, "holyagent")) !== "")
         return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
     }
     const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -34552,7 +34790,7 @@ var init_public_maintenance = __esm(() => {
       source
     ], { cwd });
     if (registeredRoot !== undefined) {
-      const manifest = yield* readJsonObject(join35(registeredRoot, "package.json")).pipe(option2);
+      const manifest = yield* readJsonObject(join36(registeredRoot, "package.json")).pipe(option2);
       if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
         return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
     } else if (npm.exitCode !== 0)

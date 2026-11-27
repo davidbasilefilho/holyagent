@@ -95,6 +95,8 @@ export interface Mount {
   readonly codexDesktop?: NonNullable<TuiInput["offer"]["harnesses"]>["codexDesktop"]
   /** The capability rows, all switched on at the start; none when absent. */
   readonly capabilities?: ReadonlyArray<CapabilityOffer>
+  readonly browserUseEnabled?: boolean
+  readonly browserIds?: ReadonlyArray<string>
   readonly browse?: TuiInput["offer"]["browse"]
   readonly dryRun?: boolean
   /** The terminal background the palette is picked for; dark when absent. */
@@ -148,9 +150,13 @@ export const mount = async (options: Mount) => {
           }
         : {}),
       capabilities: Object.fromEntries(
-        (options.capabilities ?? []).map((capability) => [capability.feature, true]),
+        (options.capabilities ?? []).map(({ feature }) => [
+          feature,
+          feature === "browserUse" ? (options.browserUseEnabled ?? true) : true,
+        ]),
       ),
       ...(options.browse?.action === undefined ? {} : { browseSetup: true }),
+      ...(options.browserIds === undefined ? {} : { browseBrowserIds: options.browserIds }),
     },
     dryRun: options.dryRun ?? false,
     review: (choices) => {
