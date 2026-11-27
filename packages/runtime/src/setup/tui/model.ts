@@ -154,9 +154,7 @@ export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
               ? []
               : ([
                   "codexInAppBrowser",
-                  ...((offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) +
-                    (offer.harnesses.codexDesktop.extensionUnavailableBrowsers?.length ?? 0) >
-                  0
+                  ...((offer.harnesses.codexDesktop.extensionBrowsers?.length ?? 0) > 0
                     ? (["codexBrowserExtension"] as const)
                     : []),
                 ] as const)),
@@ -261,9 +259,6 @@ const extensionBrowsers = (offer: Offer | undefined) =>
 
 const browserEnabled = (choices: Choices) => choices.capabilities["browserUse"] === true
 
-const compatibleBrowsers = (offer: Offer | undefined) =>
-  browserOptions(offer).filter(({ browseCompatibility }) => browseCompatibility === "supported")
-
 const settingsOptions = (state: State, offer: Offer | undefined): ReadonlyArray<SettingsOption> =>
   state.settings === "codex-extension"
     ? [
@@ -275,7 +270,7 @@ const settingsOptions = (state: State, offer: Offer | undefined): ReadonlyArray<
       ? [
           "capability",
           ...(browserEnabled(state.choices)
-            ? compatibleBrowsers(offer).map(({ id }): SettingsOption => `browser:${id}`)
+            ? browserOptions(offer).map(({ id }): SettingsOption => `browser:${id}`)
             : []),
           "back",
         ]
@@ -298,7 +293,7 @@ const selectSetting = (state: State, option: SettingsOption, offer: Offer | unde
   }
   if (option.startsWith("browser:")) {
     const id = option.slice("browser:".length)
-    if (!browserEnabled(choices) || !compatibleBrowsers(offer).some((entry) => entry.id === id))
+    if (!browserEnabled(choices) || !browserOptions(offer).some((entry) => entry.id === id))
       return state
     const marked = choices.browseBrowserIds ?? []
     return {
@@ -742,7 +737,7 @@ const settingsLines = (state: State, context: Context): ReadonlyArray<Line> => {
     }
     if (option === "capability") return enabled ? "Disable browser-use" : "Enable browser-use"
     if (option.startsWith("browser:")) {
-      const candidate = compatibleBrowsers(offer).find(
+      const candidate = browserOptions(offer).find(
         ({ id }) => id === option.slice("browser:".length),
       )
       if (candidate !== undefined)
@@ -753,10 +748,10 @@ const settingsLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const options = settingsOptions(state, offer).map((option, index) => ({ option, index }))
   const shortcuts = keyLines([`${g.arrows} or j/k focus`, "Enter select", "Esc back"], width)
   const capacity = Math.max(1, context.height - shortcuts.length - 9)
-  const candidates = browserPage ? options.slice(1, -1) : []
+  const candidates = browserPage || browserExtension ? options.slice(1, -1) : []
   const start = Math.max(0, Math.min(candidates.length - capacity, state.action - capacity))
   const optionLines = ({ option, index }: (typeof options)[number]): ReadonlyArray<Line> =>
-    (option.startsWith("browser:")
+    (option.startsWith("browser:") || option.startsWith("extension:")
       ? [clip(optionText(option), width - 2, g.ellipsis)]
       : wrap(optionText(option), width - 2)
     ).map((part, line): Line => [
@@ -786,13 +781,19 @@ const settingsLines = (state: State, context: Context): ReadonlyArray<Line> => {
                 ...heading("Browsers", width),
                 ...candidates.slice(start, start + capacity).flatMap(optionLines),
                 ...(candidates.length === 0
-                  ? hintLines("No compatible browsers detected.", width)
+                  ? hintLines("No Chromium browsers detected.", width)
                   : []),
               ]
             : []),
           ...options.slice(-1).flatMap(optionLines),
         ]
-      : options.flatMap(optionLines)),
+      : browserExtension
+        ? [
+            ...options.slice(0, 1).flatMap(optionLines),
+            ...candidates.slice(start, start + capacity).flatMap(optionLines),
+            ...options.slice(-1).flatMap(optionLines),
+          ]
+        : options.flatMap(optionLines)),
   ]
   const hint = nativeBrowser
     ? hintLines(
@@ -800,25 +801,11 @@ const settingsLines = (state: State, context: Context): ReadonlyArray<Line> => {
         width,
       )
     : browserExtension
-      ? [
-          ...hintLines(
-            "Open OpenAI’s installation guide only after you review and apply. The extension connects your existing browser profile. Setup does not install it or grant access.",
-            width,
-          ),
-          ...(offer.harnesses?.codexDesktop?.extensionUnavailableBrowsers ?? []).flatMap(
-            ({ name, reason }) => hintLines(`${name} — ${reason}`, width),
-          ),
-        ]
-      : enabled
-        ? browserOptions(offer).flatMap(({ name, browseCompatibility }) =>
-            browseCompatibility === "supported"
-              ? []
-              : hintLines(
-                  `${name} — ${browseCompatibility === "unsupported" ? "not supported by Browse" : "compatibility unverified"}`,
-                  width,
-                ),
-          )
-        : []
+      ? hintLines(
+          "After review and Apply, setup opens OpenAI’s guide in the chosen browser. Confirm availability and any connection in ChatGPT desktop. This does not install the extension, connect a profile or grant access.",
+          width,
+        )
+      : []
   // Keep focusable controls visible before adding explanatory text in short terminals.
   const room = Math.max(0, context.height - controls.length - 2)
   return [...controls, ...(room === 0 ? [] : [blank, ...hint.slice(0, room)])]

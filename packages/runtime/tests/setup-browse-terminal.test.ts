@@ -799,3 +799,47 @@ test.skipIf(!shouldRunLinux)(
     expect(await Bun.file(fixtureCapabilities().receipt).exists()).toBe(false)
   },
 )
+
+test.skipIf(!shouldRunLinux)(
+  "the newly detected Chromium default without a known profile opens only the official store in its exact executable",
+  async () => {
+    const vendor = join(directory, "vendor")
+    const browser = join(vendor, "another chromium")
+    const entry = "fixture-aurora.desktop"
+    await program(browser)
+    await program(join(vendor, "resources.pak"), "engine fixture")
+    await program(join(vendor, "chrome-sandbox"), "engine fixture")
+    await program(
+      join(directory, "applications", entry),
+      '[Desktop Entry]\nType=Application\nName=Aurora Browser\nCategories=WebBrowser;\nExec="' +
+        browser +
+        '" %U\n',
+    )
+    const shell = desktop(undefined, entry)
+    const plan = await Effect.runPromise(
+      planTerminalBrowse(env(), directory, undefined, "linux").pipe(Effect.provide(shell.layer)),
+    )
+    expect(plan).toMatchObject({ id: "desktop-fixture-aurora", executable: browser, next: "store" })
+    expect(plan.profile).toBeUndefined()
+    const opened: Array<readonly [string, ReadonlyArray<string>]> = []
+    const host: BrowseDesktopHost = {
+      open: (command, args) =>
+        Effect.sync(() => {
+          opened.push([command, args])
+        }),
+      pair: () => Effect.die("unknown profile must not be paired automatically"),
+      probeRelay: () => Effect.die("opening only the store does not need the relay"),
+    }
+    const result = await Effect.runPromise(
+      runTerminalBrowse(env(), directory, root, undefined, plan, () => Effect.void, host).pipe(
+        Effect.provide(shell.layer),
+      ),
+    )
+    expect(opened).toEqual([[browser, [BROWSE_EXTENSION_STORE]]])
+    expect(result).toMatchObject({
+      ok: true,
+      lines: [expect.stringContaining("did not verify a connection")],
+    })
+    expect(shell.lines().every((line) => line.startsWith("/fake/bin/xdg-settings "))).toBe(true)
+  },
+)

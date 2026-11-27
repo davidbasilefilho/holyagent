@@ -4,6 +4,7 @@ import { enabledPiProviders } from "../../../../core/src/pi/provider.ts"
 import {
   checkBrowserExecutable,
   discoverBrowsers,
+  isChromiumBrowser,
   systemDefaultBrowser,
 } from "../../../../core/src/setup/browser-discovery.ts"
 import {
@@ -453,14 +454,15 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     choices.harnesses?.codex === true && codexHandoff?.status === "candidate"
       ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff)
       : undefined
-  const browserOptions: ReadonlyArray<BrowserOption> = browsers.map(
-    ({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }),
-  )
+  const chromium = browsers
+    .filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser))
+    .map((browser) => ({ ...browser, name: plain(browser.name) }))
+  const browserOptions: ReadonlyArray<BrowserOption> = chromium.map(({ id, name }) => ({
+    id,
+    name,
+  }))
   const selectedBrowsers = (choices: Choices) =>
-    browserOptions.filter(
-      ({ id, browseCompatibility }) =>
-        browseCompatibility === "supported" && choices.browseBrowserIds?.includes(id),
-    )
+    chromium.filter(({ id }) => choices.browseBrowserIds?.includes(id))
   const browserSelectionToSave = (choices: Choices) => {
     const chosen = choices.browseBrowserIds
     const enabled = choices.capabilities["browserUse"] === true
@@ -490,11 +492,30 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     const selected = selectedBrowsers(choices)
     if (selected.length === 0) return undefined
     const requested = browse.profiles?.[choices.browseProfile ?? -1]
-    const targets = selected.map(({ name }): BrowseTarget => {
+    const targets = selected.map(({ name, profileDirectory }): BrowseTarget => {
+      if (profileDirectory === undefined)
+        return {
+          target: name,
+          next: "manual",
+          guidance: `open the official Browse extension store (${BROWSE_EXTENSION_STORE}) in the intended profile and pair manually; setup could not verify a profile directory`,
+        }
+      const profiles = (browse.profiles ?? []).filter(({ browser }) => browser === name)
+      const enabled = profiles.filter(({ extension }) => extension === "enabled")
       const profile =
         requested?.browser === name
           ? requested
-          : browse.profiles?.find(({ browser }) => browser === name)
+          : enabled.length === 1
+            ? enabled[0]
+            : profiles.length === 1
+              ? profiles[0]
+              : undefined
+      if (profile === undefined && profiles.length > 1)
+        return {
+          target: name,
+          next: "manual",
+          guidance:
+            "more than one profile is possible; open the Browse extension in the intended profile and pair manually",
+        }
       const target = profile === undefined ? name : `${name}, ${profile.profile}`
       if (profile?.extension === "enabled") {
         if (browse.alreadyPaired === true)
@@ -514,6 +535,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`,
       }
     })
+    if (!browse.alreadyPaired && targets.every(({ next }) => next === "manual")) {
+      const { action: _action, ...manual } = browse
+      return { ...manual, next: "none", targets }
+    }
     const ready = targets.find(({ next }) => next === "pair")
     return {
       ...browse,
@@ -628,13 +653,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                         ? {
                             extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
                               id,
-                              name,
+                              name: plain(name),
                             })),
                           }
                         : {}),
-                      ...(codexHandoff?.unavailableBrowsers === undefined
-                        ? {}
-                        : { extensionUnavailableBrowsers: codexHandoff.unavailableBrowsers }),
                     },
                   }),
             },

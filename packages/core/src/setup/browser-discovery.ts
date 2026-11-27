@@ -15,11 +15,17 @@ export interface DetectedBrowser {
   readonly family: "chromium" | "gecko" | "unknown"
   readonly browseCompatibility: "supported" | "unverified" | "unsupported"
   readonly source: "registry" | "desktop-entry" | "known-path" | "path" | "profile" | "manual"
+  /** The exact desktop entry id when an XDG registration supplied the candidate. */
+  readonly desktopEntry?: string
   /** An existing executable-shaped file; a profile alone never supplies this field. */
   readonly executable?: string
   /** The standard user-data root for this browser when known, not necessarily a configured profile. */
   readonly profileDirectory?: string
 }
+
+/** Shared eligibility for Chromium extension entry points, not proof of pairing or support. */
+export const isChromiumBrowser = (browser: Pick<DetectedBrowser, "family">): boolean =>
+  browser.family === "chromium"
 
 interface Browser {
   readonly id: string
@@ -534,9 +540,16 @@ const linuxRegistrations = Effect.fn("linuxRegistrations")(function* (env: Env) 
       // An env/flatpak/shell command is a wrapper, not enough evidence to identify the install.
       if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix.basename(executable)))
         continue
-      extra.push(
-        yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"),
-      )
+      extra.push({
+        ...(yield* registeredBrowser(
+          entry.slice(0, -8),
+          name,
+          executable,
+          "desktop-entry",
+          "linux",
+        )),
+        desktopEntry: entry,
+      })
     }
   }
   return extra
@@ -671,7 +684,7 @@ const LINUX_BROWSER_IDS = new Map([
 const MAC_DEFAULT =
   '/** Read the LaunchServices handler without opening the URL. */\nObjC.import("AppKit");\nvar app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.URLWithString("https://example.invalid/"));\nif (app) ObjC.unwrap(app.path);'
 
-/** Match the OS default only to a compatible detected install. Never launch or change the browser. */
+/** Match the OS default only to a detected Chromium executable. Never launch or change it. */
 export const systemDefaultBrowser = Effect.fn("systemDefaultBrowser")(function* (
   env: Env,
   cwd: string,
@@ -680,8 +693,7 @@ export const systemDefaultBrowser = Effect.fn("systemDefaultBrowser")(function* 
 ): Effect.fn.Return<string | undefined, never, Shell> {
   // A stale profile can still appear in the menu. It cannot establish an installed OS default.
   const candidates = detected.filter(
-    ({ executable, browseCompatibility }) =>
-      executable !== undefined && browseCompatibility === "supported",
+    (browser) => browser.executable !== undefined && isChromiumBrowser(browser),
   )
   if (candidates.length === 0) return undefined
   if (platform === "win32") {
@@ -701,7 +713,10 @@ export const systemDefaultBrowser = Effect.fn("systemDefaultBrowser")(function* 
     const command = yield* shell.which("xdg-settings", { strict: { cwd } })
     if (command._tag === "None") return undefined
     const result = yield* shell.run(command.value, ["get", "default-web-browser"], { cwd })
-    const id = result.exitCode === 0 ? LINUX_BROWSER_IDS.get(result.stdout.trim()) : undefined
+    if (result.exitCode !== 0) return undefined
+    const entry = result.stdout.trim()
+    const registered = detected.find((candidate) => candidate.desktopEntry === entry)
+    const id = registered?.id ?? LINUX_BROWSER_IDS.get(entry)
     return candidates.find((candidate) => candidate.id === id)?.id
   }
   if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {

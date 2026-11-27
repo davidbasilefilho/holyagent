@@ -9,6 +9,7 @@ import { BROWSE_EXTENSION_IDS, findBrowseProfiles } from "../../core/src/setup/b
 import {
   checkBrowserExecutable,
   discoverBrowsers,
+  isChromiumBrowser,
   systemDefaultBrowser,
 } from "../../core/src/setup/browser-discovery.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
@@ -211,18 +212,26 @@ describe("read-only discovery of installed browsers", () => {
     directories.set(key(root), ["120.0.0.1", "other"])
     await touch(`${root}\\120.0.0.1\\chrome.dll`)
     await touch(FIREFOX)
+    await touch(HELIUM)
+    const internetExplorer = "D:\\Windows\\Internet Explorer\\iexplore.exe"
+    await touch(internetExplorer)
     const shell = fakeShell({
       commands: [],
       respond: (line) => {
-        if (line.endsWith(`${HKCU} /reg:64`)) return { stdout: `${HKCU}\\New Vendor Client\r\n` }
+        if (line.endsWith(`${HKCU} /reg:64`))
+          return { stdout: `${HKCU}\\New Vendor Client\r\n${HKCU}\\Internet Explorer\r\n` }
         if (line.includes("New Vendor Client\\shell\\open\\command"))
           return { stdout: `  (Default)  REG_SZ  "${binary}" -- "%1"\r\n` }
         if (line.endsWith(`${HKCU}\\New Vendor Client /ve /reg:64`))
           return { stdout: "  (Default)  REG_SZ  Aurora Browser\n" }
+        if (line.includes("Internet Explorer\\shell\\open\\command"))
+          return { stdout: `  (Default)  REG_SZ  "${internetExplorer}" "%1"\r\n` }
         return { exitCode: 1 }
       },
     })
-    expect(await lookup(shell)).toMatchObject([
+    const found = await lookup(shell)
+    expect(found).toMatchObject([
+      { id: "helium", executable: HELIUM, family: "chromium" },
       { id: "firefox", executable: FIREFOX, family: "gecko", browseCompatibility: "unsupported" },
       {
         id: "registered-new-vendor-client",
@@ -231,6 +240,11 @@ describe("read-only discovery of installed browsers", () => {
         family: "chromium",
         browseCompatibility: "unverified",
       },
+      { name: "Internet Explorer", executable: internetExplorer, family: "unknown" },
+    ])
+    expect(found.filter(isChromiumBrowser).map(({ name }) => name)).toEqual([
+      "Helium",
+      "Aurora Browser",
     ])
     expect(shell.calls.every(({ command }) => command === REG)).toBe(true)
   })
@@ -304,7 +318,7 @@ describe("read-only discovery of installed browsers", () => {
       return chosen
     }
     expect(await detect(CHROME.toLowerCase())).toBe("chrome")
-    expect(await detect(HELIUM)).toBeUndefined()
+    expect(await detect(HELIUM)).toBe("helium")
     expect(await detect(FIREFOX)).toBeUndefined()
     expect(await detect("C:\\fixture\\missing\\chrome.exe")).toBeUndefined()
   })
@@ -413,7 +427,7 @@ describe("read-only discovery of installed browsers", () => {
       return selected
     }
     expect(await query("Google Chrome")).toBe("chrome")
-    expect(await query("Aurora Browser")).toBeUndefined()
+    expect(await query("Aurora Browser")).toBe("app-aurora-browser")
   })
 
   test("portable manual choice checks one absolute executable and cannot claim Browse support", async () => {

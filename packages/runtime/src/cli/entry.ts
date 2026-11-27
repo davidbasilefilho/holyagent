@@ -1,9 +1,8 @@
 import { Effect } from "effect"
 
-import type { SetupResult } from "../setup/tui/result-file.ts"
 import { hasCode } from "../state/files.ts"
 import { StdinMissing } from "./errors.ts"
-import { run } from "./program.ts"
+import { type Result, run } from "./program.ts"
 import type { CliSurface } from "./types.ts"
 
 /** The `holyagent` entry point: runs the command line of the process and sets its exit code. */
@@ -37,7 +36,7 @@ export type OutputPresentation = (
   text: string,
   kind: "stdout" | "stderr" | "progress",
   targetIsTty: boolean,
-  summary?: SetupResult,
+  layout?: Pick<Result, "setupResult" | "publicHelp">,
 ) => Effect.Effect<string>
 
 const plainOutput: OutputPresentation = (text) => Effect.succeed(text)
@@ -85,7 +84,7 @@ export const main = (
         },
         surface,
       )
-      const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result.setupResult)
+      const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result)
       const stderr = yield* present(result.stderr, "stderr", Boolean(process.stderr.isTTY))
       yield* write(process.stdout, stdout)
       yield* write(process.stderr, stderr)
