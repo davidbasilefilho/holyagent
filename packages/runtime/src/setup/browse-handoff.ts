@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises"
 import { release } from "node:os"
-import { isAbsolute, join, win32 } from "node:path"
+import { isAbsolute, win32 } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
@@ -8,10 +8,14 @@ import {
   discoverBrowsers,
   systemDefaultBrowser,
 } from "../../../core/src/setup/browser-discovery.ts"
-import { readJsonObjectSnapshot } from "../../../core/src/setup/json-file.ts"
 import { inCloudSession } from "../../../core/src/vcs/identity.ts"
 import { cmdExeArguments, isBatchFile } from "../pi/bash/cmd.ts"
 import { liveHost, stopGroup } from "../pi/browser-launch.ts"
+import {
+  browseRelaySafe,
+  type BrowseRelayProbe,
+  checkLocalBrowseRelay,
+} from "./browse-local-relay.ts"
 import { type BrowsePair, configureBrowse, planBrowse } from "./browse-setup.ts"
 import {
   BROWSE_EXTENSION_IDS,
@@ -191,6 +195,8 @@ export interface BrowseDesktopHost {
     options: { readonly cwd: string; readonly env: Env },
   ) => Effect.Effect<void, SetupFailure>
   readonly pair: BrowsePair
+  /** A read-only compatibility check before the native pairing command. */
+  readonly probeRelay?: BrowseRelayProbe
 }
 
 // The browser needs the desktop session and its own profile, not credentials in the invoking
@@ -278,33 +284,11 @@ export const liveBrowseDesktop: BrowseDesktopHost = {
         return yield* failure("the selected browser quit before opening Browse")
     }),
   pair: livePair,
+  probeRelay: browseRelaySafe,
 }
 
 const label = (plan: TerminalBrowsePlan) =>
   plan.profile === undefined ? plan.name : `${plan.name}, ${plan.profile}`
-
-const checkLocalRelay = Effect.fn("checkBrowseDesktopRelay")(function* (env: Env) {
-  const custom = firstNonEmpty(env.OPENCODE_BROWSER_HOME)
-  if (custom !== undefined && !isAbsolute(custom))
-    return yield* failure("OPENCODE_BROWSER_HOME must be absolute for automatic pairing")
-  const config = firstNonEmpty(env.XDG_CONFIG_HOME)
-  const root =
-    custom ??
-    join(
-      config !== undefined && isAbsolute(config) ? config : join(homeDirectory(env), ".config"),
-      "browse",
-    )
-  const { value } = yield* readJsonObjectSnapshot(join(root, "config.json"))
-  const hostname = value.hostname
-  if (
-    hostname !== undefined &&
-    (typeof hostname !== "string" ||
-      !["127.0.0.1", "::1", "[::1]", "localhost"].includes(hostname.trim().toLowerCase()))
-  )
-    return yield* failure(
-      "the existing Browse relay is configured for remote access. Use Browse's own instructions instead of this local handoff",
-    )
-})
 
 /** Open a verified store/Options destination after successful Pi setup and recheck before pairing. */
 export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
@@ -317,6 +301,10 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
   host: BrowseDesktopHost = liveBrowseDesktop,
 ) {
   const shell = yield* Shell
+  const checkLocalRelay = checkLocalBrowseRelay(
+    env,
+    host.probeRelay ?? (() => Effect.succeed(true)),
+  )
   const check = Effect.gen(function* () {
     const current = yield* planTerminalBrowse(env, cwd, requested)
     if (JSON.stringify(current) !== JSON.stringify(expected))
@@ -346,7 +334,7 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
     }
     if (!isKnownExtension(expected.extensionId)) return yield* failure("unsupported extension")
     const options = `chrome-extension://${expected.extensionId}/settings.html`
-    yield* checkLocalRelay(env)
+    yield* checkLocalRelay
     const pairing = yield* readBrowsePairing(env)
     if (pairing.state === "paired") {
       yield* open(options)
@@ -361,7 +349,7 @@ export const runTerminalBrowse = Effect.fn("runTerminalBrowse")(function* (
     const pair: BrowsePair = (command, args, processOptions) =>
       Effect.gen(function* () {
         yield* check
-        yield* checkLocalRelay(env)
+        yield* checkLocalRelay
         if ((yield* readBrowsePairing(env)).state !== "unpaired")
           return yield* failure("pairing state changed; existing pairings were kept")
         yield* open(options)

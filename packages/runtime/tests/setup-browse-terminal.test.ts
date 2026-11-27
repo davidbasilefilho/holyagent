@@ -15,6 +15,7 @@ import {
   type BrowseDesktopHost,
   type BrowseTerminalMode,
 } from "../src/setup/browse-handoff.ts"
+import { browseRelaySafe, checkLocalBrowseRelay } from "../src/setup/browse-local-relay.ts"
 import {
   BROWSE_EXTENSION_IDS,
   BROWSE_EXTENSION_STORE,
@@ -22,6 +23,7 @@ import {
   browserDirectories,
   browsePairingFile,
 } from "../src/setup/browse.ts"
+import type { Env } from "../src/setup/environment.ts"
 import { SetupFailure } from "../src/setup/errors.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
 
@@ -142,6 +144,56 @@ const fixtureCapabilities = () => ({
 })
 const shouldRunLinux = process.platform === "linux"
 const root = "/tmp/bunx-1234-holyagent@dev/node_modules/holyagent"
+
+test("the relay preflight uses native paths/ports and prevents legacy replacement", async () => {
+  const local = { ...env(), XDG_STATE_HOME: join(directory, "state") }
+  await json(join(local.XDG_STATE_HOME, "browse", "relays", "19988", "relay.json"), {
+    configuredPort: 19988,
+    port: 21031,
+  })
+  const ports: Array<number> = []
+  const probe = (port: number) =>
+    Effect.sync(() => {
+      ports.push(port)
+      return port !== 21031
+    })
+  const check = (environment: Env) => Effect.runPromise(checkLocalBrowseRelay(environment, probe))
+  await expect(check(local)).rejects.toThrow("does not replace it")
+  expect(ports.splice(0)).toEqual([19988, 21031])
+  await check({ ...local, OPENCODE_BROWSER_PORT: "21032" })
+  expect(ports.splice(0)).toEqual([21032])
+  await expect(check({ ...local, HOME: "" })).rejects.toThrow("folders could not be verified")
+  expect(ports).toEqual([])
+})
+
+test.skipIf(!shouldRunLinux)(
+  "the loopback probe is read-only, native-only and does not follow redirects",
+  async () => {
+    let body: unknown = { version: "0.0.17", runtime: "typescript" }
+    const calls: Array<string> = []
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (request) => {
+        const path = new URL(request.url).pathname
+        calls.push(`${request.method} ${path}`)
+        return body === null
+          ? Response.redirect(new URL("/unsafe", request.url))
+          : Response.json(body)
+      },
+    })
+    try {
+      expect(await Effect.runPromise(browseRelaySafe(server.port!))).toBe(false)
+      body = { version: "0.1.5", runtime: "rust" }
+      expect(await Effect.runPromise(browseRelaySafe(server.port!))).toBe(true)
+      body = null
+      expect(await Effect.runPromise(browseRelaySafe(server.port!))).toBe(false)
+      expect(calls).toEqual(["GET /version", "GET /version", "GET /version"])
+    } finally {
+      await server.stop(true)
+    }
+  },
+)
 
 test("public Pi alone accepts the new flags and requires explicit terminal Browse intent", async () => {
   const host = {

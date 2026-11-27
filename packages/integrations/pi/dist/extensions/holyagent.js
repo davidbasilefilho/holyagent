@@ -14548,7 +14548,7 @@ var userFiles = (env) => {
   };
 };
 
-import { constants as constants4, realpathSync } from "node:fs";
+import { constants as constants4, lstatSync, realpathSync } from "node:fs";
 import { delimiter, dirname as dirname7, isAbsolute as isAbsolute7, join as join13, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14607,22 +14607,61 @@ var isInside = (api, parent, path) => {
   const relative = api.relative(parent, path);
   return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
 };
+var checkoutAncestors = (api, cwd) => {
+  const roots = [];
+  for (let dir = cwd;; dir = api.dirname(dir)) {
+    try {
+      const path = api.join(dir, ".git");
+      const marker = lstatSync(path);
+      if (marker.isDirectory()) {
+        const head = lstatSync(api.join(path, "HEAD"));
+        if (head.isFile() || head.isSymbolicLink())
+          roots.push(dir);
+      } else if (marker.isFile() && marker.size > 0 || marker.isSymbolicLink()) {
+        roots.push(dir);
+      }
+    } catch (error) {
+      if (!(error instanceof Error && ("code" in error) && error.code === "ENOENT"))
+        throw error;
+    }
+    if (api.dirname(dir) === dir)
+      return roots;
+  }
+};
 var strictWhich = (command, path, strict, lookup = which) => {
   const windows = (strict.platform ?? process.platform) === "win32";
   const api = windows ? win32 : posix;
   if (!api.isAbsolute(strict.cwd))
     return null;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  const excluded = [strict.cwd];
+  if (strict.which === undefined) {
+    try {
+      const physical = realpathSync(strict.cwd);
+      excluded.push(physical);
+      if (strict.excludeCheckout) {
+        const roots = new Set([
+          ...checkoutAncestors(api, strict.cwd),
+          ...checkoutAncestors(api, physical)
+        ]);
+        for (const root of roots)
+          excluded.push(root, realpathSync(root));
+      }
+    } catch {
+      return null;
+    }
+  }
+  const excludedPath = (candidate) => excluded.some((root) => isInside(api, root, candidate));
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !excludedPath(entry));
   if (trusted.length === 0)
     return null;
   const acceptable = (found) => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
+    if (found === null || !api.isAbsolute(found) || excludedPath(found))
       return false;
     if (windows && !found.toLowerCase().endsWith(".exe"))
       return false;
     if (strict.which === undefined) {
       try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
+        if (excludedPath(realpathSync(found)))
           return false;
       } catch {
         return false;
@@ -14700,7 +14739,7 @@ var lookupCtx7 = fn2("lookupCtx7")(function* (env, cwd = process.cwd(), platform
   const inBun = yield* shell.which("ctx7", { includeBunBin: true });
   if (isSome2(inBun))
     return { kind: "bun", path: inBun.value };
-  const mise = yield* shell.which("mise", { strict: { cwd, platform } });
+  const mise = yield* shell.which("mise", { strict: { cwd, platform, excludeCheckout: true } });
   if (isNone2(mise))
     return { kind: isSome2(yield* shell.which("mise")) ? "unverified" : "missing" };
   const options = { cwd: homeDirectory2(env), env: discoveryOptions };
@@ -28912,7 +28951,7 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
   }))))));
   return { changes, summary: summarise(changes) };
 });
-import { lstatSync, realpathSync as realpathSync2 } from "node:fs";
+import { lstatSync as lstatSync2, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { posix as posix4, win32 as win324 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -29349,7 +29388,7 @@ var throughLinks = (path, host) => {
       return paths.join(real.value, ...tail);
     if (real.code !== "ENOENT")
       return;
-    if (probe(() => lstatSync(current)).found)
+    if (probe(() => lstatSync2(current)).found)
       return;
     const parent = paths.dirname(current);
     if (parent === current)

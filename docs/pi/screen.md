@@ -59,7 +59,7 @@ Omit `--browse-browser` to reuse a single compatible saved browser, or to use a 
 
 If the extension is missing, setup opens the official store in that browser and reports it as pending. Add it yourself, then rerun the command. If it is disabled, enable it yourself first. For an enabled extension, setup opens its Options and runs the pinned `browse pair` with the package runner that installed HolyAgent (`bunx`, npm or mise). Enter the one-time code from the terminal into those Options. Setup does not copy the code into the browser's launch arguments or its report. An existing pairing is kept, and an open Options page alone is not evidence that the selected profile is connected.
 
-The handoff requires normal form and an interactive terminal on a local GUI session. It opens nothing in CI, SSH, WSL, cloud, headless, dry-run or `--non-interactive` sessions. It does not install browser extensions, change Browse's relay settings or configure other agents. If pairing is cancelled or times out, the waiting command ends. The browser and Browse's own relay may remain open, and existing pairings are not removed.
+The handoff requires normal form and an interactive terminal on a local GUI session. It opens nothing in CI, SSH, WSL, cloud, headless, dry-run or `--non-interactive` sessions. It does not install browser extensions, change Browse's relay settings or configure other agents. If a legacy or unverified listener would have to be replaced, setup leaves it running and points to the official Browse flow. If pairing is cancelled or times out, the waiting command ends. The browser and Browse's own relay may remain open, and existing pairings are not removed.
 
 ### Headless: the browser-use MCP server
 

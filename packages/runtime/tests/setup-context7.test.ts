@@ -1,11 +1,12 @@
 import { expect, test } from "bun:test"
-import { dirname, join } from "node:path"
+import { mkdir, symlink, writeFile } from "node:fs/promises"
+import { delimiter, dirname, join } from "node:path"
 
 import { Effect, Layer, Option } from "effect"
 
 import { lookupCtx7 } from "../../core/src/setup/context7.ts"
 import { doctor } from "../src/setup/doctor.ts"
-import { Shell, type ShellResult, type WhichOptions } from "../src/setup/shell.ts"
+import { findCommand, Shell, type ShellResult, type WhichOptions } from "../src/setup/shell.ts"
 import { installCtx7 } from "../src/setup/steps.ts"
 import { scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
@@ -103,7 +104,7 @@ test("recognizes a registered npm:ctx7 under Windows mise without activating it 
   ).toEqual({ kind: "mise", path: executable })
   expect(fixture.queries).toContainEqual({
     command: "mise",
-    options: { strict: { cwd: project, platform: "win32" } },
+    options: { strict: { cwd: project, platform: "win32", excludeCheckout: true } },
   })
   expect(fixture.queries).toContainEqual({ command: "ctx7", options: { directory } })
   expect(fixture.calls).toEqual(
@@ -119,6 +120,68 @@ test("recognizes a registered npm:ctx7 under Windows mise without activating it 
     Path: project,
     MISE_CONFIG_FILE: `${project}\\mise.toml`,
   })
+})
+
+test("nested checkout mise and its aliases are never run, but a user mise is still found", async () => {
+  const { directory, remove } = await scratch("holyagent-ctx7-worktree-")
+  try {
+    const project = join(directory, "checkout")
+    const nested = join(project, "packages", "example")
+    const admin = join(directory, "git-admin")
+    const checkoutBin = join(project, "bin")
+    const home = join(directory, "user")
+    const userBin = join(home, "bin")
+    const cwdAlias = join(home, "checkout-alias")
+    const binAlias = join(home, "bin-alias")
+    const userBinAlias = join(project, "outside-alias")
+    const cwdOutside = join(project, "cwd-outside")
+    const name = windows ? "mise.exe" : "mise"
+    for (const dir of [nested, admin, checkoutBin, userBin]) await mkdir(dir, { recursive: true })
+    await writeFile(join(project, ".git"), `gitdir: ${admin}\n`)
+    await writeFile(join(admin, "HEAD"), "ref: refs/heads/main\n")
+    await mkdir(join(nested, ".git"))
+    await writeFile(join(nested, ".git", "HEAD"), "ref: refs/heads/main\n")
+    await writeFile(join(checkoutBin, name), "", { mode: 0o700 })
+    await writeFile(join(userBin, name), "", { mode: 0o700 })
+    const links = [
+      [project, cwdAlias],
+      [checkoutBin, binAlias],
+      [userBin, userBinAlias],
+      [home, cwdOutside],
+    ] as const
+    for (const [target, alias] of links) await symlink(target, alias, "junction")
+
+    const check = async (cwd: string, path: ReadonlyArray<string>) => {
+      const env = { HOME: home, USERPROFILE: home, PATH: path.join(delimiter) }
+      const calls: Array<string> = []
+      const shell = Shell.of({
+        which: (command, options) => Effect.sync(() => findCommand(env, command, options)),
+        run: (command) =>
+          Effect.sync(() => {
+            calls.push(command)
+            return { exitCode: 0, stdout: "[]", stderr: "" }
+          }),
+      })
+      const found = await Effect.runPromise(
+        lookupCtx7(env, cwd).pipe(Effect.provideService(Shell, shell)),
+      )
+      return { found, calls }
+    }
+
+    const unverified = { found: { kind: "unverified" as const }, calls: [] }
+    // Lexical checkout path, both directions of aliasing, and a physical checkout from an alias.
+    expect(await check(nested, [checkoutBin, binAlias, userBinAlias])).toEqual(unverified)
+    expect(await check(join(cwdAlias, "packages", "example"), [checkoutBin, binAlias])).toEqual(
+      unverified,
+    )
+    expect(await check(cwdOutside, [checkoutBin, binAlias])).toEqual(unverified)
+    expect(await check(nested, [checkoutBin, binAlias, userBinAlias, userBin])).toEqual({
+      found: { kind: "missing" },
+      calls: [join(userBin, name)],
+    })
+  } finally {
+    await remove()
+  }
 })
 
 test("a real run, dry run and doctor --fix report the same already-installed mise command", async () => {

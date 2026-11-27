@@ -51,7 +51,7 @@ export const lookupCtx7 = Effect.fn("lookupCtx7")(function* (
   if (Option.isSome(inBun)) return { kind: "bun", path: inBun.value }
 
   // Only a trusted installed mise executable, in the user's home with no mise config loaded.
-  const mise = yield* shell.which("mise", { strict: { cwd, platform } })
+  const mise = yield* shell.which("mise", { strict: { cwd, platform, excludeCheckout: true } })
   if (Option.isNone(mise))
     return { kind: Option.isSome(yield* shell.which("mise")) ? "unverified" : "missing" }
   const options = { cwd: homeDirectory(env), env: discoveryOptions }
