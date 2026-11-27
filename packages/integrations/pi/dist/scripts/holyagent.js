@@ -31234,19 +31234,57 @@ var init_startup = __esm(() => {
 });
 
 import { randomUUID as randomUUID5 } from "crypto";
-import { lstat as lstat10, mkdir as mkdir11, readdir as readdir5, readFile as readFile6, realpath as realpath7, rename as rename7, rm as rm10, writeFile as writeFile6 } from "fs/promises";
-import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, resolve as resolve14 } from "path";
-var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`)))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
+import {
+  lstat as lstat10,
+  mkdir as mkdir11,
+  mkdtemp as mkdtemp5,
+  readdir as readdir5,
+  readFile as readFile6,
+  realpath as realpath7,
+  rename as rename7,
+  rm as rm10,
+  writeFile as writeFile6
+} from "fs/promises";
+import { tmpdir as tmpdir4 } from "os";
+import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, posix as posix3, resolve as resolve14, win32 as win323 } from "path";
+var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), installCodex = "If you want to install or update Codex, run `npm install -g @openai/codex@latest`, then rerun setup.", codexVersion, verifiedRootOnlyRelease = "0.172.0", nativeQueries, defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`)))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
   try: () => record4(Bun.TOML.parse(content)),
   catch: () => fail9("Invalid Codex config.toml; left it unchanged")
-}), same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b), developerLine, ownedInstruction = (asset, before) => {
+}), same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b), localMarketplacePath = (path, platform) => {
+  if (/[\p{Cc}]/u.test(path))
+    return;
+  if (path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === ".."))
+    return;
+  if (platform !== "win32")
+    return posix3.isAbsolute(path) ? posix3.normalize(path) : undefined;
+  const extended = path.startsWith("\\\\?\\");
+  if (extended && (path.includes("/") || path.slice(4).includes("\\\\")))
+    return;
+  const drivePath = extended ? path.slice(4) : path.replaceAll("/", "\\");
+  if (!/^[a-z]:\\/i.test(drivePath))
+    return;
+  if (drivePath.slice(3).split("\\").some((part) => /[<>:"|?*]|[. ]$/u.test(part)))
+    return;
+  return win323.normalize(drivePath);
+}, sameCodexMarketplacePath = (first, second, platform = process.platform) => {
+  const a = localMarketplacePath(first, platform);
+  const b = localMarketplacePath(second, platform);
+  if (a === undefined || b === undefined)
+    return false;
+  return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}, resolvedLocalPath = (path) => io2(path, () => realpath7(path)).pipe(map5((actual) => localMarketplacePath(actual, process.platform)), orElseSucceed2(() => {
+  return;
+})), sameResolvedMarketplace, receiptFor = (content) => decodeUnknownEffect2(Receipt, { onExcessProperty: "error" })(content).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed"))), priorMarketplaceProof, marketplaceConflict = (source) => {
+  const local = typeof source === "string" ? localMarketplacePath(source, process.platform) : undefined;
+  return fail9(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}${local === undefined ? "" : ` at ${local}`}; kept it unchanged. Use a separate --codex-home, or restore the original HolyAgent marketplace and review again.`);
+}, marketplaceLink, marketplaceHeader, sourceLine, relinkMarketplaceConfig, developerLine, ownedInstruction = (asset, before) => {
   if (asset.path === "AGENTS.md")
     return true;
   if (asset.path === join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
     return true;
   const line = asset.content.match(developerLine)?.[0];
   return asset.path.startsWith("agents/holyagent-") && asset.path.endsWith(".toml") && line !== undefined && before.replace(developerLine, () => line) === asset.content;
-}, checkPolicy, store2, setupCodex;
+}, checkPolicy, store2, checkNativeCodex, setupCodex;
 var init_setup2 = __esm(() => {
   init_dist();
   init_environment2();
@@ -31271,6 +31309,12 @@ var init_setup2 = __esm(() => {
     }))
   });
   receiptFile = join31("holyagent", "setup-v1.json");
+  codexVersion = /^codex-cli (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\s*$/m;
+  nativeQueries = [
+    { path: ["plugin", "marketplace", "add"], flags: ["json"] },
+    { path: ["plugin", "add"], flags: ["json"] },
+    { path: ["plugin", "list"], flags: ["json", "marketplace"] }
+  ];
   canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
     const target = resolve14(candidate);
     const root = yield* statOptional(target);
@@ -31335,6 +31379,95 @@ var init_setup2 = __esm(() => {
           return yield* fail9(`Kept modified Codex plugin cache: ${join31(home, path)}`);
     }
   });
+  sameResolvedMarketplace = fn2("sameResolvedCodexMarketplace")(function* (left, right) {
+    if (left === right)
+      return true;
+    if (process.platform !== "win32" || !sameCodexMarketplacePath(left, right))
+      return false;
+    const a = yield* statOptional(left);
+    const b = yield* statOptional(right);
+    return a !== undefined && b !== undefined && a.isDirectory() && b.isDirectory() && a.ino > 0 && a.ino === b.ino && a.dev === b.dev;
+  });
+  priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market) {
+    const oldHome = dirname13(dirname13(market));
+    const expected = join31(oldHome, CODEX_STARTUP_MARKETPLACE);
+    if (!sameCodexMarketplacePath(expected, market))
+      return;
+    const prior = yield* resolvedLocalPath(yield* inside(oldHome, CODEX_STARTUP_MARKETPLACE));
+    if (prior === undefined || !(yield* sameResolvedMarketplace(market, prior)))
+      return;
+    const snapshot = yield* read2(oldHome, receiptFile);
+    if (snapshot === undefined)
+      return;
+    const receipt = yield* receiptFor(snapshot);
+    const installed = codexMarketplaceFiles().map(({ path, content }) => ({
+      path: join31(CODEX_STARTUP_MARKETPLACE, path),
+      content
+    }));
+    const catalog = installed[0];
+    if (catalog === undefined || (yield* read2(oldHome, catalog.path)) !== catalog.content)
+      return;
+    const pluginRoot = join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+    yield* checkPluginTree(oldHome, pluginRoot, installed.slice(1), false);
+    for (const { path } of installed) {
+      const file = yield* read2(oldHome, path);
+      if (file === undefined || !Object.hasOwn(receipt.files, path) || digest(file) !== receipt.files[path])
+        return;
+    }
+    return digest(snapshot);
+  });
+  marketplaceLink = fn2("planCodexMarketplaceLink")(function* (registered, target) {
+    if (Object.keys(registered).length === 0)
+      return { kind: "add" };
+    const source = registered.source;
+    if (registered.source_type !== "local" || typeof source !== "string")
+      return yield* marketplaceConflict(source);
+    const clean = localMarketplacePath(source, process.platform);
+    if (clean === undefined)
+      return yield* marketplaceConflict(source);
+    if (clean === localMarketplacePath(target, process.platform))
+      return { kind: "keep" };
+    const actual = yield* resolvedLocalPath(clean);
+    const destination = yield* resolvedLocalPath(target);
+    if (actual !== undefined && destination !== undefined && (yield* sameResolvedMarketplace(actual, destination)))
+      return { kind: "keep" };
+    if (actual === undefined)
+      return yield* marketplaceConflict(source);
+    const proof = yield* priorMarketplaceProof(actual).pipe(orElseSucceed2(() => {
+      return;
+    }));
+    if (proof === undefined)
+      return yield* marketplaceConflict(source);
+    return { kind: "relink", source, actual, proof };
+  });
+  marketplaceHeader = /^[ \t]*\[[ \t]*(?:marketplaces|"marketplaces"|'marketplaces')[ \t]*\.[ \t]*(?:holyagent-local|"holyagent-local"|'holyagent-local')[ \t]*\][ \t]*(?:#[^\r\n]*)?\r?$/gm;
+  sourceLine = /^([ \t]*(?:source|"source"|'source')[ \t]*=[ \t]*)(?:"(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*')([ \t]*(?:#[^\r\n]*)?\r?)$/gm;
+  relinkMarketplaceConfig = fn2("relinkCodexMarketplaceConfig")(function* (text, settings, target) {
+    const headers = [...text.matchAll(marketplaceHeader)];
+    const header = headers.length === 1 ? headers[0] : undefined;
+    const unsupported = fail9(`Kept ${CODEX_MARKETPLACE} unchanged because the registered source cannot be safely updated in this config.toml format. Use a separate --codex-home.`);
+    if (header?.index === undefined)
+      return yield* unsupported;
+    const start = header.index + header[0].length;
+    const remaining = text.slice(start);
+    const nextHeader = remaining.search(/^[ \t]*\[/m);
+    const section = nextHeader === -1 ? remaining : remaining.slice(0, nextHeader);
+    if ([...section.matchAll(sourceLine)].length !== 1)
+      return yield* unsupported;
+    const replaced = section.replace(sourceLine, (_, prefix, tail) => `${prefix}${JSON.stringify(target)}${tail}`);
+    const next = text.slice(0, start) + replaced + remaining.slice(section.length);
+    const marketplaces = record4(settings.marketplaces);
+    const expected = {
+      ...settings,
+      marketplaces: {
+        ...marketplaces,
+        [CODEX_MARKETPLACE]: { ...record4(marketplaces[CODEX_MARKETPLACE]), source: target }
+      }
+    };
+    if (!same2(yield* parseToml(next), expected))
+      return yield* unsupported;
+    return next;
+  });
   developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m;
   checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
     const currentAgents = record4(current.agents);
@@ -31366,6 +31499,24 @@ var init_setup2 = __esm(() => {
       yield* io2(path, () => rename7(next, path));
     }).pipe(ensuring2(io2(next, () => rm10(next, { force: true })).pipe(ignore2)));
   });
+  checkNativeCodex = fn2("validateNativeCodexCapabilities")(function* (run) {
+    return yield* acquireUseRelease2(io2(tmpdir4(), () => mkdtemp5(join31(tmpdir4(), "holyagent-codex-probe-"))), (probe) => gen2(function* () {
+      const release = codexVersion.exec(yield* run(["--version"], probe))?.[1];
+      if (release === undefined)
+        return yield* fail9("`codex --version` did not identify the native CLI.");
+      yield* forEach2(nativeQueries, ({ path, flags }) => gen2(function* () {
+        const help = yield* run([...path, "--help"], probe);
+        const command = `codex ${path.join(" ")}`;
+        const usage = new RegExp(`^Usage: codex(?:\\.exe)? ${path.join(" ")}(?:\\s|$)`, "m");
+        if (!usage.test(help))
+          return yield* fail9(`${command} is not available.`);
+        for (const flag of flags)
+          if (!new RegExp(`(?:^|[ \\t,])--${flag}(?:[ \\t=,]|$)`, "m").test(help))
+            return yield* fail9(`${command} does not support --${flag}.`);
+      }));
+      return release;
+    }), (probe) => io2(probe, () => rm10(probe, { recursive: true, force: true })).pipe(ignore2)).pipe(mapError2((error) => fail9(`Incompatible native Codex CLI. ${error.detail} ${installCodex}`)));
+  });
   setupCodex = fn2("setupCodex")(function* (env, options) {
     if (!isAbsolute11(options.home))
       return yield* fail9("--codex-home must be an absolute path");
@@ -31376,11 +31527,12 @@ var init_setup2 = __esm(() => {
     if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
       return yield* fail9("Invalid HolyAgent plugin version");
     const shell = yield* Shell;
-    if (!options.dryRun && isNone2(yield* shell.which("codex")))
-      return yield* fail9("Codex is not on PATH. Apply from an environment with the verified native Codex CLI. A setup preview does not require it.");
-    const run = (args) => shell.run("codex", args, {
+    const native = yield* shell.which("codex", { includeBunBin: true });
+    if (!options.dryRun && isNone2(native))
+      return yield* fail9(`Codex is not on PATH. Preview does not require it. ${installCodex}`);
+    const run = (args, profile = home) => shell.run("codex", args, {
       cwd: homeDirectory2(env),
-      env: { CODEX_HOME: home, NO_COLOR: "1" }
+      env: { CODEX_HOME: profile, NO_COLOR: "1" }
     }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
     const desired = yield* codexStartupFiles(home, options.catalog, version);
     const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
@@ -31400,14 +31552,17 @@ var init_setup2 = __esm(() => {
     if (beforeConfig !== undefined)
       yield* checkPolicy(settings, yield* parseToml(config));
     const market = join31(home, CODEX_STARTUP_MARKETPLACE);
-    const registered = record4(record4(settings.marketplaces)[CODEX_MARKETPLACE]);
-    if (Object.keys(registered).length > 0 && (registered.source !== market || registered.source_type !== "local"))
-      return yield* fail9(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}; kept it unchanged`);
+    const registration = record4(settings.marketplaces)[CODEX_MARKETPLACE];
+    const registered = record4(registration);
+    if (registration !== undefined && Object.keys(registered).length === 0)
+      return yield* marketplaceConflict(undefined);
+    const link = yield* marketplaceLink(registered, market);
+    const relinkedConfig = link.kind === "relink" && beforeConfig !== undefined ? yield* relinkMarketplaceConfig(beforeConfig, settings, market) : undefined;
     const plugin = record4(record4(settings.plugins)[CODEX_PLUGIN]);
     if (plugin.enabled === false)
       return yield* fail9("The HolyAgent Codex plugin is disabled in this profile; left that choice unchanged");
     const beforeReceipt = yield* read2(home, receiptFile);
-    const receipt = beforeReceipt === undefined ? { files: {} } : yield* decodeUnknownEffect2(Receipt, { onExcessProperty: "error" })(beforeReceipt).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed")));
+    const receipt = beforeReceipt === undefined ? { files: {} } : yield* receiptFor(beforeReceipt);
     const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
       const before = yield* read2(home, asset.path);
       const previousDigest = receipt.files[asset.path];
@@ -31434,14 +31589,13 @@ var init_setup2 = __esm(() => {
     if (cached !== undefined)
       yield* checkPluginTree(home, cache, expectedCache, true);
     const install = plugin.enabled !== true || cached === undefined;
-    const addMarket = Object.keys(registered).length === 0;
     const fingerprint = digest(JSON.stringify([
       home,
       version,
       beforeConfig,
       beforeOverride,
       beforeReceipt,
-      addMarket,
+      link,
       install,
       assets.map(({ path, before, content }) => [path, before, content])
     ]));
@@ -31450,9 +31604,11 @@ var init_setup2 = __esm(() => {
     const lines = [
       `~ Codex home: ${home}`,
       `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
+      ...options.dryRun && isNone2(native) ? [`~ Codex CLI: not on PATH. ${installCodex}`] : [],
       ...beforeConfig === undefined ? ["+ Codex config: create a dedicated startup profile"] : ["= Codex config: keeping existing settings"],
       ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
-      ...addMarket ? ["+ Codex plugin: register the local marketplace"] : [],
+      ...link.kind === "add" ? ["+ Codex plugin: register the local marketplace"] : [],
+      ...link.kind === "relink" ? ["+ Codex plugin: relink the verified HolyAgent marketplace"] : [],
       ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present in the local cache`],
       ...record4(settings.skills).include_instructions === false ? [
         "~ Codex skills: this profile disables automatic skill listings. HolyAgent workflow will not be listed in the prompt under this setting."
@@ -31471,20 +31627,35 @@ var init_setup2 = __esm(() => {
         ...managedConflicts.length > 0 ? { managedConflicts } : {}
       };
     const backups = [];
+    let relinked = false;
     const backupRoot = join31("holyagent", "setup-backups", randomUUID5());
+    const verifyActiveMarketplace = fn2("verifyActiveCodexMarketplace")(function* () {
+      const liveConfig = yield* read2(home, "config.toml");
+      if (liveConfig === undefined)
+        return yield* fail9("Codex config.toml disappeared during setup.");
+      const liveSettings = yield* parseToml(liveConfig);
+      const active = record4(record4(liveSettings.marketplaces)[CODEX_MARKETPLACE]);
+      if ((yield* marketplaceLink(active, market)).kind !== "keep")
+        return yield* fail9("The active Codex marketplace source changed during setup. Review it again.");
+      if (record4(liveSettings.features).plugins === false || record4(record4(liveSettings.plugins)[CODEX_PLUGIN]).enabled === false)
+        return yield* fail9("The HolyAgent plugin is now disabled. Setup kept that choice unchanged.");
+      yield* checkPolicy(liveSettings, yield* parseToml(config));
+      yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
+    });
     const steps = [
       {
         label: "Codex runtime",
         run: gen2(function* () {
-          const binary = yield* run(["--version"]);
-          if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
-            return yield* fail9("This startup profile requires the verified Codex 0.172.0 runtime line");
+          const version = yield* checkNativeCodex(run);
+          if (options.catalog !== undefined && version !== verifiedRootOnlyRelease)
+            return yield* fail9(`Codex ${version} supports plugin setup, but native root-only delegation has not been verified on this build. Remove --root-only-catalog and use a separate direct-only profile. No profile files were changed.`);
+          lines.push(`= Codex CLI ${version}: marketplace and plugin commands verified`);
         })
       },
       {
         label: "Codex profile files",
         run: gen2(function* () {
-          if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile)) !== beforeReceipt)
+          if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile)) !== beforeReceipt || !same2(yield* marketplaceLink(registered, market), link))
             return yield* fail9(`Profile changed during setup: ${join31(home, "config.toml")}`);
           if (options.expectedPlan !== undefined) {
             for (const asset of assets)
@@ -31516,10 +31687,19 @@ var init_setup2 = __esm(() => {
           yield* store2(home, receiptFile, beforeReceipt, nextReceipt);
         })
       },
-      ...addMarket ? [
+      ...link.kind === "add" || relinkedConfig !== undefined ? [
         {
           label: "Codex marketplace",
           run: gen2(function* () {
+            if (relinkedConfig !== undefined) {
+              if (!same2(yield* marketplaceLink(registered, market), link))
+                return yield* fail9("The previous HolyAgent marketplace changed. Review setup again.");
+              yield* gen2(function* () {
+                yield* store2(home, "config.toml", beforeConfig, relinkedConfig);
+                relinked = true;
+              }).pipe(uninterruptible2);
+              return;
+            }
             yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected marketplace")));
           })
         }
@@ -31529,21 +31709,31 @@ var init_setup2 = __esm(() => {
         run: gen2(function* () {
           if (install) {
             yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`);
+            yield* verifyActiveMarketplace();
             const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected plugin")));
             if (result.version !== version)
               return yield* fail9(`Codex installed version ${result.version}, expected ${version}`);
             yield* checkPluginTree(home, cache, expectedCache, true);
           }
           yield* reportSetupActivity(`Checking enabled version ${version}`);
+          yield* verifyActiveMarketplace();
           const list = yield* decodeUnknownEffect2(fromJsonString2(PluginList))(yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"])).pipe(mapError2(() => fail9("Codex did not report enabled plugins for this profile")));
           if (!list.installed.some((item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version))
             return yield* fail9(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`);
         })
       }
     ];
-    for (const [index, { label, run }] of steps.entries())
-      yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run).pipe(mapError2((error) => backups.length === 0 ? error : fail9(`${error.detail}
-Backups: ${backups.join(", ")}`)));
+    yield* forEach2(steps, ({ label, run }, index) => withSetupPhase({ index: index + 1, total: steps.length, label }, run)).pipe(catchTag2("StartupStageError", (error) => gen2(function* () {
+      const detail = [error.detail];
+      if (relinked && beforeConfig !== undefined && relinkedConfig !== undefined) {
+        const rollback = yield* result2(store2(home, "config.toml", relinkedConfig, beforeConfig));
+        detail.push(rollback._tag === "Success" ? "Restored the previous marketplace source." : "The profile changed after relinking. Kept those changes and the original marketplace files. Review config.toml before retrying.");
+      }
+      if (backups.length > 0)
+        detail.push(`Backups: ${backups.join(", ")}`);
+      return yield* fail9(detail.join(`
+`));
+    })));
     return { ok: true, lines, fingerprint };
   });
 });
@@ -31567,13 +31757,13 @@ var init_settings6 = __esm(() => {
 });
 
 import { constants as constants6 } from "fs";
-import { posix as posix3, win32 as win323 } from "path";
+import { posix as posix4, win32 as win324 } from "path";
 var BROWSERS, envOf = (env, name, windows) => env[name] ?? (windows ? Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1] : undefined), localPath = (value, windows) => {
   if (Array.from(value).some((char) => (char.codePointAt(0) ?? 0) < 32))
     return;
   if (windows)
-    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win323.normalize(value) : undefined;
-  return value.startsWith("/") ? posix3.normalize(value) : undefined;
+    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win324.normalize(value) : undefined;
+  return value.startsWith("/") ? posix4.normalize(value) : undefined;
 }, checkFile = (path, executable, windows) => gen2(function* () {
   const fs = yield* fileSystem;
   const metadata = yield* tryPromise2(() => fs.stat(path));
@@ -31587,8 +31777,8 @@ var BROWSERS, envOf = (env, name, windows) => env[name] ?? (windows ? Object.ent
   const home = envOf(env, windows ? "USERPROFILE" : "HOME", windows) ?? homeDirectory2(env);
   if (browser.id === "firefox") {
     if (windows)
-      return localPath(win323.join(envOf(env, "APPDATA", true) ?? win323.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
-    return localPath(posix3.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
+      return localPath(win324.join(envOf(env, "APPDATA", true) ?? win324.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
+    return localPath(posix4.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
   }
   const profileEnv = windows ? {
     ...env,
@@ -31611,20 +31801,20 @@ var BROWSERS, envOf = (env, name, windows) => env[name] ?? (windows ? Object.ent
   if (platform === "win32") {
     const user = envOf(env, "USERPROFILE", true) ?? home;
     const programRoots = [
-      envOf(env, "LOCALAPPDATA", true) ?? win323.join(user, "AppData", "Local"),
+      envOf(env, "LOCALAPPDATA", true) ?? win324.join(user, "AppData", "Local"),
       ...["ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"].map((name) => envOf(env, name, true))
     ];
-    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win323.join(root, rest)) : []);
+    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win324.join(root, rest)) : []);
   }
   if (platform === "darwin" && browser.app !== undefined) {
     const app = browser.app;
-    return ["/Applications", posix3.join(home, "Applications")].filter(posix3.isAbsolute).map((root) => posix3.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
+    return ["/Applications", posix4.join(home, "Applications")].filter(posix4.isAbsolute).map((root) => posix4.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
   }
   if (platform === "linux")
-    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix3.join(root, command)));
+    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix4.join(root, command)));
   return [];
 }, uniqueWinNames = (browser) => (browser.winExe ?? []).filter((exe) => exe.toLowerCase() !== "launcher.exe" && BROWSERS.filter((candidate) => candidate.winExe?.includes(exe)).length === 1), pathsOnPath = (browser, env, windows) => {
-  const pathApi = windows ? win323 : posix3;
+  const pathApi = windows ? win324 : posix4;
   const names = windows ? uniqueWinNames(browser) : browser.commands ?? [];
   return (envOf(env, "PATH", windows) ?? "").split(pathApi.delimiter).flatMap((entry) => {
     const root = localPath(entry, windows);
@@ -31776,7 +31966,7 @@ var init_browser_discovery = __esm(() => {
     const local = root === undefined ? undefined : localPath(root, true);
     if (local === undefined)
       return new Map;
-    const reg = win323.join(local, "System32", "reg.exe");
+    const reg = win324.join(local, "System32", "reg.exe");
     if (!(yield* checkFile(reg, true, true)))
       return new Map;
     const shell = yield* Shell;
@@ -31801,7 +31991,7 @@ var init_browser_discovery = __esm(() => {
       const verified = yield* forEach2(chosen, ({ client, browser }) => gen2(function* () {
         const output = yield* query(`${prefix}${client}\\shell\\open\\command`, view, true);
         const path = registryExecutable(output, env);
-        return path !== undefined && browser.winExe?.some((exe) => exe.toLowerCase() === win323.basename(path).toLowerCase()) && (yield* checkFile(path, true, true)) ? { id: browser.id, path } : undefined;
+        return path !== undefined && browser.winExe?.some((exe) => exe.toLowerCase() === win324.basename(path).toLowerCase()) && (yield* checkFile(path, true, true)) ? { id: browser.id, path } : undefined;
       }), { concurrency: 4 });
       for (const entry of verified)
         if (entry !== undefined && !registered.has(entry.id))
@@ -31811,9 +32001,9 @@ var init_browser_discovery = __esm(() => {
     const appNames = ["chrome.exe", "firefox.exe", "helium.exe"].filter((exe) => missing.some(({ winExe }) => winExe?.includes(exe)));
     const appResults = yield* forEach2(roots.flatMap(({ hive, view }) => appNames.map((exe) => ({ hive, view, exe }))), ({ hive, view, exe }) => query(`${hive}\\${AppPaths}\\${exe}`, view, true).pipe(map5((stdout) => ({ exe, path: registryExecutable(stdout, env) }))), { concurrency: 4 });
     for (const { exe, path } of appResults) {
-      if (path === undefined || win323.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
+      if (path === undefined || win324.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
         continue;
-      const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win323.normalize(suffix).toLowerCase()}`)));
+      const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win324.normalize(suffix).toLowerCase()}`)));
       if (browser !== undefined && !registered.has(browser.id))
         registered.set(browser.id, path);
     }
@@ -31821,7 +32011,7 @@ var init_browser_discovery = __esm(() => {
   });
   discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = process.platform) {
     const windows = platform === "win32";
-    const path = windows ? win323 : posix3;
+    const path = windows ? win324 : posix4;
     if (!windows && platform !== "linux" && platform !== "darwin")
       return [];
     const registry = windows ? yield* windowsRegistrations(env) : new Map;
@@ -32788,11 +32978,11 @@ var TUI_PACKAGES = {
 }
 `;
 
-import { lstat as lstat11, mkdir as mkdir12, mkdtemp as mkdtemp5, readdir as readdir6, rename as rename8, rm as rm11, stat as stat6, writeFile as writeFile7 } from "fs/promises";
+import { lstat as lstat11, mkdir as mkdir12, mkdtemp as mkdtemp6, readdir as readdir6, rename as rename8, rm as rm11, stat as stat6, writeFile as writeFile7 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename9, dirname as dirname14, join as join32, posix as posix4, win32 as win324 } from "path";
+import { basename as basename9, dirname as dirname14, join as join32, posix as posix5, win32 as win325 } from "path";
 import { pathToFileURL } from "url";
-var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win324 : posix4, cacheHome = (env, platform = process.platform) => {
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win325 : posix5, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   const { join } = pathModule(platform);
   if (platform === "win32")
@@ -32913,7 +33103,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win324 : p
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp5(join32(dirname14(directory), `.${basename9(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp6(join32(dirname14(directory), `.${basename9(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
@@ -33164,10 +33354,10 @@ var init_browse_setup = __esm(() => {
   })));
 });
 
-import { posix as posix5, win32 as win325 } from "path";
+import { posix as posix6, win32 as win326 } from "path";
 var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension", browserIds, desktopPlatforms, decodeBrowser, decodePlatform, labels, windowsDesktop, windowsDrivePath, powershell = (env) => {
   const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
-  return root !== undefined && windowsDrivePath.test(root) ? win325.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
+  return root !== undefined && windowsDrivePath.test(root) ? win326.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
 }, powershellArgs = (command) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], versionText, versionOf = (output) => getOrUndefined(versionText(output.trim())), desktopEvidence = (platform, version) => ({
   platform,
   name: "ChatGPT desktop app",
@@ -33178,7 +33368,7 @@ var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension", bro
   if (platform === "linux" && firstNonEmpty2(env["WSL_DISTRO_NAME"], env["WSL_INTEROP"]) !== undefined)
     return "Use the native desktop outside WSL to connect your browser.";
   return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
-}, browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix5.isAbsolute(executable)), steps, detectCodexBrowserHandoff, detachedGuide = 'test -x "$1" || exit 126; "$1" "$2" </dev/null >/dev/null 2>&1 &', windowsGuide, openCodexBrowserHandoff;
+}, browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix6.isAbsolute(executable)), steps, detectCodexBrowserHandoff, detachedGuide = 'test -x "$1" || exit 126; "$1" "$2" </dev/null >/dev/null 2>&1 &', windowsGuide, openCodexBrowserHandoff;
 var init_codex_browser_handoff = __esm(() => {
   init_dist();
   init_identity2();
@@ -33212,9 +33402,9 @@ var init_codex_browser_handoff = __esm(() => {
       return result.exitCode === 0 && version !== undefined ? desktopEvidence(platform, version) : undefined;
     }
     if (platform === "darwin") {
-      for (const directory of ["/Applications", posix5.join(home, "Applications")]) {
+      for (const directory of ["/Applications", posix6.join(home, "Applications")]) {
         for (const app of ["ChatGPT.app", "Codex.app"]) {
-          const plist = posix5.join(directory, app, "Contents", "Info.plist");
+          const plist = posix6.join(directory, app, "Contents", "Info.plist");
           const read = (key) => shell.run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], input);
           const id = yield* read("CFBundleIdentifier");
           if (id.exitCode !== 0 || id.stdout.trim() !== "com.openai.codex")
@@ -34118,7 +34308,8 @@ var init_setup3 = __esm(() => {
     output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
     notes: [
       "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
-      "Apply requires the verified Codex 0.172.0 runtime on PATH. Preview does not. Setup never changes a running session.",
+      "Apply verifies the native marketplace and plugin commands in your installed Codex CLI. Preview does not require Codex. Setup never installs or updates Codex itself and never changes a running session.",
+      "If the CLI is missing or incompatible, choose whether to install its stable release with npm install -g @openai/codex@latest, then rerun setup.",
       "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
       "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
       "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
