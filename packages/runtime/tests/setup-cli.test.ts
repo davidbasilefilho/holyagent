@@ -4,11 +4,12 @@ import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
+import { PiProbeTransport } from "../../core/src/setup/pi-host.ts"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
-import { programName, scratch, writeCompleteSettings } from "./setup-fixture.ts"
+import { fixturePiProbe, programName, scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
 let home: string
 let remove: () => Promise<void>
@@ -60,6 +61,10 @@ const publicCli = (argv: ReadonlyArray<string>) =>
         setupTui: () => Effect.die("this setup must not open the TUI"),
       },
       "public",
+    ).pipe(
+      Effect.provideService(PiProbeTransport, {
+        run: (request) => Effect.succeed(fixturePiProbe(request)),
+      }),
     ),
   )
 

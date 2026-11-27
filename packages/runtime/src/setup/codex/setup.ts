@@ -52,7 +52,9 @@ const receiptFile = join("holyagent", "setup-v1.json")
 const digest = (content: string) => Bun.CryptoHasher.hash("sha256", content, "hex")
 const fail = (detail: string) => new StartupStageError({ detail })
 const installCodex =
-  "If you want to install or update Codex, run `npm install -g @openai/codex@latest`, then rerun setup."
+  "If Codex is already installed, put it on PATH. For a new installation, use the official stable release with `npm install -g @openai/codex@latest`, then rerun setup."
+const updateCodex =
+  "Check the official release with `npm view @openai/codex@latest version --registry=https://registry.npmjs.org/`. Update through your existing installation channel only if the release is stable and newer than your installed copy."
 const codexVersion = /^codex-cli (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\s*$/m
 // An audited behavioral result for the experimental native delegation mode, not an installation
 // requirement. Plugin API capability alone cannot establish enforcement of the native depth limit.
@@ -447,13 +449,13 @@ const checkNativeCodex = Effect.fn("validateNativeCodexCapabilities")(function* 
               if (!new RegExp(`(?:^|[ \\t,])--${flag}(?:[ \\t=,]|$)`, "m").test(help))
                 return yield* fail(`${command} does not support --${flag}.`)
           }),
-        )
+        ).pipe(Effect.mapError(({ detail }) => fail(`Detected Codex ${release}. ${detail}`)))
         return release
       }),
     (probe) => io(probe, () => rm(probe, { recursive: true, force: true })).pipe(Effect.ignore),
   ).pipe(
     Effect.mapError((error) =>
-      fail(`Incompatible native Codex CLI. ${error.detail} ${installCodex}`),
+      fail(`Incompatible native Codex CLI. ${error.detail} ${updateCodex}`),
     ),
   )
 })

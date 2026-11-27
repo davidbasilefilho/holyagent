@@ -4,12 +4,13 @@ import { join } from "node:path"
 
 import { Effect, Option } from "effect"
 
+import { PiProbeTransport } from "../../core/src/setup/pi-host.ts"
 import { SetupProgress, type SetupProgressUpdate } from "../../core/src/setup/progress.ts"
 import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
 import { Shell } from "../src/setup/shell.ts"
 import { setup } from "../src/setup/steps.ts"
-import { scratch } from "./setup-fixture.ts"
+import { fixturePiProbe, scratch } from "./setup-fixture.ts"
 
 test.each([false, true])(
   "reports the actual slow Pi install and honours abort=%s",
@@ -48,11 +49,18 @@ test.each([false, true])(
           },
         ).pipe(
           Effect.provideService(SetupProgress, (update) => updates.push(update)),
+          Effect.provideService(PiProbeTransport, {
+            run: (request) => Effect.succeed(fixturePiProbe(request)),
+          }),
           Effect.provideService(
             Shell,
             Shell.of({
               which: (command) =>
-                Effect.succeed(command === "pi" ? Option.some("pi") : Option.none()),
+                Effect.succeed(
+                  command === "pi"
+                    ? Option.some(join(made.directory, "fixture-pi"))
+                    : Option.none(),
+                ),
               run: (command, args) =>
                 Effect.tryPromise(async () => {
                   firstCommand.resolve([command, ...args])
@@ -69,7 +77,11 @@ test.each([false, true])(
         { index: 2, total: 5, label: "Pi packages" },
         { index: 2, total: 5, label: "Pi packages", activity: `Installing ${source}` },
       ]
-      expect(await firstCommand.promise).toEqual(["pi", "install", source])
+      expect(await firstCommand.promise).toEqual([
+        join(made.directory, "fixture-pi"),
+        "install",
+        source,
+      ])
       expect(updates).toEqual(current)
       const settings = Bun.file(join(t3, "userdata", "settings.json"))
       if (abort) {

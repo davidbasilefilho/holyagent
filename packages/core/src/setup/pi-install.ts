@@ -30,6 +30,7 @@ import {
   piSettingsFiles,
   piSettingsSources,
 } from "./pi-check.ts"
+import { runVerifiedPi } from "./pi-host.ts"
 import { reportSetupActivity } from "./progress.ts"
 import { added, failed, hint, present, skipped } from "./report.ts"
 import { refuseLinks, type Scope } from "./scope.ts"
@@ -386,6 +387,10 @@ const retireRegistration = Effect.fn("retirePiRegistration")(function* (
 
 /** What the Pi step of `holyagent setup` was asked to do. */
 export interface PiInstallOptions {
+  /** The exact executable vetted by the public setup preflight. */
+  readonly verifiedPi?: string
+  /** Public apply must not fall back to a different executable if configuration changes. */
+  readonly requireVerifiedPi?: boolean
   /**
    * The scope setup runs at: `user` works on Pi's global settings and reads the user's own
    * HolyAgent config only, the others work on the project's settings and read its config too.
@@ -439,6 +444,10 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     options.providers,
   )
   if (!config.pi.enable) return [skipped("pi packages: pi.enable is off in the HolyAgent config")]
+  if (options.requireVerifiedPi === true && options.verifiedPi === undefined)
+    return yield* new SetupFailure({
+      message: "Pi was enabled after setup started. Rerun setup to verify its executable",
+    })
 
   const projectLevel = options.scope !== "user"
   const [globalFile, projectFile] = piSettingsFiles(env, options.cwd)
@@ -600,7 +609,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   }
   if (installs.length === 0 && removals.length === 0) return lines
 
-  if (Option.isNone(yield* shell.which("pi"))) {
+  if (options.verifiedPi === undefined && Option.isNone(yield* shell.which("pi"))) {
     return [
       ...lines,
       `! pi packages: pi not found on PATH, so the changes to ${file} cannot run; install Pi (\`holyagent doctor\` names the command), then re-run`,
@@ -612,6 +621,12 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   // file of the current project steers Pi.
   const cwd = projectLevel ? options.cwd : homeDirectory(env)
   const withScope = (args: ReadonlyArray<string>) => (projectLevel ? [...args, "-l"] : args)
+  const run = (args: ReadonlyArray<string>) => {
+    const runOptions = { cwd, env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) } }
+    return options.verifiedPi === undefined
+      ? shell.run("pi", args, runOptions)
+      : runVerifiedPi(shell, env, options.verifiedPi, args, runOptions)
+  }
   for (const source of installs) {
     const args = withScope(["install", source])
     const command = `pi ${args.join(" ")}`
@@ -621,10 +636,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     }
     const commit = replacement?.target.source === source ? replacement : undefined
     yield* reportSetupActivity(`Installing ${source}`)
-    const install = shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
-    })
+    const install = run(args)
     if (commit === undefined) {
       const result = yield* install
       lines.push(
@@ -712,10 +724,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       continue
     }
     yield* reportSetupActivity(`Removing npm:${name}`)
-    const result = yield* shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
-    })
+    const result = yield* run(args)
     lines.push(
       result.exitCode === 0
         ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`)
