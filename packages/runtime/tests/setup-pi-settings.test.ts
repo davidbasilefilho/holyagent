@@ -9,10 +9,15 @@ import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../src/pi/bash/guardrails.ts"
 import { doctor } from "../src/setup/doctor.ts"
-import { PI_HOST_VERSION } from "../src/setup/pi-check.ts"
 import { addRecorded, recordPath } from "../src/setup/record.ts"
 import { setup } from "../src/setup/steps.ts"
-import { fakeShell, scratch, withoutSearchTools, writeCompleteSettings } from "./setup-fixture.ts"
+import {
+  fakeShell,
+  PI_TEST_HOST_VERSION,
+  scratch,
+  withoutSearchTools,
+  writeCompleteSettings,
+} from "./setup-fixture.ts"
 
 let home: string
 let project: string
@@ -60,7 +65,7 @@ const withPi = () =>
     commands: ["bun", "ctx7", "pi", "node", "npx", "cua-driver"],
     respond: (line) =>
       line === "pi --version"
-        ? { stdout: `${PI_HOST_VERSION}\n` }
+        ? { stdout: `${PI_TEST_HOST_VERSION}\n` }
         : line === "node --version"
           ? { stdout: "v22.19.0\n" }
           : undefined,

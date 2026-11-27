@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { writeFileSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
@@ -19,7 +20,6 @@ import { chooseForm } from "../src/setup/form.ts"
 import {
   checkCapability,
   isHolyagentSource,
-  PI_HOST_VERSION,
   PI_MINIMUM_NODE,
   piAgentDirectory,
 } from "../src/setup/pi-check.ts"
@@ -28,6 +28,7 @@ import { setup } from "../src/setup/steps.ts"
 import {
   BROWSE_LAST_SEEN_TEXT,
   fakeShell,
+  PI_TEST_HOST_VERSION,
   scratch,
   withoutSearchTools,
   writeBrowsePairing,
@@ -57,7 +58,10 @@ const DEFAULT = await Effect.runPromise(defaultConfig)
 const DEFAULT_SOURCES = piPackages(DEFAULT)
 const SOURCE = `git:github.com/davidbasilefilho/holyagent@holyagent-${version}`
 const NPM_SOURCE = `npm:holyagent@${version}`
-const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
+const PI_INSTALL = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"
+const PI_LATEST =
+  "npm view @earendil-works/pi-coding-agent dist-tags.latest --registry=https://registry.npmjs.org"
+const PI_GUIDANCE = `use a compatible Pi on PATH. If Pi is missing, install with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer; https://pi.dev). For an existing install, run \`${PI_LATEST}\` and update through your original manager only if the compatible stable release is newer`
 
 const write = async (file: string, content: unknown) => {
   await mkdir(dirname(file), { recursive: true })
@@ -105,7 +109,7 @@ const shellWith = (
     commands,
     respond: (line) =>
       line === "pi --version"
-        ? { stdout: `${versions.pi ?? PI_HOST_VERSION}\n` }
+        ? { stdout: `${versions.pi ?? PI_TEST_HOST_VERSION}\n` }
         : line === "node --version"
           ? { stdout: `${versions.node ?? "v22.19.0"}\n` }
           : undefined,
@@ -156,19 +160,25 @@ describe("holyagent doctor, Pi checks", () => {
     },
   )
 
-  test("pass when pi, Node and the package are in place, and run only the version commands", async () => {
+  test("pass when Pi, Node and the package are in place, using only local compatibility probes", async () => {
     await write(globalSettings(), { theme: "dark", ...FULL() })
     const shell = shellWith()
     const report = await check(shell)
     expect(report.ok).toBe(true)
     expect(piLines(report)).toEqual([
-      `ok   pi: ${PI_HOST_VERSION} (/fake/bin/pi)`,
+      `ok   pi: ${PI_TEST_HOST_VERSION} (/fake/bin/pi; CLI and RPC compatible)`,
       "ok   node: 22.19.0 (/fake/bin/node)",
       `ok   pi package: listed in ${globalSettings()}`,
       ...PI_LINES_OK,
     ])
     // The second `node --version` is the browse need (Node.js 22.19 or newer) of browser use.
-    expect(shell.lines()).toEqual(["pi --version", "node --version", "node --version"])
+    expect(shell.calls.map(({ command, args }) => [command, args[0]])).toEqual([
+      ["pi", "--version"],
+      ["pi", "--help"],
+      ["pi", "--mode"],
+      ["node", "--version"],
+      ["node", "--version"],
+    ])
   })
 
   test("report each missing part with the command that fixes it, and install nothing even with --fix", async () => {
@@ -177,7 +187,7 @@ describe("holyagent doctor, Pi checks", () => {
       const report = await check(shell, { fix, env: IN_USE })
       expect(report.ok).toBe(false)
       expect(piLines(report)).toEqual([
-        `FAIL pi: not found on PATH; install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`,
+        `FAIL pi: not found on PATH; ${PI_GUIDANCE}`,
         `FAIL node: not found on PATH; install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`,
         `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${NPM_SOURCE}\``,
         `FAIL pi base package pi-provider-kimi-code: not listed at ${DEFAULT_SOURCES[0]} in the packages of ${globalSettings()}; install it with \`pi install ${DEFAULT_SOURCES[0]}\`, or re-run \`holyagent setup\``,
@@ -224,17 +234,116 @@ describe("holyagent doctor, Pi checks", () => {
     }
   })
 
-  test("a pi older than the pinned release fails, a newer one passes with a note", async () => {
-    await write(globalSettings(), FULL())
-    const older = piLines(await check(shellWith({ pi: "1.4.9" })))[0]
-    expect(older).toBe(
-      `FAIL pi: 1.4.9 at /fake/bin/pi is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`,
+  test.each(["1.4.9", PI_TEST_HOST_VERSION, "1.7.0"])(
+    "reuses Pi %s when the host implements the required CLI and RPC",
+    async (pi) => {
+      await write(globalSettings(), FULL())
+      const report = await check(shellWith({ pi }), { fix: true })
+      expect(piLines(report)[0]).toBe(`ok   pi: ${pi} (/fake/bin/pi; CLI and RPC compatible)`)
+      expect(report.ok).toBe(true)
+    },
+  )
+
+  test.each([
+    ["pi remove <source>", "", "does not advertise local package install and remove"],
+    ["--no-approve", "", "does not advertise isolated RPC and extension options"],
+    ["--offline", "--offline-optional", "does not advertise isolated RPC and extension options"],
+  ])("does not load an extension if help lacks %s", async (missing, replacement, reason) => {
+    const help =
+      "pi install <source> [-l]\npi remove <source> [-l]\n--mode --extension --offline --no-session --no-extensions --no-approve --no-skills"
+    const shell = fakeShell({
+      commands: ["bun", "ctx7", "pi", "node"],
+      piProbe: ({ args }) =>
+        args[0] === "--version"
+          ? { stdout: "100.0.0" }
+          : args[0] === "--help"
+            ? { stdout: help.replace(missing, replacement) }
+            : undefined,
+    })
+    const report = await check(shell, { fix: true, env: IN_USE })
+    expect(piLines(report)[0]).toBe(`FAIL pi: 100.0.0 at /fake/bin/pi ${reason}; ${PI_GUIDANCE}`)
+    expect(
+      shell.calls.filter(({ command }) => command === "pi").map(({ args }) => args[0]),
+    ).toEqual(["--version", "--help"])
+    expect(shell.lines().some((line) => line.startsWith("npm "))).toBe(false)
+  })
+
+  test("a version banner and working RPC without the required extension APIs do not pass", async () => {
+    const shell = fakeShell({
+      commands: ["bun", "ctx7", "pi", "node"],
+      piProbe: ({ stdin }) =>
+        stdin === undefined
+          ? undefined
+          : {
+              stdout: [
+                {
+                  id: "ha-state",
+                  type: "response",
+                  command: "get_state",
+                  success: true,
+                  data: { sessionId: "fixture", isStreaming: false },
+                },
+                {
+                  id: "ha-commands",
+                  type: "response",
+                  command: "get_commands",
+                  success: true,
+                  data: { commands: [] },
+                },
+              ]
+                .map((response) => JSON.stringify(response))
+                .join("\n"),
+            },
+    })
+    expect(piLines(await check(shell, { fix: true, env: IN_USE }))[0]).toBe(
+      `FAIL pi: ${PI_TEST_HOST_VERSION} at /fake/bin/pi did not complete the isolated RPC/extension capability check; ${PI_GUIDANCE}`,
     )
-    const newer = await check(shellWith({ pi: "1.6.0" }))
-    expect(piLines(newer)[0]).toBe(
-      `ok   pi: 1.6.0 (/fake/bin/pi; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`,
-    )
-    expect(newer.ok).toBe(true)
+  })
+
+  test("the offline RPC probe does not read or modify user preferences or inherit credentials", async () => {
+    const settings = JSON.stringify({ theme: "dark", ...FULL() })
+    await write(globalSettings(), settings)
+    const shell = shellWith()
+    await check(shell, {
+      env: {
+        ...IN_USE,
+        OPENAI_API_KEY: "fixture-do-not-inherit",
+        NODE_OPTIONS: "--require=fixture-do-not-load",
+        PI_PACKAGE_DIR: join(home, "custom-package"),
+        PI_CODING_AGENT_DIR: join(home, "custom-agent"),
+        PATH: "/synthetic/bin",
+      },
+    })
+    const calls = shell.calls.filter(({ command }) => command === "pi")
+    expect(calls).toHaveLength(3)
+    const directory = calls[0]?.cwd ?? ""
+    expect(directory).not.toBe("")
+    expect(directory).not.toBe(home)
+    for (const call of calls) {
+      expect(call.cwd).toBe(directory)
+      expect(call.env).toMatchObject({
+        HOME: directory,
+        PI_CODING_AGENT_DIR: directory,
+        PI_OFFLINE: "1",
+        PI_TELEMETRY: "0",
+        PATH: "/synthetic/bin",
+      })
+      for (const name of ["OPENAI_API_KEY", "NODE_OPTIONS", "PI_PACKAGE_DIR"])
+        expect(call.env).not.toHaveProperty(name)
+    }
+    expect(calls[2]?.args).toEqual([
+      "--mode",
+      "rpc",
+      "--offline",
+      "--no-session",
+      "--no-extensions",
+      "--no-approve",
+      "--no-skills",
+      "--extension",
+      join(directory, "probe.mjs"),
+    ])
+    expect(await Bun.file(join(directory, "probe.mjs")).exists()).toBe(false)
+    expect(await Bun.file(globalSettings()).text()).toBe(settings)
   })
 
   test("a pi that prints no version, or exits non-zero, fails", async () => {
@@ -243,15 +352,15 @@ describe("holyagent doctor, Pi checks", () => {
       respond: (line) => (line === "pi --version" ? { stdout: "hello\n" } : undefined),
     })
     expect(piLines(await check(silent))[0]).toStartWith(
-      "FAIL pi: /fake/bin/pi did not report a version for --version (exit 0); install Pi",
+      "FAIL pi: /fake/bin/pi did not report a version for --version (exit 0); use a compatible Pi",
     )
     const broken = fakeShell({
       commands: ["bun", "ctx7", "pi", "node"],
       respond: (line) =>
-        line === "pi --version" ? { exitCode: 3, stdout: `${PI_HOST_VERSION}\n` } : undefined,
+        line === "pi --version" ? { exitCode: 3, stdout: `${PI_TEST_HOST_VERSION}\n` } : undefined,
     })
     expect(piLines(await check(broken))[0]).toStartWith(
-      "FAIL pi: /fake/bin/pi did not report a version for --version (exit 3); install Pi",
+      "FAIL pi: /fake/bin/pi did not report a version for --version (exit 3); use a compatible Pi",
     )
   })
 
@@ -551,7 +660,12 @@ describe("holyagent doctor, capabilities", () => {
     expect(result.lines.some((line) => /browser-use|uvx|Chromium|\b(rg|fd):/.test(line))).toBe(
       false,
     )
-    expect(shell.calls.map((call) => call.line)).toEqual(["pi --version", "node --version"])
+    expect(shell.calls.map(({ command, args }) => [command, args[0]])).toEqual([
+      ["pi", "--version"],
+      ["pi", "--help"],
+      ["pi", "--mode"],
+      ["node", "--version"],
+    ])
 
     await setConfig({ pi: { features: { mcp: false } } })
     const withoutMcp = await diagnose()
@@ -757,10 +871,10 @@ describe("which listed packages setup removes", () => {
   })
 })
 
-describe("the pinned Pi release", () => {
-  test("is the release bun.lock resolves for the Pi host", async () => {
+describe("the reproducible Pi test fixture", () => {
+  test("is the release bun.lock resolves before testing", async () => {
     const lock = await Bun.file(join(import.meta.dir, "../../../bun.lock")).text()
-    expect(lock).toContain(`"@earendil-works/pi-coding-agent@${PI_HOST_VERSION}"`)
+    expect(lock).toContain(`"@earendil-works/pi-coding-agent@${PI_TEST_HOST_VERSION}"`)
   })
 })
 
@@ -797,6 +911,98 @@ const piCommands = (shell: ReturnType<typeof fakeShell>) =>
 
 describe("holyagent setup, Pi packages", () => {
   const withPi = () => fakeShell({ commands: ["bun", "pi"] })
+
+  test("public apply checks the Pi host before changing settings or running an installer", async () => {
+    await mkdir(join(home, ".t3"), { recursive: true })
+    const prior = JSON.stringify({ theme: "dark", ...FULL() })
+    await write(globalSettings(), prior)
+    const shell = fakeShell({
+      commands: ["bun", "pi"],
+      piProbe: ({ stdin }) => (stdin === undefined ? undefined : { exitCode: 5 }),
+    })
+    const apply = (dryRun: boolean) =>
+      Effect.runPromise(
+        setup(
+          { HOME: home, ...IN_USE },
+          { cwd: project, target: "pi", dryRun, skipCtx7: true, subagentCacheTtl: "1h" },
+        ).pipe(Effect.provide(shell.layer)),
+      )
+    expect((await apply(true)).ok).toBe(true)
+    expect(shell.lines()).not.toContain("pi --version")
+    const report = await apply(false)
+    expect(report).toEqual({
+      ok: false,
+      lines: [
+        `! pi: ${PI_TEST_HOST_VERSION} at /fake/bin/pi did not complete the isolated RPC/extension capability check; ${PI_GUIDANCE}`,
+      ],
+    })
+    expect(shell.lines().some((line) => /^pi (install|remove) |^npm /.test(line))).toBe(false)
+    expect(await Bun.file(globalSettings()).text()).toBe(prior)
+    expect(await Bun.file(join(home, ".t3", "userdata", "settings.json")).exists()).toBe(false)
+  })
+
+  test("public apply uses the probed executable and does not probe when Pi is disabled", async () => {
+    await mkdir(join(home, ".t3"), { recursive: true })
+    await write(globalSettings(), { packages: [SOURCE] })
+    const apply = (shell: ReturnType<typeof fakeShell>) =>
+      Effect.runPromise(
+        setup(
+          { HOME: home, PATH: "./untrusted", ...IN_USE },
+          { cwd: project, target: "pi", dryRun: false, skipCtx7: true, subagentCacheTtl: "1h" },
+        ).pipe(Effect.provide(shell.layer)),
+      )
+    const supported = withPi()
+    expect((await apply(supported)).ok).toBe(true)
+    const packageCalls = supported.calls.filter(({ args }) => args[0] === "install")
+    expect(packageCalls.length).toBeGreaterThan(0)
+    expect(
+      packageCalls.every(({ command, cwd }) => command === "/fake/bin/pi" && cwd === home),
+    ).toBe(true)
+
+    await setConfig({ pi: { enable: false } })
+    const disabled = fakeShell({ commands: ["bun", "pi"], piProbe: () => ({ exitCode: 5 }) })
+    expect((await apply(disabled)).ok).toBe(true)
+    expect(disabled.calls.some(({ command }) => command === "pi" || command.endsWith("/pi"))).toBe(
+      false,
+    )
+  })
+
+  test("enabling Pi after preflight cannot invoke an unverified package installer", async () => {
+    await mkdir(join(home, ".t3"), { recursive: true })
+    await setConfig({ pi: { enable: false } })
+    const prior = JSON.stringify({ packages: [] })
+    await write(globalSettings(), prior)
+    const shell = fakeShell({
+      commands: ["bun", "pi"],
+      respond: (line) => {
+        if (line.includes(" add -g ctx7"))
+          writeFileSync(
+            join(home, ".holyagent", "config.json"),
+            JSON.stringify({ pi: { enable: true } }),
+          )
+        return undefined
+      },
+    })
+    const report = await Effect.runPromise(
+      setup(
+        { HOME: home, ...IN_USE },
+        {
+          cwd: project,
+          target: "pi",
+          dryRun: false,
+          skipCtx7: false,
+          subagentCacheTtl: "1h",
+        },
+      ).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(false)
+    expect(report.lines.join("\n")).toContain("Pi was enabled after setup started")
+    expect(shell.calls.some(({ command }) => command === "pi" || command.endsWith("/pi"))).toBe(
+      false,
+    )
+    expect(await Bun.file(globalSettings()).text()).toBe(prior)
+    expect(await Bun.file(join(home, ".t3", "userdata", "settings.json")).exists()).toBe(false)
+  })
 
   test("installs every enabled package the settings lack, in the home directory, and shows each command", async () => {
     await write(globalSettings(), { packages: [SOURCE] })

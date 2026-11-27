@@ -2,7 +2,7 @@
 
 **Status: the launcher (the 18 specialists as `@tintinweb/pi-subagents` package agents, with the extension glue) and the runtime changes under Pi ship in 0.3.0 ([Decision for 0.3.0](#decision-for-030), [The runtime under Pi](#the-runtime-under-pi)). The Pi fixtures and the contract and T3 replay tests are built and run in `mise run verify` ([CI and Windows](#ci-and-windows)). Decided and not built: the codemode settings, of which only `PI_CODEMODE_MAX_WORKERS` is applied (the extension sets it on the root; `holyagent setup` does not write `codemode.mode`) ([Codemode in 0.3.0](#codemode-in-030)). The sections after them are research on Pi's primitives and are not shipped behaviour.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Sourced facts carry a link. Everything marked "Inference:" is design reasoning, not Pi behaviour. The Claude Code and HolyAgent side of the mapping (dynamic workflows, Intents, Assignments, the 18 Role.task identities) comes from the task brief, not from Pi.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the original integration targeted 1.5.0; see [README.md](README.md#version-risk)). Sourced facts carry a link. Everything marked "Inference:" is design reasoning, not Pi behaviour. The Claude Code and HolyAgent side of the mapping (dynamic workflows, Intents, Assignments, the 18 Role.task identities) comes from the task brief, not from Pi.
 
 ## Decision for 0.3.0
 

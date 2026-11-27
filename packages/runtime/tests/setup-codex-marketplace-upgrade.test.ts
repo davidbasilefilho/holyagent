@@ -16,6 +16,7 @@ import {
   CODEX_STARTUP_MARKETPLACE,
   codexStartupConfig,
   codexStartupFiles,
+  StartupStageError,
 } from "../src/setup/codex/startup.ts"
 import { Shell, type ShellResult } from "../src/setup/shell.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
@@ -274,9 +275,23 @@ test.each(capabilityFailures)(
       await Bun.write(p.config, saved)
       const { fingerprint } = await p.apply({ dryRun: true })
       expect(p.shell.calls).toEqual([])
-      await expect(p.apply({ expectedPlan: fingerprint })).rejects.toMatchObject({
-        detail: expect.stringContaining("npm install -g @openai/codex@latest"),
-      })
+      const error = await p.apply({ expectedPlan: fingerprint }).then(
+        () => {
+          throw new Error("Expected the incompatible Codex CLI to be refused")
+        },
+        (failure: unknown) => failure,
+      )
+      if (!(error instanceof StartupStageError))
+        throw new Error("Expected a Codex setup diagnostic")
+      expect(error.detail).toContain(
+        "npm view @openai/codex@latest version --registry=https://registry.npmjs.org/",
+      )
+      expect(error.detail).toContain(
+        "Update through your existing installation channel only if the release is stable and newer",
+      )
+      expect(error.detail).not.toContain("npm install -g")
+      if (_scenario !== "an invalid CLI version banner")
+        expect(error.detail).toContain("Detected Codex 1.3.0.")
       expect(p.shell.calls.length).toBeGreaterThan(0)
       for (const call of p.shell.calls) expect(preflightLines).toContain(call.line)
       for (const call of p.shell.calls.filter(({ args }) => args.includes("--help"))) {

@@ -26,23 +26,20 @@ import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice, hasDisplay } from "./form.ts"
 import { fileOperation } from "./json-file.ts"
+import { probePiHost } from "./pi-host.ts"
 import { fail, hint, pass } from "./report.ts"
 import type { Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
 
-/**
- * The Pi release HolyAgent is built and tested against: the `@earendil-works/pi-coding-agent`
- * release in `bun.lock`, which the documented install command names. A test keeps the two equal, so
- * a `mise run deps:update` that moves Pi fails it until this moves too.
- */
-export const PI_HOST_VERSION = "1.5.0"
-
 /** The oldest Node.js release Pi runs on (the `engines` field of `@earendil-works/pi-coding-agent`). */
 export const PI_MINIMUM_NODE = "22.19.0"
 
-const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
+const PI_INSTALL = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest"
+const PI_LATEST =
+  "npm view @earendil-works/pi-coding-agent dist-tags.latest --registry=https://registry.npmjs.org"
 const NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`
-const PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`
+/** Shared manual guidance for setup and doctor; never overwrite an existing host. */
+export const PI_HOST_GUIDANCE = `use a compatible Pi on PATH. If Pi is missing, install with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer; https://pi.dev). For an existing install, run \`${PI_LATEST}\` and update through your original manager only if the compatible stable release is newer`
 const PACKAGE_COMMAND = `pi install npm:holyagent@${manifest.version}`
 
 /**
@@ -70,7 +67,6 @@ const compareReleases = (
   b: readonly [number, number, number],
 ): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
 
-const PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0]
 const MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0]
 
 /**
@@ -109,22 +105,12 @@ const checkVersioned = (
   })
 
 const checkPi = (env: Env) =>
-  checkVersioned(env, "pi", "pi", {
-    fix: PI_FIX,
-    judge: (release, shown, path) =>
-      compareReleases(release, PINNED_PI) < 0
-        ? {
-            ok: false,
-            detail: `${shown} at ${path} is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; ${PI_FIX}`,
-          }
-        : {
-            ok: true,
-            detail:
-              compareReleases(release, PINNED_PI) === 0
-                ? `${shown} (${path})`
-                : `${shown} (${path}; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`,
-          },
-  })
+  probePiHost(env).pipe(
+    Effect.match({
+      onSuccess: ({ version, path }) => pass("pi", `${version} (${path}; CLI and RPC compatible)`),
+      onFailure: ({ message }) => fail("pi", `${message}; ${PI_HOST_GUIDANCE}`),
+    }),
+  )
 
 const checkNode = (env: Env) =>
   checkVersioned(env, "node", "node", {
@@ -614,21 +600,20 @@ const checkCapabilities = (
   })
 
 /**
- * The Pi checks of `holyagent doctor`, one line each: `pi` on PATH at the release HolyAgent is
- * built against ({@link PI_HOST_VERSION}) or newer, `node` on PATH at {@link PI_MINIMUM_NODE} or
- * newer, `pi package`, the HolyAgent package in the `packages` of Pi's global settings (Pi's agent
- * folder, `PI_CODING_AGENT_DIR` honored), the base packages (provider, web kit) those settings do
- * not list at their pins, then the form in force and one line for each enabled capability: its
- * system needs and its packages at their pins, or why its form does not offer it
- * ({@link checkCapability}). Headless browser requirements follow the selected Pi surface. The form
- * is the `choice` (detected or named by `--form`; `normal` when the caller passes none). Scope
- * `project` and `local` also count the project's `.pi/settings.json` ({@link piPresenceFiles});
- * scope `user` does not. Every failing line ends with the command that fixes it, and nothing is
- * installed or written. The config is the one `setup` reads at the same scope
- * ({@link loadPiConfig}). The checks run only while Pi is in use ({@link piInUse}) and `pi.enable`
- * is on in that config; when Pi is not in use there is one informational `~` line saying so, with
- * `pi.enable` off there are no lines, and a config that cannot be loaded gives one failing `pi
- * config` line.
+ * The Pi checks of `holyagent doctor`, one line each: a compatible `pi` on PATH verified by an
+ * isolated offline CLI/RPC probe, `node` on PATH at {@link PI_MINIMUM_NODE} or newer, `pi package`,
+ * the HolyAgent package in the `packages` of Pi's global settings (Pi's agent folder,
+ * `PI_CODING_AGENT_DIR` honored), the base packages (provider, web kit) those settings do not list
+ * at their pins, then the form in force and one line for each enabled capability: its system needs
+ * and its packages at their pins, or why its form does not offer it ({@link checkCapability}).
+ * Headless browser requirements follow the selected Pi surface. The form is the `choice` (detected
+ * or named by `--form`; `normal` when the caller passes none). Scope `project` and `local` also
+ * count the project's `.pi/settings.json` ({@link piPresenceFiles}); scope `user` does not. Failing
+ * lines provide a fix. No software is installed and no existing profile is written. The config is
+ * the one `setup` reads at the same scope ({@link loadPiConfig}). The checks run only while Pi is
+ * in use ({@link piInUse}) and `pi.enable` is on in that config; when Pi is not in use there is one
+ * informational `~` line saying so, with `pi.enable` off there are no lines, and a config that
+ * cannot be loaded gives one failing `pi config` line.
  */
 export const piChecks = (
   env: Env,

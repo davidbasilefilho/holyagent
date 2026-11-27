@@ -13,10 +13,12 @@ import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice } from "./form.ts"
 import {
   type CapabilityChoices,
   loadPiConfig,
+  PI_HOST_GUIDANCE,
   piExecutionSurface,
   piInUse,
   usesStandaloneSearch,
 } from "./pi-check.ts"
+import { probePiHost } from "./pi-host.ts"
 import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
 import { reportSetupActivity, withSetupPhase } from "./progress.ts"
@@ -198,6 +200,7 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   const cloud = inCloudSession(env)
   const piUsed = includePi && !cloud && (yield* piInUse(env))
   const surface = piExecutionSurface(env, piOnly ? "t3" : undefined)
+  let verifiedPi: string | undefined
   if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed)
     if (blockers.length > 0)
@@ -210,6 +213,25 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
         ],
         ok: false,
       } satisfies Report
+    if (!options.dryRun) {
+      const config = yield* Effect.result(
+        loadPiConfig(env, piOptions.cwd, scope, choices, options.piProviders),
+      )
+      if (config._tag === "Failure")
+        return {
+          ok: false,
+          lines: [`! pi config: ${config.failure.message}`],
+        } satisfies Report
+      if (config.success.pi.enable) {
+        const host = yield* Effect.result(probePiHost(env))
+        if (host._tag === "Failure")
+          return {
+            ok: false,
+            lines: [`! pi: ${host.failure.message}; ${PI_HOST_GUIDANCE}`],
+          } satisfies Report
+        verifiedPi = host.success.path
+      }
+    }
   }
   // A failed capability write blocks the dependent phases. They remain in the plan but never
   // report progress as though they ran.
@@ -265,7 +287,26 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           ),
           phase(
             "Pi packages",
-            asStep("pi packages", installPiPackages(env, piOptions)),
+            asStep(
+              "pi packages",
+              installPiPackages(env, {
+                ...piOptions,
+                requireVerifiedPi: piOnly && !options.dryRun,
+                ...(verifiedPi === undefined ? {} : { verifiedPi }),
+              }),
+            ).pipe(
+              Effect.tap((lines) =>
+                Effect.sync(() => {
+                  if (
+                    piOnly &&
+                    !options.dryRun &&
+                    verifiedPi === undefined &&
+                    lines.some((line) => line.startsWith("! "))
+                  )
+                    piSteps = false
+                }),
+              ),
+            ),
             whenPiSaved,
           ),
           phase(

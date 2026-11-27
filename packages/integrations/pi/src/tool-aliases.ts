@@ -27,6 +27,8 @@ export const registerToolAliases = (
   isSupported: (target: ToolInfo) => boolean = isPinnedAliasTarget,
   hostVersion = VERSION,
 ): ReadonlyArray<string> => {
+  // Keep the existing 1.5 compatibility path. Newer Pi's codemode-only loadout
+  // advertises both names even when hiddenDeclarations hides the original's standalone declaration.
   if (hostVersion !== "1.5.0") return []
   const registered: Array<string> = []
   for (const [alias, original] of Object.entries(PI_TOOL_ALIASES)) {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdir, readdir } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
@@ -18,7 +18,7 @@ import type {
   SetupTuiModule,
   TuiInput,
 } from "../src/setup/tui/types.ts"
-import { scratch } from "./setup-fixture.ts"
+import { scratch, writePiProbeExecutable } from "./setup-fixture.ts"
 
 let home: string
 let t3Home: string
@@ -44,14 +44,19 @@ const DEFAULT_SWITCHES = Object.fromEntries(
 
 /** A machine with T3 Code, and an Android SDK unless `sdk` is false. */
 const machine = async (options: { sdk?: boolean; t3?: boolean } = {}) => {
-  if (options.t3 !== false) await mkdir(t3Home, { recursive: true })
+  if (options.t3 !== false) {
+    const bin = join(home, "bin")
+    await mkdir(bin, { recursive: true })
+    await writePiProbeExecutable(bin)
+    await mkdir(t3Home, { recursive: true })
+  }
   if (options.sdk !== false) await mkdir(androidSdk, { recursive: true })
 }
 
 const environment = (extra: Record<string, string> = {}) => ({
   HOME: home,
   CLAUDE_CONFIG_DIR: join(home, "claude"),
-  PATH: dirname(process.execPath),
+  PATH: [join(home, "bin"), dirname(process.execPath)].join(delimiter),
   HOLYAGENT_HOST: "pi",
   T3CODE_HOME: t3Home,
   ANDROID_HOME: androidSdk,
@@ -67,6 +72,8 @@ const cli = (
     terminal?: { stdin: boolean; stdout: boolean }
     setupTui?: SetupTuiLoader
     publicEntry?: boolean
+    /** Opt into the native Windows shell only for fixtures that actually apply the Pi setup. */
+    runPiProbe?: boolean
   } = {},
 ) =>
   Effect.runPromise(
@@ -76,7 +83,12 @@ const cli = (
         : ["setup", "--skip-ctx7", ...argv],
       {
         cwd: home,
-        env: environment(options.env),
+        env: environment({
+          ...(options.runPiProbe === true && process.env["SystemRoot"] !== undefined
+            ? { SystemRoot: process.env["SystemRoot"] }
+            : {}),
+          ...options.env,
+        }),
         stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
         ...(options.terminal === undefined ? {} : { terminal: options.terminal }),
         ...(options.setupTui === undefined ? {} : { setupTui: options.setupTui }),
@@ -265,6 +277,7 @@ describe("the public setup renderer", () => {
       terminal: TERMINAL,
       setupTui: shown.loader,
       publicEntry: true,
+      runPiProbe: true,
     })
     expect(result.code).toBe(0)
     expect((await Bun.file(config).json()).pi).toEqual({
@@ -327,6 +340,7 @@ describe("the public setup renderer", () => {
       terminal: TERMINAL,
       setupTui: shown.loader,
       publicEntry: true,
+      runPiProbe: true,
     })
     expect(result.code).toBe(0)
     expect((await Bun.file(config).json()).pi).toEqual({
@@ -412,6 +426,7 @@ describe("the public setup renderer", () => {
       terminal: TERMINAL,
       setupTui: shown.loader,
       publicEntry: true,
+      runPiProbe: true,
     })
     const piHarness = { index: 1, total: 2, label: "Pi / T3 Code" }
     const claudeHarness = { index: 2, total: 2, label: "Claude Code" }
@@ -543,6 +558,7 @@ describe("the public setup renderer", () => {
       terminal: TERMINAL,
       setupTui: shown.loader,
       publicEntry: true,
+      runPiProbe: true,
     })
     expect(shown.loaded()).toBe(0)
     expect(result.code).toBe(0)

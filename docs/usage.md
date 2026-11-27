@@ -16,10 +16,10 @@ The root checks small, low-risk requests directly. It uses Assignments for work 
 
 ## Install
 
-T3 Code is the only supported user-facing interface. The supported workflow uses T3 Code's Pi provider. Pi's command line below installs and configures the backend; start your HolyAgent work in T3 Code, not in a standalone Pi session.
+T3 Code is the supported user-facing interface for the Pi integration. Pi's command line below installs and configures the backend; start your HolyAgent work in T3 Code, not in a standalone Pi session. Native Codex has a separate setup and startup path described below.
 
 1. Install and open [T3 Code](https://github.com/pingdotgg/t3code) once so it creates its settings directory. Install [Bun](https://bun.sh), Node.js 22.19 or newer, Git and an authenticated GitHub CLI (`gh`). On Windows install Git for Windows with Git Bash. See [requirements](requirements.md).
-2. Keep a compatible Pi already on `PATH`. If Pi is missing, install the tested backend with `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`. Install the HolyAgent package at user scope. Replace `<version>` with the published version you want. Use the [0.3.4 quickstart](https://github.com/davidbasilefilho/holyagent/blob/holyagent-0.3.4/docs/usage.md#install) for that release. [npm versions](https://www.npmjs.com/package/holyagent?activeTab=versions) · [GitHub releases](https://github.com/davidbasilefilho/holyagent/releases)
+2. Keep a compatible Pi on `PATH`. If it is missing, use the [official Pi installer](https://docs.pi.dev/latest/quickstart) or run `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest`. Use your original installation method to update an incompatible Pi, and compare versions first so you do not downgrade. Install the HolyAgent package at user scope. Replace `<version>` with the published version you want. Use the [0.3.4 quickstart](https://github.com/davidbasilefilho/holyagent/blob/holyagent-0.3.4/docs/usage.md#install) for that release. [npm versions](https://www.npmjs.com/package/holyagent?activeTab=versions) · [GitHub releases](https://github.com/davidbasilefilho/holyagent/releases)
 
    ```sh
    npm install -g holyagent@<version>
