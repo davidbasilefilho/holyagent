@@ -51,6 +51,17 @@ const probe = async (directory: string, onNativeVersion?: () => void) => {
         onNativeVersion?.()
         return { stdout: "codex-cli 0.172.0\n" }
       }
+      if (line === "codex plugin marketplace add --help")
+        return {
+          stdout: "Usage: codex plugin marketplace add [OPTIONS] <SOURCE>\n\n      --json\n",
+        }
+      if (line === "codex plugin add --help")
+        return { stdout: "Usage: codex plugin add [OPTIONS] <PLUGIN>\n\n      --json\n" }
+      if (line === "codex plugin list --help")
+        return {
+          stdout:
+            "Usage: codex plugin list [OPTIONS]\n\n      --marketplace <NAME>\n      --json\n",
+        }
       if (line.startsWith("codex plugin list"))
         return {
           stdout: JSON.stringify({

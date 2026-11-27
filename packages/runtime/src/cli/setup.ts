@@ -160,7 +160,8 @@ const codexCommand: Command = {
   output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
   notes: [
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
-    "Apply requires the verified Codex 0.172.0 runtime on PATH. Preview does not. Setup never changes a running session.",
+    "Apply verifies the native marketplace and plugin commands in your installed Codex CLI. Preview does not require Codex. Setup never installs or updates Codex itself and never changes a running session.",
+    "If the CLI is missing or incompatible, choose whether to install its stable release with npm install -g @openai/codex@latest, then rerun setup.",
     "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
     "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
