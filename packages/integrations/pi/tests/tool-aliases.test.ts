@@ -66,21 +66,23 @@ const host = (initial: ToolInfo[], active: string[], allowed: () => boolean = ()
   return { definitions, tools, active }
 }
 
-test("unknown Pi host versions leave original names untouched", () => {
+test("Pi versions without verified alias compatibility leave original names untouched", () => {
   const registered: string[] = []
   const pi = {
     getAllTools: () => [info("Agent")],
     getActiveTools: () => ["Agent"],
     registerTool: (tool: ToolDefinition) => registered.push(tool.name),
   } as unknown as ExtensionAPI
-  expect(
-    registerToolAliases(
-      pi,
-      () => true,
-      () => true,
-      "unknown",
-    ),
-  ).toEqual([])
+  for (const version of ["1.6.1", "1.7.0", "unknown"]) {
+    expect(
+      registerToolAliases(
+        pi,
+        () => true,
+        () => true,
+        version,
+      ),
+    ).toEqual([])
+  }
   expect(registered).toEqual([])
 })
 
@@ -153,6 +155,21 @@ test("a previously registered alias refuses calls after the integration is disab
   )
   expect(result.isError).toBe(true)
   expect(JSON.stringify(result.content)).toContain("disabled or unavailable")
+})
+
+test("an alias refuses a new schema even at the same pinned target and path", async () => {
+  const original = info("Agent")
+  const { definitions, tools } = host([original], ["Agent"])
+  tools[0] = { ...original, parameters: Type.Object({ message: Type.Number() }) }
+  const result = await definitions[0]!.execute(
+    "1",
+    { message: "x" },
+    undefined,
+    undefined,
+    {} as ExtensionToolContext,
+  )
+  expect(result.isError).toBe(true)
+  expect(JSON.stringify(result.content)).toContain("no longer callable with its registered schema")
 })
 
 test("canonical gates apply to aliases and originals", async () => {
@@ -275,7 +292,15 @@ test("Pi SDK runs the alias and nested original through independent tool hooks",
       if (event.type === "tool_execution_update") updates.push(JSON.stringify(event.partialResult))
     })
     let count = 0
-    session.agent.streamFunction = () => {
+    const declared: string[][] = []
+    session.agent.streamFunction = (_model, context) => {
+      const names = new Set<string>()
+      for (const message of context.messages) {
+        if (message.role !== "system") continue
+        for (const tool of message.toolsRemoved ?? []) names.delete(tool.name)
+        for (const tool of message.toolsAdded ?? []) names.add(tool.name)
+      }
+      declared.push([...names])
       const stream = createAssistantMessageEventStream()
       const first = count++ === 0
       const message: AssistantMessage = {
@@ -311,6 +336,10 @@ test("Pi SDK runs the alias and nested original through independent tool hooks",
       return stream
     }
     await session.prompt("start")
+    expect(declared.length).toBeGreaterThan(0)
+    for (const names of declared) {
+      expect(names.filter((name) => name === "agent" || name === "Agent")).toEqual(["agent"])
+    }
     expect(hooks).toEqual(
       deny === "schema"
         ? []

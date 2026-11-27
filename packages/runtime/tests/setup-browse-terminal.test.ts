@@ -25,7 +25,7 @@ import {
 } from "../src/setup/browse.ts"
 import type { Env } from "../src/setup/environment.ts"
 import { SetupFailure } from "../src/setup/errors.ts"
-import { fakeShell, scratch } from "./setup-fixture.ts"
+import { fakeShell, scratch, writePiProbeExecutable } from "./setup-fixture.ts"
 
 const mode: BrowseTerminalMode = {
   terminal: { stdin: true, stdout: true },
@@ -650,7 +650,7 @@ test.skipIf(!shouldRunLinux)(
     await mkdir(join(directory, ".t3"), { recursive: true })
     const config = join(directory, ".holyagent", "config.json")
     await json(config, { pi: { providers: ["openai-codex"], features: { browserUse: false } } })
-    await program(executable("pi"), '#!/bin/sh\n[ "$1" != "--version" ] || echo 1.5.0\n')
+    await writePiProbeExecutable(dirname(executable("pi")))
     await program(executable("node"), "#!/bin/sh\necho v26.13.1\n")
     await program(executable("npx"), "#!/bin/sh\nexit 93\n")
     const setup = (...flags: ReadonlyArray<string>) =>

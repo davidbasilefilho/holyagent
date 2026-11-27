@@ -4,9 +4,13 @@ import { join } from "node:path"
 
 import { Effect, Layer, Option } from "effect"
 
+import { PiProbeTransport, type PiProbeRequest } from "../../core/src/setup/pi-host.ts"
 import { applyDefaults } from "../src/setup/json-file.ts"
 import { userSettingsDefaults } from "../src/setup/settings.ts"
 import { Shell, type ShellResult } from "../src/setup/shell.ts"
+
+/** The reproducible Pi host in bun.lock. This is not a production compatibility requirement. */
+export const PI_TEST_HOST_VERSION = "1.5.0"
 
 /** The file name a program has in a bin directory: Windows finds programs by extension. */
 export const programName = (name: string): string =>
@@ -65,6 +69,87 @@ export interface Ran {
   readonly env?: Readonly<Record<string, string | undefined>>
 }
 
+/** A successful CLI/RPC reply for a fixture whose host is not the subject under test. */
+export const fixturePiProbe = ({ args, stdin }: PiProbeRequest): ShellResult => ({
+  exitCode: 0,
+  stderr: "",
+  stdout:
+    args[0] === "--version"
+      ? PI_TEST_HOST_VERSION
+      : args[0] === "--help"
+        ? "pi install <source> [-l]\npi remove <source> [-l]\n--mode --extension --offline --no-session --no-extensions --no-approve --no-skills"
+        : stdin === undefined
+          ? ""
+          : [
+              {
+                id: "ha-state",
+                type: "response",
+                command: "get_state",
+                success: true,
+                data: { sessionId: "fixture", isStreaming: false },
+              },
+              {
+                id: "ha-commands",
+                type: "response",
+                command: "get_commands",
+                success: true,
+                data: { commands: [{ name: "holyagent-compatibility-probe" }] },
+              },
+            ]
+              .map((response) => JSON.stringify(response))
+              .join("\n"),
+})
+
+/** A fake executable for tests using the real public setup process transport. */
+export const writePiProbeExecutable = async (bin: string) => {
+  const result = (args: ReadonlyArray<string>, stdin?: string) =>
+    fixturePiProbe({
+      executable: "pi",
+      args,
+      cwd: bin,
+      env: {},
+      ...(stdin === undefined ? {} : { stdin }),
+    }).stdout
+  const version = result(["--version"])
+  const help = result(["--help"])
+  const rpc = result(["--mode"], "request")
+  const script =
+    process.platform === "win32"
+      ? [
+          "@echo off",
+          'if "%~1"=="--version" goto version',
+          'if "%~1"=="--help" goto help',
+          'if "%~1"=="--mode" goto rpc',
+          "exit /b 0",
+          ":version",
+          "echo " + version,
+          "exit /b 0",
+          ":help",
+          ...help
+            .replaceAll("<source>", "source")
+            .split("\n")
+            .map((line) => "echo " + line),
+          "exit /b 0",
+          ":rpc",
+          ...rpc.split("\n").map((line) => "echo " + line),
+          "exit /b 0",
+        ].join("\r\n")
+      : '#!/bin/sh\ncase "$1" in\n' +
+        "--version) printf '%s\\n' '" +
+        version +
+        "' ;;\n" +
+        "--help) printf '%s\\n' '" +
+        help +
+        "' ;;\n" +
+        "--mode) printf '%s\\n' '" +
+        rpc +
+        "' ;;\nesac\n"
+  await mkdir(bin, { recursive: true })
+  await writeFile(join(bin, process.platform === "win32" ? "pi.cmd" : "pi"), script, {
+    mode: 0o755,
+  })
+}
+
 const packageCommands: Readonly<Record<string, string>> = { ctx7: "ctx7" }
 
 /**
@@ -77,11 +162,13 @@ export const fakeShell = (options: {
   /** Commands found only in Bun's global bin directory, not on PATH. */
   readonly bunBinCommands?: ReadonlyArray<string>
   readonly respond?: (line: string) => Partial<ShellResult> | undefined
+  /** Override one isolated Pi compatibility subprocess independently of other shell commands. */
+  readonly piProbe?: (request: PiProbeRequest) => Partial<ShellResult> | undefined
 }) => {
   const available = new Set(options.commands)
   const inBunBin = new Set(options.bunBinCommands ?? [])
   const calls: Array<Ran> = []
-  const layer = Layer.succeed(
+  const shell = Layer.succeed(
     Shell,
     Shell.of({
       which: (command, whichOptions) =>
@@ -111,6 +198,23 @@ export const fakeShell = (options: {
         }),
     }),
   )
+  const probe = Layer.succeed(
+    PiProbeTransport,
+    PiProbeTransport.of({
+      run: (request) =>
+        Effect.sync(() => {
+          const { args, cwd, env } = request
+          const line = ["pi", ...args].join(" ")
+          calls.push({ command: "pi", args, cwd, env, line })
+          return {
+            ...fixturePiProbe(request),
+            ...options.respond?.(line),
+            ...options.piProbe?.(request),
+          }
+        }),
+    }),
+  )
+  const layer = Layer.merge(shell, probe)
   return { layer, calls, lines: () => calls.map((call) => call.line) }
 }
 
