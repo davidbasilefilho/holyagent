@@ -345,6 +345,11 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         const form = yield* formOf(args, env, usage)
         const skipBrowse = booleanFlag(args, "no-open-browse")
         const browseBrowser = stringFlag(args, "browse-browser")
+        if (skipBrowse && !booleanFlag(args, "no-tui"))
+          return yield* new Usage({
+            message: "--no-open-browse requires --no-tui",
+            hint: `Usage: holyagent ${usage}`,
+          })
         if (skipBrowse && (booleanFlag(args, "open-browse") || browseBrowser !== undefined))
           return yield* new Usage({
             message: "--no-open-browse cannot be combined with --open-browse or --browse-browser",

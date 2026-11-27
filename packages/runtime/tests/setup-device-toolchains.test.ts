@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test"
 import { constants, type Stats } from "node:fs"
-import { posix, win32 } from "node:path"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join, posix, win32 } from "node:path"
 
 import { Effect, Layer, Option } from "effect"
 
@@ -73,7 +75,8 @@ const fixture = (options: Options = {}) => {
     }
   }
   const status = (name: string): Stats => {
-    const file = files.get(path.normalize(name))
+    const normalized = path.normalize(name)
+    const file = normalized === project || normalized === home ? null : files.get(normalized)
     if (file === undefined) throw Object.assign(new Error("fixture not found"), { code: "ENOENT" })
     return {
       isDirectory: () => file === null,
@@ -85,6 +88,11 @@ const fixture = (options: Options = {}) => {
     FileSystem,
     FileSystem.of({
       ...nodeFileSystem,
+      lstatSync: ((file: string) => status(file)) as typeof nodeFileSystem.lstatSync,
+      realpathSync: ((file: string) => {
+        status(file)
+        return path.normalize(file)
+      }) as typeof nodeFileSystem.realpathSync,
       stat: (async (file: string) => status(file)) as typeof nodeFileSystem.stat,
       lstat: (async (file: string) => status(file)) as typeof nodeFileSystem.lstat,
       realpath: (async (file: string) => {
@@ -362,6 +370,72 @@ test("an incomplete existing SDK package is not sent to the installer for an upd
   )
   expect(local.calls).toEqual([])
 })
+
+test("a package appearing during the official CLI probe is preserved without running install", async () => {
+  const local = fixture({
+    respond: (tool, args) => {
+      if (tool === local.cli && args.includes("-h"))
+        local.write(posix.join(local.root, "emulator", "already-present.xml"))
+      return undefined
+    },
+  })
+  local.license()
+  local.write(local.adb)
+  local.write(local.cli)
+  expect((await local.run("apply")).lines.join(" ")).toContain("SDK packages changed during setup")
+  expect(local.calls.map(({ args }) => args)).toEqual([["--no-metrics", "-h"]])
+})
+
+test.skipIf(!["linux", "win32"].includes(process.platform) || process.arch !== "x64")(
+  "a project's SDK is not trusted from subdirectories, junctions or aliases",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent-device-checkout-"))
+    try {
+      const home = join(root, "profile")
+      const checkout = join(root, "checkout")
+      const gitDir = join(checkout, ".git")
+      const sdk = join(checkout, "toolchains", "android-sdk")
+      const nested = join(checkout, "frontend", "src")
+      for (const directory of [gitDir, sdk, nested, home])
+        await mkdir(directory, { recursive: true })
+      await writeFile(join(gitDir, "HEAD"), "ref: refs/heads/dev\n")
+      const cwdAlias = join(root, "checkout-link")
+      const sdkAlias = join(root, "sdk-link")
+      await symlink(checkout, cwdAlias, "junction")
+      await symlink(sdk, sdkAlias, "junction")
+      const calls: Array<string> = []
+      const shell = Shell.of({
+        which: () => Effect.succeed(Option.none()),
+        run: (program) =>
+          Effect.sync(() => {
+            calls.push(program)
+            return bad()
+          }),
+      })
+      for (const [cwd, configured] of [
+        [nested, sdk],
+        [join(cwdAlias, "frontend", "src"), sdk],
+        [nested, sdkAlias],
+      ] as const) {
+        const result = await Effect.runPromise(
+          deviceToolchains(
+            {
+              HOME: home,
+              USERPROFILE: home,
+              ANDROID_HOME: configured,
+              DISPLAY: ":0",
+            },
+            { mode: "apply", cwd },
+          ).pipe(Effect.provideService(Shell, shell)),
+        )
+        expect(result.lines.join(" ")).toContain("no existing SDK verified")
+      }
+      expect(calls).toEqual([])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+)
 
 test("a named but incomplete AVD and a numeric acceleration failure are not ready", async () => {
   const local = fixture({

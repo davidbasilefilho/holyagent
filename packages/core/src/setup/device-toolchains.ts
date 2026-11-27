@@ -9,7 +9,7 @@ import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { localGraphicalHostUnavailable } from "./form.ts"
 import { reportSetupActivity } from "./progress.ts"
 import { added, hint, present } from "./report.ts"
-import { Shell } from "./shell.ts"
+import { Shell, toolPathExclusions } from "./shell.ts"
 
 /** The caller chooses preview before consent, inspect for doctor, or apply for opted-in setup. */
 export interface DeviceToolchainOptions {
@@ -85,13 +85,19 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
   const shell = yield* Shell
   const cwd = options.cwd ?? process.cwd()
   const home = homeDirectory(env)
+  const excluded = toolPathExclusions(path, cwd, { includeCheckout: true, home }, fs)
+  if (excluded === undefined)
+    return report([
+      hint(
+        "Device Simulator: could not verify checkout and home paths; no toolchain commands were started",
+      ),
+    ])
   const absolute = (candidate: string) =>
     path.isAbsolute(candidate) &&
     !/\p{Cc}/u.test(candidate) &&
     (!windows || /^[a-z]:[\\/]/i.test(candidate))
   const trusted = (candidate: string) =>
-    absolute(candidate) &&
-    (!path.isAbsolute(cwd) || path.relative(home, cwd) === "" || !inside(path, cwd, candidate))
+    absolute(candidate) && excluded.every((root) => !inside(path, root, candidate))
   const secure = (candidate: string, root?: string) =>
     trusted(candidate)
       ? Effect.tryPromise(() => fs.realpath(candidate)).pipe(
@@ -403,9 +409,23 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
             : yield* run(officialCli, ["--no-metrics", "-h"])
         let installing = false
         const install = (command: string, args: ReadonlyArray<string>, childEnv: Env) =>
-          reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`).pipe(
-            Effect.andThen(run(command, args, childEnv, 600_000)),
-          )
+          Effect.gen(function* () {
+            if (
+              !(yield* Effect.forEach(missing, (name) => absent(path.join(root, name)))).every(
+                Boolean,
+              )
+            ) {
+              lines.push(
+                failure(
+                  "Android: SDK packages changed during setup; kept them unchanged, rerun setup to verify them",
+                ),
+              )
+              return Option.none()
+            }
+            installing = true
+            yield* reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`)
+            return yield* run(command, args, childEnv, 600_000)
+          })
         let result: Option.Option<{
           readonly exitCode: number
           readonly stdout: string
@@ -417,7 +437,6 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
           verified.value.exitCode === 0 &&
           /\bandroid cli\b/i.test(verified.value.stdout + verified.value.stderr)
         ) {
-          installing = true
           result = yield* install(
             officialCli,
             ["--no-metrics", `--sdk=${root}`, "sdk", "install", ...missing],
@@ -428,7 +447,11 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
           const java =
             javaHome === undefined
               ? yield* shell.which("java", {
-                  strict: { cwd, platform: windows ? "win32" : mac ? "darwin" : "linux" },
+                  strict: {
+                    cwd,
+                    excludeCheckout: true,
+                    platform: windows ? "win32" : mac ? "darwin" : "linux",
+                  },
                 })
               : (yield* program(path.join(javaHome, "bin", executable("java"))))
                 ? Option.some(path.join(javaHome, "bin", executable("java")))
@@ -468,7 +491,6 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
               )
               const invocation = cmdExeArguments(sdkmanager, args)
               if (invocation.ok && (yield* program(cmd))) {
-                installing = true
                 result = yield* install(cmd, invocation.args, javaEnv)
               } else
                 lines.push(
@@ -477,7 +499,6 @@ export const deviceToolchains = Effect.fn("deviceToolchains")(function* (
                   ),
                 )
             } else {
-              installing = true
               result = yield* install(sdkmanager, args, javaEnv)
             }
           }

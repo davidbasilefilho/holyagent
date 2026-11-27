@@ -9101,6 +9101,12 @@ var nodeFileSystem = {
   get readdirSync() {
     return sync3.readdirSync;
   },
+  get lstatSync() {
+    return sync3.lstatSync;
+  },
+  get realpathSync() {
+    return sync3.realpathSync;
+  },
   get statSync() {
     return sync3.statSync;
   }
@@ -14548,7 +14554,7 @@ var userFiles = (env) => {
   };
 };
 
-import { constants as constants4, lstatSync, realpathSync } from "node:fs";
+import { constants as constants4, realpathSync as realpathSync2 } from "node:fs";
 import { delimiter, dirname as dirname7, isAbsolute as isAbsolute7, join as join13, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14607,14 +14613,14 @@ var isInside = (api, parent, path) => {
   const relative = api.relative(parent, path);
   return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
 };
-var checkoutAncestors = (api, cwd) => {
+var checkoutAncestors = (api, cwd, fs) => {
   const roots = [];
   for (let dir = cwd;; dir = api.dirname(dir)) {
     try {
       const path = api.join(dir, ".git");
-      const marker = lstatSync(path);
+      const marker = fs.lstatSync(path);
       if (marker.isDirectory()) {
-        const head = lstatSync(api.join(path, "HEAD"));
+        const head = fs.lstatSync(api.join(path, "HEAD"));
         if (head.isFile() || head.isSymbolicLink())
           roots.push(dir);
       } else if (marker.isFile() && marker.size > 0 || marker.isSymbolicLink()) {
@@ -14628,28 +14634,38 @@ var checkoutAncestors = (api, cwd) => {
       return roots;
   }
 };
+var toolPathExclusions = (api, cwd, options = {}, fs = nodeFileSystem) => {
+  if (!api.isAbsolute(cwd))
+    return;
+  try {
+    const physical = fs.realpathSync(cwd);
+    const roots = new Set([cwd, physical]);
+    if (options.includeCheckout) {
+      for (const root of [
+        ...checkoutAncestors(api, cwd, fs),
+        ...checkoutAncestors(api, physical, fs)
+      ]) {
+        roots.add(root);
+        roots.add(fs.realpathSync(root));
+      }
+    }
+    if (options.home === undefined)
+      return [...roots];
+    const home = options.home;
+    const physicalHome = fs.realpathSync(home);
+    return [...roots].filter((dir) => api.relative(home, dir) !== "" && api.relative(physicalHome, dir) !== "");
+  } catch {
+    return;
+  }
+};
 var strictWhich = (command, path, strict, lookup = which) => {
   const windows = (strict.platform ?? process.platform) === "win32";
   const api = windows ? win32 : posix;
   if (!api.isAbsolute(strict.cwd))
     return null;
-  const excluded = [strict.cwd];
-  if (strict.which === undefined) {
-    try {
-      const physical = realpathSync(strict.cwd);
-      excluded.push(physical);
-      if (strict.excludeCheckout) {
-        const roots = new Set([
-          ...checkoutAncestors(api, strict.cwd),
-          ...checkoutAncestors(api, physical)
-        ]);
-        for (const root of roots)
-          excluded.push(root, realpathSync(root));
-      }
-    } catch {
-      return null;
-    }
-  }
+  const excluded = strict.which === undefined ? toolPathExclusions(api, strict.cwd, { includeCheckout: strict.excludeCheckout === true }) : [strict.cwd];
+  if (excluded === undefined)
+    return null;
   const excludedPath = (candidate) => excluded.some((root) => isInside(api, root, candidate));
   const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !excludedPath(entry));
   if (trusted.length === 0)
@@ -14661,7 +14677,7 @@ var strictWhich = (command, path, strict, lookup = which) => {
       return false;
     if (strict.which === undefined) {
       try {
-        if (excludedPath(realpathSync(found)))
+        if (excludedPath(realpathSync2(found)))
           return false;
       } catch {
         return false;
@@ -16481,8 +16497,13 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
   const shell = yield* Shell;
   const cwd = options.cwd ?? process.cwd();
   const home = homeDirectory2(env);
+  const excluded = toolPathExclusions(path, cwd, { includeCheckout: true, home }, fs);
+  if (excluded === undefined)
+    return report([
+      hint("Device Simulator: could not verify checkout and home paths; no toolchain commands were started")
+    ]);
   const absolute = (candidate) => path.isAbsolute(candidate) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(candidate));
-  const trusted = (candidate) => absolute(candidate) && (!path.isAbsolute(cwd) || path.relative(home, cwd) === "" || !inside(path, cwd, candidate));
+  const trusted = (candidate) => absolute(candidate) && excluded.every((root) => !inside(path, root, candidate));
   const secure = (candidate, root) => trusted(candidate) ? tryPromise2(() => fs.realpath(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved))), orElseSucceed2(() => false)) : succeed6(false);
   const isDirectory = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isDirectory()), orElseSucceed2(() => false));
   const absent = (candidate) => tryPromise2(() => fs.lstat(candidate)).pipe(match4({
@@ -16627,15 +16648,26 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
       } else {
         const verified = officialCli === undefined ? none2() : yield* run(officialCli, ["--no-metrics", "-h"]);
         let installing = false;
-        const install = (command, args, childEnv) => reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`).pipe(andThen2(run(command, args, childEnv, 600000)));
+        const install = (command, args, childEnv) => gen2(function* () {
+          if (!(yield* forEach2(missing, (name) => absent(path.join(root, name)))).every(Boolean)) {
+            lines.push(failure("Android: SDK packages changed during setup; kept them unchanged, rerun setup to verify them"));
+            return none2();
+          }
+          installing = true;
+          yield* reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`);
+          return yield* run(command, args, childEnv, 600000);
+        });
         let result = none2();
         if (officialCli !== undefined && isSome2(verified) && verified.value.exitCode === 0 && /\bandroid cli\b/i.test(verified.value.stdout + verified.value.stderr)) {
-          installing = true;
           result = yield* install(officialCli, ["--no-metrics", `--sdk=${root}`, "sdk", "install", ...missing], androidEnv);
         } else if (sdkmanager !== undefined) {
           const javaHome = firstNonEmpty2(env["JAVA_HOME"]);
           const java = javaHome === undefined ? yield* shell.which("java", {
-            strict: { cwd, platform: windows ? "win32" : mac ? "darwin" : "linux" }
+            strict: {
+              cwd,
+              excludeCheckout: true,
+              platform: windows ? "win32" : mac ? "darwin" : "linux"
+            }
           }) : (yield* program(path.join(javaHome, "bin", executable("java")))) ? some2(path.join(javaHome, "bin", executable("java"))) : none2();
           const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* tryPromise2(() => fs.realpath(java.value)).pipe(orElseSucceed2(() => "")) : "";
           if (!absolute(resolvedJava) || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
@@ -16654,12 +16686,10 @@ var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
               const cmd = path.join(firstNonEmpty2(env["SystemRoot"], env["WINDIR"]) ?? "C:\\Windows", "System32", "cmd.exe");
               const invocation = cmdExeArguments(sdkmanager, args);
               if (invocation.ok && (yield* program(cmd))) {
-                installing = true;
                 result = yield* install(cmd, invocation.args, javaEnv);
               } else
                 lines.push(failure("Android: the sdkmanager batch command could not be started safely; use Android Studio's SDK Manager"));
             } else {
-              installing = true;
               result = yield* install(sdkmanager, args, javaEnv);
             }
           }
@@ -29302,7 +29332,7 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
   }))))));
   return { changes, summary: summarise(changes) };
 });
-import { lstatSync as lstatSync2, realpathSync as realpathSync2 } from "node:fs";
+import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { posix as posix5, win32 as win325 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -29734,7 +29764,7 @@ var throughLinks = (path, host) => {
   const tail = [];
   let current = path;
   for (;; ) {
-    const real = probe(() => realpathSync2(current));
+    const real = probe(() => realpathSync3(current));
     if (real.found)
       return paths.join(real.value, ...tail);
     if (real.code !== "ENOENT")

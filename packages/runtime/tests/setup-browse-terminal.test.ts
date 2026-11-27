@@ -262,6 +262,10 @@ test("public Pi alone accepts the new flags and requires explicit terminal Brows
   expect(await pa(["setup", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "claude", "--open-browse"])).toMatchObject({ code: 2 })
   expect(await pa(["setup", "claude", "--no-open-browse"])).toMatchObject({ code: 2 })
+  expect(await pa(["setup", "pi", "--no-open-browse"])).toMatchObject({
+    code: 2,
+    stderr: expect.stringContaining("--no-open-browse requires --no-tui"),
+  })
   const skipped = ["setup", "pi", "--no-tui", "--browser-use", "on", "--no-open-browse"]
   for (const flag of [["--open-browse"], ["--browse-browser", "chrome"]]) {
     expect(await pa([...skipped, ...flag])).toMatchObject({
