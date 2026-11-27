@@ -19,6 +19,12 @@ const RegistryVersion = open({
 })
 const RegistryError = open({ error: open({ code: Schema.Literal("E404") }) })
 const GitObject = open({ object: open({ type: Schema.String, sha: Schema.String }) })
+const DevHead = open({
+  name: Schema.Literal("dev"),
+  protected: Schema.Literal(true),
+  commit: open({ sha: Schema.String }),
+})
+const DevTag = open({ dev: Schema.String })
 
 /** A publication cannot safely proceed. */
 export class PublishError extends Data.TaggedError("PublishError")<{ readonly detail: string }> {}
@@ -126,6 +132,78 @@ export const preflightTag = (
     }
   })
 
+const currentProtectedDev = (
+  context: TagContext,
+  request: (url: string, init: RequestInit) => Promise<Response>,
+) =>
+  Effect.tryPromise({
+    try: async (): Promise<unknown> => {
+      const response = await request(
+        `https://api.github.com/repos/${context.repository}/branches/dev`,
+        {
+          headers: {
+            Authorization: `Bearer ${context.token}`,
+            Accept: "application/vnd.github+json",
+          },
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+        },
+      )
+      if (!response.ok) throw new Error("Branch lookup failed")
+      return response.json()
+    },
+    catch: () => new PublishError({ detail: "Could not confirm the current protected dev head" }),
+  }).pipe(
+    Effect.flatMap((input) => decode(DevHead, input)),
+    Effect.flatMap(({ commit }) =>
+      commit.sha === context.commit
+        ? Effect.void
+        : Effect.fail(
+            new PublishError({
+              detail: "The dev head moved; this build may not set the dev channel",
+            }),
+          ),
+    ),
+  )
+
+const checkDevReadback = (
+  name: string,
+  version: string,
+  request: (url: string, init: RequestInit) => Promise<Response>,
+) =>
+  Effect.tryPromise({
+    try: async (): Promise<unknown> => {
+      const response = await request(
+        `https://registry.npmjs.org/-/package/${encodeURIComponent(name)}/dist-tags`,
+        {
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+        },
+      )
+      if (!response.ok) throw new Error("Dist-tag lookup failed")
+      return response.json()
+    },
+    catch: () =>
+      new PublishError({
+        detail:
+          "npm publish returned success but dev channel readback failed; inspect registry state before any retry",
+      }),
+  }).pipe(
+    Effect.flatMap((input) => decode(DevTag, input)),
+    Effect.flatMap(({ dev }) =>
+      dev === version
+        ? Effect.void
+        : Effect.fail(
+            new PublishError({
+              detail:
+                "npm publish returned success but dev resolves to a different version; inspect registry state before any retry",
+            }),
+          ),
+    ),
+  )
+
 /** Publishes a fresh packed artifact after checking the intended GitHub tag. */
 export const publishArtifact = (
   path: string,
@@ -165,11 +243,23 @@ export const publishArtifact = (
         return yield* new PublishError({
           detail: `Registry lookup failed: ${lookup.stderr || lookup.stdout}`,
         })
-      const published = yield* run(["publish", path, "--tag", tag, "--provenance"])
+      if (tag === "dev") yield* currentProtectedDev(context, request)
+      const published = yield* run([
+        "publish",
+        path,
+        "--tag",
+        tag,
+        "--provenance",
+        ...(tag === "dev" ? ["--ignore-scripts"] : []),
+      ])
       if (published.exitCode !== 0)
         return yield* new PublishError({
           detail: `npm publish failed: ${published.stderr || published.stdout}`,
         })
+      if (tag === "dev") {
+        yield* checkDevReadback(manifest.name, manifest.version, request)
+        yield* currentProtectedDev(context, request)
+      }
       return
     }
     yield* decode(Schema.fromJsonString(RegistryVersion), lookup.stdout)
