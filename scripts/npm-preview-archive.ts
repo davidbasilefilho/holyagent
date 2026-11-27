@@ -180,6 +180,27 @@ const header = (path: string, size: number, executable: boolean) => {
   return h
 }
 
+const readBlobs = (data: Buffer, entries: readonly PreviewTreeEntry[]) => {
+  let offset = 0
+  const contents = entries.map((entry) => {
+    const expected = Buffer.from(`${entry.oid} blob ${entry.size}`, "ascii")
+    const limit = offset + expected.byteLength
+    const end = limit + 1 + entry.size
+    if (
+      end >= data.length ||
+      !data.subarray(offset, limit).equals(expected) ||
+      data[limit] !== 10 ||
+      data[end] !== 10
+    )
+      throw refused("The Git blob batch did not match the approved tree")
+    const blob = data.subarray(limit + 1, end)
+    offset = end + 1
+    return blob
+  })
+  if (offset !== data.length) throw refused("Unexpected data followed the approved Git blobs")
+  return contents
+}
+
 /**
  * Export the exact already reviewed SHA into an npm tarball without checking it out or executing
  * it.
@@ -212,10 +233,15 @@ export const packPreview = (
       const entries = previewTree(
         (await git(["ls-tree", "-r", "-l", "-z", "--full-tree", sha, "--", dist])).text(),
       )
+      // These exact hashes and lengths have already passed the preview tree allowlist and bounds.
+      // One read-only Git process avoids starting hundreds of processes on Windows runners.
+      const input = new Blob([entries.map(({ oid }) => `${oid}\n`).join("")])
+      const batch = await $`git --no-replace-objects cat-file --batch < ${input}`.cwd(root).quiet()
+      const contents = readBlobs(batch.stdout, entries)
       const pieces: Buffer[] = []
-      for (const file of entries) {
-        const source = (await git(["cat-file", "blob", file.oid])).stdout
-        if (source.byteLength !== file.size) throw refused("Preview blob size mismatch")
+      for (const [index, file] of entries.entries()) {
+        const source = contents[index]
+        if (source === undefined) throw refused("Missing approved preview blob")
         const data =
           file.path === "package.json"
             ? replaceManifest(source, rootManifest.version, version)
