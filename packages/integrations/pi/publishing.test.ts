@@ -130,12 +130,21 @@ describe("npm publication", () => {
       const download = release.steps.find((step) =>
         step.uses?.startsWith("actions/download-artifact@"),
       )!
-      const attach = release.steps.find((step) => step.run?.includes("gh release upload"))!
+      const attach = release.steps.find((step) =>
+        step.run?.includes(
+          name === "stable" ? "gh release upload" : "scripts/dev-prerelease-recovery.ts current",
+        ),
+      )!
       expect(publish.steps.indexOf(pack)).toBeLessThan(publish.steps.indexOf(npm))
       expect(publish.steps.indexOf(npm)).toBeLessThan(publish.steps.indexOf(upload))
-      const tag = release.steps.find((step) => step.uses === "./.github/actions/tag-release")!
-      expect(release.steps.indexOf(download)).toBeLessThan(release.steps.indexOf(tag))
-      expect(release.steps.indexOf(tag)).toBeLessThan(release.steps.indexOf(attach))
+      if (name === "stable") {
+        const tag = release.steps.find((step) => step.uses === "./.github/actions/tag-release")!
+        expect(release.steps.indexOf(download)).toBeLessThan(release.steps.indexOf(tag))
+        expect(release.steps.indexOf(tag)).toBeLessThan(release.steps.indexOf(attach))
+      } else {
+        expect(release.steps.indexOf(download)).toBeLessThan(release.steps.indexOf(attach))
+        expect(attach.env?.["GH_TOKEN"]).toBe("${{ github.token }}")
+      }
       expect(publish.steps.some((step) => step.run === "bun install --frozen-lockfile")).toBe(true)
       expect(upload.with?.["name"]).toBe(download.with?.["name"])
       expect(upload.with?.["path"]).toBe("${{ runner.temp }}/holyagent-*.tgz")
@@ -167,7 +176,15 @@ if [ "$1" = "-r" ]; then node -e 'console.log(require(process.argv[1]).version)'
       writeFileSync(
         join(dir, "bin/bun"),
         `#!/bin/sh
-if [ "$1" = "scripts/npm-publishing.ts" ]; then printf '%s\\n' "$@" > "$RUNNER_TEMP/npm-args"; cp "$2" "$RUNNER_TEMP/npm.tgz"; else "$REAL_BUN" "$@"; fi
+if [ "$1" = "scripts/npm-publishing.ts" ]; then
+  printf '%s\\n' "$@" > "$RUNNER_TEMP/npm-args"
+  cp "$2" "$RUNNER_TEMP/npm.tgz"
+elif [ "$1" = "scripts/dev-prerelease-recovery.ts" ] && [ "$2" = "current" ]; then
+  printf '%s\\n' "$@" > "$RUNNER_TEMP/reconcile-args"
+  cp "$3" "$RUNNER_TEMP/attached.tgz"
+else
+  "$REAL_BUN" "$@"
+fi
 `,
         { mode: 0o755 },
       )
@@ -214,7 +231,17 @@ ${attach.run}
       )
       expect(readFileSync(join(dir, "runner/npm-args"), "utf8")).toContain(`holyagent-${version}\n`)
       expect(npm.env?.["GH_TOKEN"]).toBe("${{ github.token }}")
-      expect(readFileSync(join(dir, "runner/gh-args"), "utf8")).toContain(`holyagent-${version}\n`)
+      if (name === "dev") {
+        const [script, mode, path] = readFileSync(join(dir, "runner/reconcile-args"), "utf8")
+          .trim()
+          .split("\n")
+        expect([script, mode]).toEqual(["scripts/dev-prerelease-recovery.ts", "current"])
+        expect(path?.replaceAll("\\", "/")).toEndWith(`/runner/holyagent-${version}.tgz`)
+      } else {
+        expect(readFileSync(join(dir, "runner/gh-args"), "utf8")).toContain(
+          `holyagent-${version}\n`,
+        )
+      }
       const manifest = Bun.spawnSync(["tar", "-xOzf", archive, "package/package.json"])
       expect(manifest.exitCode).toBe(0)
       expect(JSON.parse(manifest.stdout.toString())).toMatchObject({ name: "holyagent", version })
