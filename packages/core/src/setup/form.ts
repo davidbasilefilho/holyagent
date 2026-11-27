@@ -1,6 +1,8 @@
+import { release } from "node:os"
+
 import { CAPABILITY_FORMS, type CapabilityForm } from "../config/capabilities.ts"
 import { inCloudSession } from "../vcs/identity.ts"
-import type { Env } from "./environment.ts"
+import { type Env, firstNonEmpty } from "./environment.ts"
 
 /** The forms `--form` accepts. */
 export const FORM_CHOICES = CAPABILITY_FORMS
@@ -42,6 +44,39 @@ export const hasDisplay = (env: Env, platform: string = process.platform): boole
 export const inCi = (env: Env): boolean => {
   const value = env["CI"]?.trim().toLowerCase()
   return value !== undefined && !["", "0", "false", "no", "off"].includes(value)
+}
+
+/** A host-level gate shared by browser handoffs and local toolchain preparation. */
+export const localGraphicalHostUnavailable = (
+  env: Env,
+  platform: string = process.platform,
+  kernel: string = release(),
+): "remote" | "no-display" | undefined => {
+  const remote = [
+    "SSH_CLIENT",
+    "SSH_CONNECTION",
+    "SSH_TTY",
+    "WSL_DISTRO_NAME",
+    "WSL_INTEROP",
+    "CODEX_CAAS_SESSION_ID",
+  ]
+  if (
+    inCi(env) ||
+    inCloudSession(env) ||
+    remote.some((name) => firstNonEmpty(env[name]) !== undefined) ||
+    (platform === "linux" && /microsoft|wsl/i.test(kernel))
+  )
+    return "remote"
+  if (
+    !["darwin", "linux", "win32"].includes(platform) ||
+    !hasDisplay(env, platform) ||
+    (platform === "linux" &&
+      !firstNonEmpty(env.WAYLAND_DISPLAY) &&
+      !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "")) ||
+    (platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
+  )
+    return "no-display"
+  return undefined
 }
 
 /**

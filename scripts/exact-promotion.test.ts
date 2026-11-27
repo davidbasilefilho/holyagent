@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import {
+  checkCandidateJobs,
+  checkCandidateRun,
   checkExactPromotion,
   checkPromotionReadiness,
   checkSourceJobs,
@@ -30,6 +32,7 @@ const proof: PromotionEvidence = {
   devObject: { sha: dev, tree: { sha: tree }, parents: [] },
   publishRun: {
     id: 45908297590,
+    run_attempt: 1,
     path: ".github/workflows/publish.yml",
     event: "push",
     head_branch: "dev",
@@ -119,17 +122,92 @@ test("source validation and prerelease jobs cannot be skipped in a green aggrega
   const required = [
     "validation / check",
     "validation / windows",
+    "validation / macos",
     "validation / installers",
     "dev / publish",
     "dev / prerelease",
   ]
-  const jobs = required.map((name) => ({ name, status: "completed", conclusion: "success" }))
-  expect(await Effect.runPromise(checkSourceJobs({ jobs }))).toBeUndefined()
-  const skipped = jobs.map((job) =>
-    job.name === "dev / publish" ? { ...job, conclusion: "skipped" } : job,
-  )
-  const failure = await Effect.runPromise(Effect.flip(checkSourceJobs({ jobs: skipped })))
-  expect(failure.detail).toContain("dev / publish")
+  const jobs = required.map((name) => ({
+    name,
+    head_sha: dev,
+    status: "completed",
+    conclusion: "success",
+  }))
+  expect(await Effect.runPromise(checkSourceJobs({ jobs }, dev))).toBeUndefined()
+  for (const name of ["dev / publish", "validation / macos"]) {
+    const skipped = jobs.map((job) => (job.name === name ? { ...job, conclusion: "skipped" } : job))
+    const failure = await Effect.runPromise(Effect.flip(checkSourceJobs({ jobs: skipped }, dev)))
+    expect(failure.detail).toContain(name)
+  }
+})
+
+describe("official candidate workflow provenance", () => {
+  const expected = {
+    number: 77,
+    repositoryId: 9,
+    base: { ref: "main", sha: main },
+    head: { ref: headRef, sha: head },
+  }
+  const linked = {
+    number: expected.number,
+    base: { ...expected.base, repo: { id: expected.repositoryId } },
+    head: { ...expected.head, repo: { id: expected.repositoryId } },
+  }
+  const run = {
+    id: 901,
+    run_attempt: 2,
+    path: ".github/workflows/validation.yml",
+    event: "pull_request",
+    head_branch: headRef,
+    head_sha: head,
+    status: "completed",
+    conclusion: "success",
+    pull_requests: [linked],
+  }
+  test("accepts the exact official main candidate rather than a check label", async () => {
+    expect(await Effect.runPromise(checkCandidateRun(run, expected))).toBe(run)
+  })
+  test("rejects other workflows, pending attempts, dev-targeted and stale or ambiguous associations", async () => {
+    for (const evidence of [
+      undefined,
+      { ...run, path: ".github/workflows/not-validation.yml" },
+      { ...run, event: "push" },
+      { ...run, status: "in_progress", conclusion: null },
+      { ...run, run_attempt: 0 },
+      { ...run, pull_requests: [{ ...linked, number: 78 }] },
+      { ...run, pull_requests: [{ ...linked, base: { ...linked.base, ref: "dev" } }] },
+      { ...run, pull_requests: [{ ...linked, base: { ...linked.base, sha: changed } }] },
+      { ...run, pull_requests: [{ ...linked, head: { ...linked.head, sha: changed } }] },
+      { ...run, pull_requests: [{ ...linked, head: { ...linked.head, repo: { id: 10 } } }] },
+      { ...run, pull_requests: [linked, { ...linked, number: 78 }] },
+    ]) {
+      const outcome = await Effect.runPromise(Effect.flip(checkCandidateRun(evidence, expected)))
+      expect(outcome.detail).toContain("exact PR, base and head")
+    }
+  })
+  test("candidate attempt must actually finish every required job at the exact SHA", async () => {
+    const jobs = ["branch-model", "version", "check", "windows", "macos", "installers"].map(
+      (name) => ({
+        name,
+        head_sha: head,
+        status: "completed",
+        conclusion: "success",
+      }),
+    )
+    expect(await Effect.runPromise(checkCandidateJobs({ jobs }, head))).toBeUndefined()
+    const noMac = jobs.filter(({ name }) => name !== "macos")
+    const missing = await Effect.runPromise(Effect.flip(checkCandidateJobs({ jobs: noMac }, head)))
+    expect(missing.detail).toContain("did not finish macos")
+    for (const version of [
+      { conclusion: "skipped" },
+      { head_sha: changed },
+      { status: "in_progress", conclusion: null },
+    ]) {
+      const rows = jobs.map((job) => (job.name === "version" ? { ...job, ...version } : job))
+      const outcome = await Effect.runPromise(Effect.flip(checkCandidateJobs({ jobs: rows }, head)))
+      expect(outcome.detail).toContain("did not finish version")
+    }
+  })
 })
 
 describe("read-only preflight before any merge", () => {
@@ -157,6 +235,7 @@ describe("read-only preflight before any merge", () => {
     mergeStateStatus: "CLEAN",
     isDraft: false,
     isCrossRepository: false,
+    autoMergeRequest: null,
     statusCheckRollup: green,
   }
   test("requires live PR metadata and all active main checks", async () => {
@@ -219,10 +298,11 @@ describe("read-only preflight before any merge", () => {
       ),
     ).toBeUndefined()
   })
-  test("rejects green checks on a moved head or a PR that is now behind", async () => {
+  test("rejects green checks on a moved head, a PR that is behind, or auto-merge", async () => {
     for (const row of [
       { ...pr, headRefOid: changed },
       { ...pr, mergeStateStatus: "BEHIND" },
+      { ...pr, autoMergeRequest: {} },
     ]) {
       const result = await Effect.runPromise(
         Effect.flip(checkPromotionReadiness(row, activeRules, headRef, head)),

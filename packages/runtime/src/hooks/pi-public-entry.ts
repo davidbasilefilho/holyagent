@@ -11,9 +11,14 @@ const installedPackageRoot =
     ? packageRoot
     : undefined
 
-const output = publicOutput(Bun.argv.slice(2), process.env, {
-  stdin: Boolean(process.stdin.isTTY),
-  stdout: Boolean(process.stdout.isTTY),
-})
+const output = publicOutput(
+  Bun.argv.slice(2),
+  process.env,
+  {
+    stdin: Boolean(process.stdin.isTTY),
+    stdout: Boolean(process.stdout.isTTY),
+  },
+  process.stdout.columns,
+)
 
 await main(true, "public", installedPackageRoot, output)

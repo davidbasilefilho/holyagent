@@ -6,6 +6,12 @@ import { Effect, Schema } from "effect"
 import { CAPABILITIES } from "../config/capabilities.ts"
 import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
+import {
+  planTerminalBrowse,
+  runTerminalBrowse,
+  terminalBrowseUnavailable,
+} from "../setup/browse-handoff.ts"
+import { exportCodexCloud } from "../setup/codex/cloud.ts"
 import { defaultCodexHome, setupCodex } from "../setup/codex/setup.ts"
 import type { Env } from "../setup/environment.ts"
 import { SetupFailure } from "../setup/errors.ts"
@@ -13,6 +19,7 @@ import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
 import {
   type CapabilityChoices,
   isHolyagentSource,
+  loadPiConfig,
   loadPiConfigSource,
   piInUse,
   piPresenceFiles,
@@ -27,11 +34,11 @@ import {
   SCOPES,
 } from "../setup/scope.ts"
 import { CACHE_TTLS } from "../setup/settings.ts"
-import { type Shell, shellLive } from "../setup/shell.ts"
+import { Shell, shellLive } from "../setup/shell.ts"
 import type { SetupTarget } from "../setup/steps.ts"
 import { saveSetupResult } from "../setup/tui/result-file.ts"
 import { runInteractive } from "../setup/tui/session.ts"
-import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
+import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { Usage } from "./errors.ts"
 import { type Command, Verbatim } from "./types.ts"
 
@@ -81,12 +88,23 @@ const CLAUDE_USAGE =
   "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]"
 const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace(
   "[--no-tui]",
-  "[--no-tui|--non-interactive]",
+  "[--no-tui|--non-interactive] [--no-open-browse|--browse-browser <id>]",
 )
 
 const CODEX_USAGE =
   "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]"
 const PublicManifest = Schema.Struct({ name: Schema.Literal("holyagent"), version: Schema.String })
+const installedVersion = (installedPackageRoot: string | undefined) =>
+  installedPackageRoot === undefined
+    ? Effect.succeed(undefined)
+    : Effect.tryPromise((): Promise<unknown> =>
+        Bun.file(join(installedPackageRoot, "package.json")).json(),
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(PublicManifest)),
+        Effect.map(({ version }) => (Bun.semver.satisfies(version, version) ? version : undefined)),
+        Effect.orElseSucceed(() => undefined),
+      )
+
 const codexPlan = (
   args: Parameters<typeof stringFlag>[0],
   env: Env,
@@ -97,20 +115,7 @@ const codexPlan = (
 ) =>
   Effect.gen(function* () {
     const catalog = stringFlag(args, "root-only-catalog")
-    const version =
-      installedPackageRoot === undefined
-        ? undefined
-        : yield* Effect.tryPromise((): Promise<unknown> =>
-            Bun.file(join(installedPackageRoot, "package.json")).json(),
-          ).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(PublicManifest)),
-            Effect.map((manifest) =>
-              Bun.semver.satisfies(manifest.version, manifest.version)
-                ? manifest.version
-                : undefined,
-            ),
-            Effect.orElseSucceed(() => undefined),
-          )
+    const version = yield* installedVersion(installedPackageRoot)
     return yield* setupCodex(env, {
       home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
       dryRun,
@@ -153,6 +158,33 @@ const reviewedCodexPlan = (
     })
 }
 
+const CLOUD_USAGE = "setup codex cloud --output <path.zip> [--dry-run]"
+
+const codexCloudCommand: Command = {
+  path: ["setup", "codex", "cloud"],
+  usage: CLOUD_USAGE,
+  summary: "Export HolyAgent as a portable skills plugin for workspace import",
+  output: "The ZIP path and the separate workspace import and Cloud task selection steps",
+  notes: [
+    "--output is a new local ZIP path. Relative paths use the selected project directory; the parent directory must already exist. Existing paths are kept.",
+    "--dry-run plans the export without writing files. Neither mode connects to a workspace or changes a Codex profile.",
+  ],
+  flags: { output: "string", "dry-run": "boolean" },
+  stateless: true,
+  positionals: 0,
+  run: ({ args, env, cwd, installedPackageRoot }) =>
+    Effect.gen(function* () {
+      const output = yield* requiredFlag(args, "output", CLOUD_USAGE)
+      const version = yield* installedVersion(installedPackageRoot)
+      return yield* exportCodexCloud(env, cwd, output, booleanFlag(args, "dry-run"), version).pipe(
+        Effect.map(printed),
+        Effect.catchTag("SetupFailure", ({ message }) =>
+          Effect.succeed(printed({ ok: false, lines: [`! Codex Cloud export: ${message}`] })),
+        ),
+      )
+    }),
+}
+
 const codexCommand: Command = {
   path: ["setup", "codex"],
   usage: CODEX_USAGE,
@@ -160,11 +192,13 @@ const codexCommand: Command = {
   output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
   notes: [
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
-    "Apply requires the verified Codex 0.172.0 runtime on PATH. Preview does not. Setup never changes a running session.",
+    "Apply verifies the native marketplace and plugin commands in your installed Codex CLI. Preview does not require Codex. Setup never installs or updates Codex itself and never changes a running session.",
+    "If Codex is missing, install the official stable release with npm install -g @openai/codex@latest, then rerun setup. If it is installed but incompatible, update through your existing installer only when its stable release is newer.",
     "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
     "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
     "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide.",
+    "Use holyagent setup codex cloud --help to export a skills ZIP for managed Cloud.",
   ],
   flags: {
     "codex-home": "string",
@@ -286,7 +320,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "in graphical Pi setup, open browser-use to enable or disable it and mark compatible detected browsers. If nothing was saved, only a compatible detected system default is selected. Apply saves the selection. Setup runs the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -336,6 +370,42 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         }
         const capabilities = yield* capabilitySwitches(args, usage)
         const form = yield* formOf(args, env, usage)
+        const skipBrowse = booleanFlag(args, "no-open-browse")
+        const browseBrowser = stringFlag(args, "browse-browser")
+        if (skipBrowse && !booleanFlag(args, "no-tui"))
+          return yield* new Usage({
+            message: "--no-open-browse requires --no-tui",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        if (skipBrowse && (booleanFlag(args, "open-browse") || browseBrowser !== undefined))
+          return yield* new Usage({
+            message: "--no-open-browse cannot be combined with --open-browse or --browse-browser",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        const openBrowse =
+          !skipBrowse &&
+          surface === "public" &&
+          target === "pi" &&
+          booleanFlag(args, "no-tui") &&
+          capabilities.browserUse === true
+        if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
+          return yield* new Usage({
+            message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        if (openBrowse && stringFlag(args, "browser-executable") !== undefined)
+          return yield* new Usage({
+            message: "Terminal Browse selects a detected browser by id, not --browser-executable",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        const browseUnavailable = openBrowse
+          ? terminalBrowseUnavailable(env, {
+              terminal,
+              form,
+              dryRun: booleanFlag(args, "dry-run"),
+              nonInteractive: booleanFlag(args, "non-interactive"),
+            })
+          : undefined
         if (
           booleanFlag(args, "undo") &&
           (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined)
@@ -361,6 +431,23 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         ) =>
           Effect.gen(function* () {
             const selectedTarget = selected?.target ?? target
+            const devicePreparation =
+              selected === undefined &&
+              surface === "public" &&
+              selectedTarget === "pi" &&
+              resolved.scope === "user" &&
+              booleanFlag(args, "no-tui") &&
+              choices.deviceAccess === true &&
+              !booleanFlag(args, "undo")
+                ? terminalBrowseUnavailable(env, {
+                    terminal,
+                    form,
+                    dryRun: booleanFlag(args, "dry-run"),
+                    nonInteractive: booleanFlag(args, "non-interactive"),
+                  }) === undefined
+                  ? "apply"
+                  : "preview"
+                : undefined
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
               ...(selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget }),
@@ -377,6 +464,10 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                 selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
+              ...(devicePreparation === undefined ? {} : { devicePreparation }),
+              ...(openBrowse && browseUnavailable === undefined && selected === undefined
+                ? { desktopBrowseHandoff: true }
+                : {}),
               capabilities: selectedTarget === "claude" ? {} : chosen,
               ...(selectedTarget === "claude" || choices.piProviders === undefined
                 ? {}
@@ -522,7 +613,42 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
               })
           }
         }
-        return printed(yield* apply(flagged, capabilities, interactive.notes))
+        const report = yield* apply(flagged, capabilities, [
+          ...interactive.notes,
+          ...(browseUnavailable === undefined
+            ? []
+            : [hint(`OpenCode Browse: ${browseUnavailable}`)]),
+        ])
+        if (!report.ok || !openBrowse || browseUnavailable !== undefined) return printed(report)
+        const handoff = yield* Effect.gen(function* () {
+          const config = yield* loadPiConfig(env, cwd, resolved.scope)
+          if (
+            !(yield* piInUse(env)) ||
+            !config.pi.enable ||
+            !config.pi.features.mcp ||
+            !config.pi.features.browserUse
+          )
+            return yield* new SetupFailure({
+              message: "enable Pi, MCP and Browser Use before running the desktop handoff",
+            })
+          const plan = yield* planTerminalBrowse(env, cwd, browseBrowser)
+          return yield* runTerminalBrowse(
+            env,
+            cwd,
+            installedPackageRoot,
+            browseBrowser,
+            plan,
+            (line) => emit(`${line.trimEnd()}\n`),
+            undefined,
+            { reopenPaired: booleanFlag(args, "open-browse") },
+          )
+        }).pipe(
+          Effect.catchTag("SetupFailure", ({ message }) =>
+            Effect.succeed({ ok: true, lines: [hint(`OpenCode Browse pending: ${message}`)] }),
+          ),
+          Effect.provide(Shell.live(env)),
+        )
+        return printed({ ok: handoff.ok, lines: [...report.lines, ...handoff.lines] })
       }).pipe(Effect.provide(shellLive(env))),
   }
 }
@@ -592,6 +718,9 @@ const publicPiSetup = (target?: "pi"): Command => {
       ...flags,
       "non-interactive": "boolean",
       "browser-executable": "string",
+      ...(target === "pi"
+        ? { "open-browse": "boolean", "no-open-browse": "boolean", "browse-browser": "string" }
+        : {}),
       ...(target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}),
     },
     notes: [
@@ -602,13 +731,21 @@ const publicPiSetup = (target?: "pi"): Command => {
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),
       "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
-      "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal.",
+      "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
+      ...(target === "pi"
+        ? [
+            "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. Use --no-open-browse to skip this handoff and keep Browser Use enabled.",
+            "The older --open-browse flag is optional. It can reopen the extension Options without replacing an existing pairing.",
+            "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode.",
+          ]
+        : []),
     ],
   }
 }
 
 /** Explicit harness selectors share the public setup handler and precede the bare command. */
 export const PUBLIC_SETUP_COMMANDS: ReadonlyArray<Command> = [
+  codexCloudCommand,
   codexCommand,
   publicPiSetup("pi"),
   {

@@ -11,7 +11,7 @@ import { TUI_BUNDLE } from "./files.ts"
 import { TUI_MANIFEST_NAME } from "./lock.ts"
 import { TUI_LOCK, TUI_PACKAGES } from "./packages.ts"
 import { plain } from "./text.ts"
-import type { SetupTuiModule, TerminalOutputRenderer } from "./types.ts"
+import type { PublicHelpRenderer, SetupTuiModule, TerminalOutputRenderer } from "./types.ts"
 
 export { plain } from "./text.ts"
 
@@ -257,19 +257,24 @@ export const loadPackagedSetupTui = (bundle = join(import.meta.dir, TUI_BUNDLE))
     return loaded
   })
 
-/** Loads the static formatter from the same installed OpenTUI/Solid bundle. */
-export const loadPackagedTerminalOutput = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+const loadRendererExport = <Renderer>(name: string, bundle: string) =>
   Effect.gen(function* () {
     const loaded = yield* importPackagedTui(bundle)
-    if (
-      typeof loaded !== "object" ||
-      loaded === null ||
-      !("renderTerminalOutput" in loaded) ||
-      typeof loaded.renderTerminalOutput !== "function"
-    )
-      return yield* new TuiUnavailable({ reason: `${bundle} does not export renderTerminalOutput` })
-    return loaded.renderTerminalOutput as TerminalOutputRenderer
+    if (typeof loaded !== "object" || loaded === null)
+      return yield* new TuiUnavailable({ reason: `${bundle} does not export ${name}` })
+    const render = (loaded as Record<string, unknown>)[name]
+    if (typeof render !== "function")
+      return yield* new TuiUnavailable({ reason: `${bundle} does not export ${name}` })
+    return render as Renderer
   })
+
+/** Loads the inline formatter from the installed OpenTUI/Solid bundle. */
+export const loadPackagedTerminalOutput = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+  loadRendererExport<TerminalOutputRenderer>("renderTerminalOutput", bundle)
+
+/** Loads the static help renderer from the installed OpenTUI/Solid bundle. */
+export const loadPackagedPublicHelp = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+  loadRendererExport<PublicHelpRenderer>("renderPublicHelp", bundle)
 
 const fileSystem = <A>(what: string, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => unavailable(what, cause) })

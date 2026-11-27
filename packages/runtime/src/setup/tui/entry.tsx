@@ -6,6 +6,7 @@ import { SetupApp } from "./app.tsx"
 import { detectBackground } from "./background.ts"
 import type { TuiInput, TuiOutcome } from "./types.ts"
 
+export { renderPublicHelp } from "./public-help.tsx"
 export { renderTerminalOutput } from "./terminal-output.ts"
 
 /**

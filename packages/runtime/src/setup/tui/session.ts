@@ -4,6 +4,8 @@ import { enabledPiProviders } from "../../../../core/src/pi/provider.ts"
 import {
   checkBrowserExecutable,
   discoverBrowsers,
+  isChromiumBrowser,
+  systemDefaultBrowser,
 } from "../../../../core/src/setup/browser-discovery.ts"
 import {
   type PiRegistrationConflict,
@@ -22,19 +24,20 @@ import {
   type BrowsePair,
   type BrowsePlan,
   type BrowseTarget,
-  browseForProfile,
   browseReview,
   configureBrowse,
   pairBrowseOnTerminal,
   planBrowse,
 } from "../browse-setup.ts"
 import { BROWSE_EXTENSION_STORE } from "../browse.ts"
+import { readBrowserPreference, writeBrowserPreference } from "../browser-preferences.ts"
 import {
   type CodexBrowserChoice,
   detectCodexBrowserHandoff,
   openCodexBrowserHandoff,
 } from "../codex-browser-handoff.ts"
 import type { Env } from "../environment.ts"
+import { SetupFailure } from "../errors.ts"
 import { describeForm, type FormChoice, inCi } from "../form.ts"
 import { type CapabilityChoices, loadPiConfigSource, piInUse } from "../pi-check.ts"
 import { hint, type Report } from "../report.ts"
@@ -414,6 +417,24 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       : yield* checkBrowserExecutable(options.env, explicit)
   const browsers =
     manual === undefined ? detected : [...detected.filter(({ id }) => id !== manual.id), manual]
+  const preference =
+    browse === undefined
+      ? undefined
+      : yield* readBrowserPreference(options.env).pipe(
+          Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+        )
+  const defaultBrowser =
+    preference !== undefined &&
+    !(preference instanceof SetupFailure) &&
+    preference.browsers === undefined
+      ? yield* systemDefaultBrowser(options.env, options.cwd, detected)
+      : undefined
+  const initialBrowsers =
+    preference === undefined
+      ? undefined
+      : preference instanceof SetupFailure
+        ? []
+        : (preference.browsers ?? (defaultBrowser === undefined ? [] : [defaultBrowser]))
   const codexHandoff = detectDesktop
     ? yield* detectCodexBrowserHandoff(options.env, detected, desktopOptions)
     : undefined
@@ -433,11 +454,34 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     choices.harnesses?.codex === true && codexHandoff?.status === "candidate"
       ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff)
       : undefined
-  const browserOptions: ReadonlyArray<BrowserOption> = browsers.map(
-    ({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }),
-  )
+  const chromium = browsers
+    .filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser))
+    .map((browser) => ({ ...browser, name: plain(browser.name) }))
+  const browserOptions: ReadonlyArray<BrowserOption> = chromium.map(({ id, name }) => ({
+    id,
+    name,
+  }))
   const selectedBrowsers = (choices: Choices) =>
-    browserOptions.filter(({ id }) => choices.browseBrowserIds?.includes(id))
+    chromium.filter(({ id }) => choices.browseBrowserIds?.includes(id))
+  const browserSelectionToSave = (choices: Choices) => {
+    const chosen = choices.browseBrowserIds
+    const enabled = choices.capabilities["browserUse"] === true
+    const saved =
+      preference !== undefined &&
+      !(preference instanceof SetupFailure) &&
+      preference.browsers !== undefined
+    return options.scope === "user" &&
+      choices.harnesses?.pi !== false &&
+      (enabled || saved) &&
+      preference !== undefined &&
+      initialBrowsers !== undefined &&
+      chosen !== undefined &&
+      ((enabled && !(preference instanceof SetupFailure) && !saved) ||
+        chosen.length !== initialBrowsers.length ||
+        chosen.some((id) => !initialBrowsers.includes(id)))
+      ? chosen
+      : undefined
+  }
   const browseFor = (choices: Choices): BrowsePlan | undefined => {
     if (
       browse === undefined ||
@@ -445,22 +489,33 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       choices.capabilities["browserUse"] !== true
     )
       return undefined
-    if (choices.browseBrowserIds === undefined)
-      return browseForProfile(browse, choices.browseProfile ?? 0)
     const selected = selectedBrowsers(choices)
     if (selected.length === 0) return undefined
     const requested = browse.profiles?.[choices.browseProfile ?? -1]
-    const targets = selected.map(({ name, browseCompatibility }): BrowseTarget => {
-      if (browseCompatibility !== "supported")
+    const targets = selected.map(({ name, profileDirectory }): BrowseTarget => {
+      if (profileDirectory === undefined)
         return {
           target: name,
           next: "manual",
-          guidance: "compatibility is unverified; nothing will be started",
+          guidance: `open the official Browse extension store (${BROWSE_EXTENSION_STORE}) in the intended profile and pair manually; setup could not verify a profile directory`,
         }
+      const profiles = (browse.profiles ?? []).filter(({ browser }) => browser === name)
+      const enabled = profiles.filter(({ extension }) => extension === "enabled")
       const profile =
         requested?.browser === name
           ? requested
-          : browse.profiles?.find(({ browser }) => browser === name)
+          : enabled.length === 1
+            ? enabled[0]
+            : profiles.length === 1
+              ? profiles[0]
+              : undefined
+      if (profile === undefined && profiles.length > 1)
+        return {
+          target: name,
+          next: "manual",
+          guidance:
+            "more than one profile is possible; open the Browse extension in the intended profile and pair manually",
+        }
       const target = profile === undefined ? name : `${name}, ${profile.profile}`
       if (profile?.extension === "enabled") {
         if (browse.alreadyPaired === true)
@@ -480,6 +535,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`,
       }
     })
+    if (!browse.alreadyPaired && targets.every(({ next }) => next === "manual")) {
+      const { action: _action, ...manual } = browse
+      return { ...manual, next: "none", targets }
+    }
     const ready = targets.find(({ next }) => next === "pair")
     return {
       ...browse,
@@ -594,7 +653,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                         ? {
                             extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
                               id,
-                              name,
+                              name: plain(name),
                             })),
                           }
                         : {}),
@@ -606,6 +665,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
+      ...(initialBrowsers === undefined ? {} : { browseBrowserIds: initialBrowsers }),
       ...(browse?.action === undefined || initialSwitches["browserUse"] !== true
         ? {}
         : { browseSetup: true }),
@@ -629,16 +689,17 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             reviewedChoices = undefined
             return yield* Effect.fail(noProvider())
           }
+          const sequence = ++reviewSequence
           const plan = browseFor(choices)
           const selection = selectedBrowsers(choices)
           const selectedNotes =
             browse === undefined ||
             choices.harnesses?.pi === false ||
-            choices.browseBrowserIds === undefined
+            choices.capabilities["browserUse"] !== true
               ? []
               : [
                   hint(
-                    `Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name, browseCompatibility }) => (browseCompatibility === "supported" ? name : `${name} (compatibility unverified)`)).join(", ")}`,
+                    `Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name }) => name).join(", ")}`,
                   ),
                   ...(plan === undefined
                     ? [hint("OpenCode Browse: no compatible selected profile will be paired")]
@@ -656,7 +717,6 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                   ].map(plain),
                 }
           if (combined !== undefined) {
-            const sequence = ++reviewSequence
             reviewedChoices = undefined
             const targets = selectionOf(choices)
             if (targets.length === 0)
@@ -734,7 +794,6 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
           }
           const chosen = withProviderChanges(choices)
           if (options.previewPi !== undefined) {
-            const sequence = ++reviewSequence
             reviewedChoices = undefined
             const { report, registration } = yield* previewRegistration(
               options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities)),
@@ -773,6 +832,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 })
           if (preview !== undefined && (next === undefined || "line" in next))
             return yield* Effect.fail(new Error("the T3 settings step has nothing to do any more"))
+          if (sequence === reviewSequence) reviewedChoices = choices
           return {
             ...reviewOf(
               next === undefined || "line" in next ? undefined : next,
@@ -786,10 +846,12 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     apply: (choices, signal, reportProgress) => {
       if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
+      const browserChanges = browserSelectionToSave(choices)
       if (
         (combined !== undefined ||
           options.previewPi !== undefined ||
           chosen.piProviders !== undefined ||
+          browserChanges !== undefined ||
           (choices.browseSetup === true && browseFor(choices)?.action !== undefined)) &&
         reviewedChoices !== choices
       )
@@ -813,6 +875,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         (target) => !(target === "pi" && keepPi) && !(target === "codex" && keepCodex),
       )
       const validate = Effect.gen(function* () {
+        if (!keepPi && browserChanges !== undefined && preference instanceof SetupFailure)
+          return yield* Effect.fail(
+            new Error("The saved HolyAgent browser selection is invalid. It was not changed."),
+          )
         if (!keepPi) {
           const preview =
             combined === undefined
@@ -892,6 +958,32 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                   })),
                 ),
           ),
+          Effect.flatMap((report) => {
+            if (
+              !report.ok ||
+              options.dryRun ||
+              keepPi ||
+              browserChanges === undefined ||
+              preference === undefined ||
+              preference instanceof SetupFailure
+            )
+              return Effect.succeed(report)
+            return writeBrowserPreference(preference, browserChanges).pipe(
+              Effect.map(() => ({
+                ...report,
+                lines: [...report.lines, hint("Browser selection saved")],
+              })),
+              Effect.catchTag("SetupFailure", () =>
+                Effect.succeed({
+                  ok: false,
+                  lines: [
+                    ...report.lines,
+                    "! Browser selection could not be saved. Existing selection was not replaced.",
+                  ],
+                }),
+              ),
+            )
+          }),
           Effect.map((report): Applied => {
             if (report.ok && handoff !== undefined && !options.dryRun) stagedHandoff = handoff
             const lines = [

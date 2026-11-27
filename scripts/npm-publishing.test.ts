@@ -32,6 +32,9 @@ const context = {
   token: "test",
 }
 const object = (type: string, sha: string) => Response.json({ object: { type, sha } })
+const devHead = (sha = commit, isProtected = true) =>
+  Response.json({ name: "dev", protected: isProtected, commit: { sha } })
+const devTag = (dev = "1.2.3-dev-0123456") => Response.json({ dev })
 
 describe("packed npm publication", () => {
   test("rejects absent or mismatched repository metadata before network or npm operations", async () => {
@@ -119,7 +122,7 @@ describe("packed npm publication", () => {
           return Promise.resolve(github.shift() ?? new Response("", { status: 500 }))
         }
         const result = await Effect.runPromiseExit(
-          publishArtifact(path, tag, context, run, request),
+          publishArtifact(path, tag, context, run, request, Effect.void),
         )
         return { result, calls, urls }
       }
@@ -144,14 +147,42 @@ describe("packed npm publication", () => {
         [new Response("{}"), object("commit", commit)],
         [new Response("{}"), object("tag", other), object("commit", commit)],
       ]) {
-        const result = await exercise(github, [missing, ok()])
+        const result = await exercise([...github, devHead(), devTag(), devHead()], [missing, ok()])
         expect(Exit.isSuccess(result.result)).toBe(true)
         expect(result.urls[1]).toEndWith(`/git/ref/tags/${context.tag}`)
         expect(result.calls).toEqual([
           ["view", "test-publish-artifact@1.2.3-dev-0123456", "--json"],
-          ["publish", path, "--tag", "dev", "--provenance"],
+          ["publish", path, "--tag", "dev", "--provenance", "--ignore-scripts"],
+        ])
+        expect(result.urls.at(-3)).toEndWith("/branches/dev")
+        expect(result.urls.at(-2)).toEndWith("/dist-tags")
+        expect(result.urls.at(-1)).toEndWith("/branches/dev")
+      }
+      for (const stale of [
+        devHead(other),
+        devHead(commit, false),
+        new Response("", { status: 403 }),
+      ]) {
+        const result = await exercise([...absent(), stale], [missing, ok()])
+        expect(Exit.isFailure(result.result)).toBe(true)
+        expect(result.calls).toEqual([
+          ["view", "test-publish-artifact@1.2.3-dev-0123456", "--json"],
         ])
       }
+      for (const after of [
+        [devTag("unexpected"), devHead()],
+        [devTag(), devHead(other)],
+      ]) {
+        const result = await exercise([...absent(), devHead(), ...after], [missing, ok()])
+        expect(Exit.isFailure(result.result)).toBe(true)
+        expect(result.calls.map(([command]) => command)).toEqual(["view", "publish"])
+      }
+      const propagated = await exercise(
+        [...absent(), devHead(), devTag("previous"), devHead(), devTag(), devHead()],
+        [missing, ok()],
+      )
+      expect(Exit.isSuccess(propagated.result)).toBe(true)
+      expect(propagated.calls.map(([command]) => command)).toEqual(["view", "publish"])
       for (const github of [
         [new Response("{}"), object("commit", other)],
         [new Response("{}"), object("tag", other), object("commit", other)],
@@ -201,7 +232,9 @@ describe("packed npm publication", () => {
         expect(result.calls).toHaveLength(1)
       }
       expect(
-        Exit.isFailure((await exercise(absent(), [missing, fail("", "publish denied")])).result),
+        Exit.isFailure(
+          (await exercise([...absent(), devHead()], [missing, fail("", "publish denied")])).result,
+        ),
       ).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })

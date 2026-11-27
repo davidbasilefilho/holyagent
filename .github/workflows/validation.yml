@@ -49,12 +49,27 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      # Resolve from GitHub before loading any candidate-controlled tooling or configuration.
+      - name: Resolve the protected development policy SHA
+        if: github.base_ref == 'main' && startsWith(github.head_ref, 'release/0.4.0/promote/')
+        id: promotion-policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          pattern='^release/0\.4\.0/promote/[a-f0-9]{40}/([a-f0-9]{40})/[a-f0-9]{40}$'
+          [[ "$HEAD_REF" =~ $pattern ]] || { echo 'Expected an exact promotion ref'; exit 1; }
+          expected_sha="${BASH_REMATCH[1]}"
+          actual_sha=$(gh api "repos/$GITHUB_REPOSITORY/branches/dev" --jq 'select(.protected == true) | .commit.sha')
+          [[ "$actual_sha" == "$expected_sha" ]] || { echo 'Protected dev moved or is unavailable'; exit 1; }
+          printf 'sha=%s\n' "$expected_sha" >> "$GITHUB_OUTPUT"
+
       # An exact promotion reads evidence with the checker from protected dev, never from its PR head.
       - name: Check out protected development policy
         if: github.base_ref == 'main' && startsWith(github.head_ref, 'release/0.4.0/promote/')
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/heads/dev
+          ref: ${{ steps.promotion-policy.outputs.sha }}
           persist-credentials: false
 
       - name: Set up tools

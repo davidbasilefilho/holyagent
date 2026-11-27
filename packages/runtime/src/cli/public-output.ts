@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 
-import { loadPackagedTerminalOutput } from "../setup/tui/load.ts"
+import { loadPackagedPublicHelp, loadPackagedTerminalOutput } from "../setup/tui/load.ts"
 import { setupResultLines } from "../setup/tui/result-file.ts"
 import { setupNotice } from "../setup/tui/result.ts"
 import { tuiFallbackReason } from "../setup/tui/session.ts"
@@ -35,6 +35,7 @@ export const publicOutput = (
   argv: ReadonlyArray<string>,
   env: Host["env"],
   terminal: Host["terminal"],
+  columns: number | undefined,
 ): OutputPresentation => {
   const enabled =
     tuiFallbackReason({
@@ -42,9 +43,18 @@ export const publicOutput = (
       terminal,
       noTui: plainPublicOutput(argv),
       choiceFlag: false,
-    }) === undefined && colorEnabled(env, true)
-  return (text, kind, targetIsTty, summary) => {
+    }) === undefined
+  return (text, kind, targetIsTty, layout) => {
     if (!enabled || !targetIsTty || text === "") return Effect.succeed(text)
+    if (layout?.publicHelp !== undefined) {
+      const input = { ...layout.publicHelp, env, width: Math.min(columns || 80, 120) }
+      return loadPackagedPublicHelp().pipe(
+        Effect.flatMap((render) => Effect.tryPromise(() => render(input))),
+        Effect.orElseSucceed(() => text),
+      )
+    }
+    if (!colorEnabled(env, true)) return Effect.succeed(text)
+    const summary = layout?.setupResult
     const lines: ReadonlyArray<TerminalOutputLine> =
       summary === undefined
         ? text.split("\n").map((line, index) => ({ text: line, tone: toneOf(line, kind, index) }))

@@ -19,8 +19,18 @@ const linux = { platform: "linux", cwd: "/fixture/project" } as const
 const windows = { platform: "win32", cwd: "C:\\Users\\fixture\\project" } as const
 const linuxEnv = { HOME: "/fixture/home", DISPLAY: ":0" }
 const windowsEnv = { USERPROFILE: "C:\\Users\\fixture", SystemRoot: "C:\\Windows" }
-const chrome = { id: "chrome", executable: "/usr/bin/google-chrome" }
-const edge = { id: "edge", executable: "/usr/bin/microsoft-edge" }
+const chrome = {
+  id: "chrome",
+  name: "Google Chrome",
+  family: "chromium",
+  executable: "/usr/bin/google-chrome",
+} as const
+const edge = {
+  id: "edge",
+  name: "Microsoft Edge",
+  family: "chromium",
+  executable: "/usr/bin/microsoft-edge",
+} as const
 
 const linuxDesktop = () =>
   fakeShell({
@@ -40,18 +50,22 @@ const detect = (
   )
 
 describe("official Codex desktop browser extension handoff", () => {
-  test("the Linux preview offers installed Chrome, with the official in-app setup steps", async () => {
+  test("Linux opens the official guide in a detected Chromium without confirming extension availability", async () => {
     const shell = linuxDesktop()
     const result = await detect(shell, [
       edge,
-      { id: "chromium", executable: "/usr/bin/chromium" },
+      { id: "chromium", name: "Chromium", family: "chromium", executable: "/usr/bin/chromium" },
       chrome,
       chrome,
     ])
     expect(result).toMatchObject({
       status: "candidate",
       desktop: { platform: "linux", name: "ChatGPT desktop app", version: "26.1109.1905-1" },
-      browsers: [{ ...chrome, name: "Google Chrome" }],
+      browsers: [
+        { id: "edge", executable: edge.executable },
+        { id: "chromium", executable: "/usr/bin/chromium" },
+        { id: "chrome", executable: chrome.executable },
+      ],
       url: "https://learn.chatgpt.com/docs/chrome-extension",
       detail: expect.stringContaining("workspace settings"),
     })
@@ -71,15 +85,75 @@ describe("official Codex desktop browser extension handoff", () => {
 
   test("desktop presence remains visible when only an unsupported or profile-only browser is found", async () => {
     const result = await detect(linuxDesktop(), [
-      edge,
-      { id: "chrome" },
-      { id: "chrome", executable: "chrome" },
+      { id: "firefox", name: "Firefox", family: "gecko", executable: "/usr/bin/firefox" },
+      { id: "chrome", name: "Google Chrome", family: "chromium" },
+      { ...chrome, executable: "chrome" },
     ])
     expect(result).toMatchObject({
       status: "unavailable",
       desktop: { platform: "linux", version: "26.1109.1905-1" },
-      reason: expect.stringContaining("Linux preview documents Chrome"),
+      reason: expect.stringContaining("No installed Chromium browser"),
     })
+  })
+
+  test("Windows Helium and another Chromium derivative open the guide using their exact targets", async () => {
+    const shell = fakeShell({
+      commands: [],
+      respond: (line) =>
+        line.includes("Get-AppxPackage") ? { stdout: "26.1109.1905.0" } : { exitCode: 0 },
+    })
+    const detected = [
+      {
+        id: "chrome",
+        name: "Google Chrome",
+        family: "chromium",
+        executable: "C:\\Chrome\\chrome.exe",
+      },
+      {
+        id: "edge",
+        name: "Microsoft Edge",
+        family: "chromium",
+        executable: "C:\\Edge\\msedge.exe",
+      },
+      {
+        id: "helium",
+        name: "Helium",
+        family: "chromium",
+        executable: "C:\\imput\\Helium\\Application\\chrome.exe",
+      },
+      {
+        id: "registered-aurora",
+        name: "Aurora Browser",
+        family: "chromium",
+        executable: "C:\\Aurora\\aurora.exe",
+      },
+      { id: "firefox", name: "Firefox", family: "gecko", executable: "C:\\Firefox\\firefox.exe" },
+      {
+        id: "iexplore",
+        name: "Internet Explorer",
+        family: "unknown",
+        executable: "C:\\IE\\iexplore.exe",
+      },
+    ] as const
+    const offer = await detect(shell, detected, windowsEnv, windows)
+    expect(offer).toMatchObject({
+      status: "candidate",
+      browsers: detected.slice(0, 4).map(({ id, name, executable }) => ({ id, name, executable })),
+    })
+    expect(JSON.stringify(offer)).not.toMatch(/Firefox|Internet Explorer|unavailableBrowsers/)
+    expect(shell.calls).toHaveLength(1)
+    for (const id of ["helium", "registered-aurora", "firefox", "iexplore"] as const) {
+      const result = await Effect.runPromise(
+        openCodexBrowserHandoff(windowsEnv, offer, id, windows).pipe(Effect.provide(shell.layer)),
+      )
+      expect(result.ok).toBe(id === "helium" || id === "registered-aurora")
+      if (result.ok) expect(result.lines.join("\\n")).toContain("Finish in ChatGPT desktop")
+    }
+    expect(shell.calls.slice(1).map(({ env }) => env)).toEqual([
+      { HOLYAGENT_SETUP_BROWSER_EXE: detected[2]?.executable },
+      { HOLYAGENT_SETUP_BROWSER_EXE: detected[3]?.executable },
+    ])
+    expect(shell.calls.slice(1).every(({ line }) => line.includes(CODEX_BROWSER_GUIDE))).toBe(true)
   })
 
   test("the CLI or a bare command named chatgpt is insufficient evidence", async () => {
@@ -130,7 +204,7 @@ describe("official Codex desktop browser extension handoff", () => {
     })
   })
 
-  test("reads current-user Windows app registration and accepts the five documented browsers", async () => {
+  test("reads current-user Windows app registration and ignores a remote executable", async () => {
     const shell = fakeShell({
       commands: [],
       respond: (line) =>
@@ -138,9 +212,11 @@ describe("official Codex desktop browser extension handoff", () => {
     })
     const browsers = ["chrome", "edge", "brave", "opera", "vivaldi", "firefox"].map((id) => ({
       id,
+      name: id,
+      family: id === "firefox" ? ("gecko" as const) : ("chromium" as const),
       executable: `C:\\Installed Apps\\${id}.exe`,
     }))
-    const remote = { id: "chrome", executable: "\\\\server\\share\\chrome.exe" }
+    const remote = { ...chrome, executable: "\\\\server\\share\\chrome.exe" }
     const offer = await detect(shell, [remote, ...browsers], windowsEnv, windows)
     expect(offer).toMatchObject({
       status: "candidate",
@@ -226,7 +302,7 @@ describe("official Codex desktop browser extension handoff", () => {
           '#!/bin/sh\nprintf "%s\\n" "$#" "$1" > "$FIXTURE_LOG.tmp"\n/bin/mv "$FIXTURE_LOG.tmp" "$FIXTURE_LOG"\n',
           { mode: 0o700 },
         )
-        const offer = await detect(linuxDesktop(), [{ id: "chrome", executable }], env)
+        const offer = await detect(linuxDesktop(), [{ ...chrome, executable }], env)
         const result = await Effect.runPromise(
           openCodexBrowserHandoff(env, offer, "chrome", linux).pipe(Effect.provide(shellLive(env))),
         )

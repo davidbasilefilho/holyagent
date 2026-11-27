@@ -56,7 +56,7 @@ describe("the setup interface, choose screen", () => {
           return column < 0 ? [] : [cells(line.slice(0, column))]
         })
       const initial = columns()
-      expect(initial).toHaveLength(6)
+      expect(initial).toHaveLength(5)
       expect(new Set(initial).size).toBe(1)
       await screen.keys("down", "down", "down", "down")
       const focus = screen.lines().find((line) => line.startsWith("❯"))
@@ -165,7 +165,7 @@ describe("the setup interface, review and apply", () => {
     await screen.keys("escape")
     await clickText(screen, "ChatGPT browser extension")
     expect(screen.lines().join("\n")).toContain("[x] Skip")
-    await clickText(screen, "Open official guide in Microsoft Edge")
+    await clickText(screen, "Install in Microsoft Edge")
     await screen.keys("escape")
     expect(screen.lines().find(ROW("ChatGPT browser extension"))).toContain("[x] Open guide")
     expect(screen.applies).toHaveLength(0)

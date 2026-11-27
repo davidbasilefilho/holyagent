@@ -38,6 +38,12 @@ export interface CodexAsset {
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`
 const plugin = "plugins/holyagent"
 
+/** The skills available in both the native marketplace and the portable Cloud export. */
+export const codexSkillFiles: ReadonlyArray<CodexAsset> = [
+  { path: "skills/holyagent-workflow/SKILL.md", content: workflow },
+  { path: "skills/hillclimb-iteration/SKILL.md", content: hillclimb },
+]
+
 /** Files of a local marketplace containing the native HolyAgent plugin. */
 export const codexMarketplaceFiles = (
   assetVersion = CODEX_ASSET_VERSION,
@@ -66,8 +72,7 @@ export const codexMarketplaceFiles = (
       interface: { displayName: "HolyAgent" },
     }),
   },
-  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: workflow },
-  { path: `${plugin}/skills/hillclimb-iteration/SKILL.md`, content: hillclimb },
+  ...codexSkillFiles.map(({ path, content }) => ({ path: `${plugin}/${path}`, content })),
 ]
 
 const roleProfiles = {

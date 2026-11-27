@@ -5,15 +5,20 @@ import type { PiProviderSelection } from "../config/schema.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { reportBrowserUse } from "./browser-use.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
+import { CTX7_MISE_UNVERIFIED, lookupCtx7 } from "./context7.ts"
+import { deviceToolchains } from "./device-toolchains.ts"
 import { type Env, homeDirectory } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice } from "./form.ts"
 import {
   type CapabilityChoices,
+  loadPiConfig,
+  PI_HOST_GUIDANCE,
   piExecutionSurface,
   piInUse,
   usesStandaloneSearch,
 } from "./pi-check.ts"
+import { probePiHost } from "./pi-host.ts"
 import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
 import { reportSetupActivity, withSetupPhase } from "./progress.ts"
@@ -22,7 +27,12 @@ import { type Scope, settingsFile } from "./scope.ts"
 import { searchToolLines, setupToolLine } from "./search-tools.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
-import { checkT3Prerequisites, installT3Settings, undoT3Settings } from "./t3-settings.ts"
+import {
+  checkT3Prerequisites,
+  devicePreparationRefusal,
+  installT3Settings,
+  undoT3Settings,
+} from "./t3-settings.ts"
 
 /** Why ctx7 is left out of a claude.ai cloud session. */
 const CLOUD_SKIP =
@@ -34,48 +44,36 @@ const CLOUD_SKIP =
  */
 const neutralDirectory = (env: Env) => homeDirectory(env)
 
-/**
- * Installs a command with `bun add -g` unless it is already available. Returns the report lines and
- * whether the command can be used afterwards (on a dry run, whether it would be).
- */
-const ensureGlobal = Effect.fn("ensureGlobal")(function* (
-  env: Env,
-  command: string,
-  packageName: string,
-  dryRun: boolean,
-) {
-  const shell = yield* Shell
-  if (Option.isSome(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present(`${command}: already installed`)] }
-  }
-  if (dryRun) {
-    return {
-      usable: true,
-      lines: [added(`${command}: would install with bun add -g ${packageName}`)],
-    }
-  }
-  // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
-  yield* reportSetupActivity(`Installing ${packageName}`)
-  const result = yield* shell.run(
-    "bun",
-    ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName],
-    { cwd: neutralDirectory(env) },
-  )
-  if (result.exitCode !== 0)
-    return { usable: false, lines: [failed(`bun add -g ${packageName}`, result)] }
-  const lines = [added(`${command}: installed with bun add -g ${packageName}`)]
-  const onPath = yield* shell.which(command)
-  const anywhere = yield* shell.which(command, { includeBunBin: true })
-  if (Option.isNone(onPath) && Option.isSome(anywhere)) {
-    lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`))
-  }
-  return { usable: true, lines }
-})
-
 /** Install the Context7 CLI without installing external instructions or accessing credentials. */
 export const installCtx7 = Effect.fn("installCtx7")(function* (env: Env, dryRun: boolean) {
-  const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun)
-  return result.lines
+  const installed = yield* lookupCtx7(env)
+  if (installed.kind === "mise")
+    return [
+      present(
+        `ctx7: already installed with mise at ${installed.path} (not on PATH; add its directory to PATH)`,
+      ),
+    ]
+  if (installed.kind === "unverified") return [`! ctx7: ${CTX7_MISE_UNVERIFIED}`]
+  if (installed.kind === "path" || installed.kind === "bun")
+    return [present("ctx7: already installed")]
+  if (dryRun) return [added("ctx7: would install with bun add -g ctx7")]
+
+  const shell = yield* Shell
+  // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
+  yield* reportSetupActivity("Installing ctx7")
+  const result = yield* shell.run(
+    "bun",
+    ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", "ctx7"],
+    { cwd: neutralDirectory(env) },
+  )
+  if (result.exitCode !== 0) return [failed("bun add -g ctx7", result)]
+  const lines = [added("ctx7: installed with bun add -g ctx7")]
+  const onPath = yield* shell.which("ctx7")
+  const anywhere = yield* shell.which("ctx7", { includeBunBin: true })
+  if (Option.isNone(onPath) && Option.isSome(anywhere)) {
+    lines.push(hint(`ctx7: ${anywhere.value} is not on PATH; add its directory to PATH`))
+  }
+  return lines
 })
 
 /** Turns a step that cannot finish (an unreadable settings file) into a failed line, not an abort. */
@@ -116,6 +114,10 @@ export interface SetupOptions {
   readonly worktrees?: boolean
   /** Whether agents may use devices in T3 Code (see `installT3Settings`); `true` when absent. */
   readonly deviceAccess?: boolean
+  /** Opt-in screenless support for device tools. Only apply mode can invoke installers. */
+  readonly devicePreparation?: "preview" | "apply"
+  /** The public entry separately performs and reports the requested desktop Browse handoff. */
+  readonly desktopBrowseHandoff?: boolean
   /**
    * The capabilities the run switches on or off, by `pi.features` key (see
    * `applyCapabilityChoices`).
@@ -198,6 +200,7 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   const cloud = inCloudSession(env)
   const piUsed = includePi && !cloud && (yield* piInUse(env))
   const surface = piExecutionSurface(env, piOnly ? "t3" : undefined)
+  let verifiedPi: string | undefined
   if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed)
     if (blockers.length > 0)
@@ -210,10 +213,30 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
         ],
         ok: false,
       } satisfies Report
+    if (!options.dryRun) {
+      const config = yield* Effect.result(
+        loadPiConfig(env, piOptions.cwd, scope, choices, options.piProviders),
+      )
+      if (config._tag === "Failure")
+        return {
+          ok: false,
+          lines: [`! pi config: ${config.failure.message}`],
+        } satisfies Report
+      if (config.success.pi.enable) {
+        const host = yield* Effect.result(probePiHost(env))
+        if (host._tag === "Failure")
+          return {
+            ok: false,
+            lines: [`! pi: ${host.failure.message}; ${PI_HOST_GUIDANCE}`],
+          } satisfies Report
+        verifiedPi = host.success.path
+      }
+    }
   }
   // A failed capability write blocks the dependent phases. They remain in the plan but never
   // report progress as though they ran.
   let piSteps = true
+  let deviceReadiness: string | null | undefined
   const whenPiSaved = () => piSteps
   const phase = (
     label: string,
@@ -264,7 +287,26 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           ),
           phase(
             "Pi packages",
-            asStep("pi packages", installPiPackages(env, piOptions)),
+            asStep(
+              "pi packages",
+              installPiPackages(env, {
+                ...piOptions,
+                requireVerifiedPi: piOnly && !options.dryRun,
+                ...(verifiedPi === undefined ? {} : { verifiedPi }),
+              }),
+            ).pipe(
+              Effect.tap((lines) =>
+                Effect.sync(() => {
+                  if (
+                    piOnly &&
+                    !options.dryRun &&
+                    verifiedPi === undefined &&
+                    lines.some((line) => line.startsWith("! "))
+                  )
+                    piSteps = false
+                }),
+              ),
+            ),
             whenPiSaved,
           ),
           phase(
@@ -274,26 +316,87 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           ),
           phase(
             "Browser-use checks",
-            asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })),
+            asStep(
+              "browser use",
+              reportBrowserUse(env, {
+                ...piOptions,
+                surface,
+                pairingHandledByCaller: options.desktopBrowseHandoff === true,
+              }),
+            ),
             whenPiSaved,
           ),
           // T3 Code's server settings are the user's own, so the step runs at scope user only.
           ...(scope === "user"
             ? [
+                ...(piOnly &&
+                options.deviceAccess === true &&
+                options.devicePreparation !== undefined
+                  ? [
+                      phase(
+                        "Device Simulator tools",
+                        Effect.gen(function* () {
+                          const config = yield* loadPiConfig(
+                            env,
+                            piOptions.cwd,
+                            "user",
+                            choices,
+                            options.piProviders,
+                          ).pipe(Effect.orElseSucceed(() => undefined))
+                          if (
+                            config?.pi.enable !== true ||
+                            !config.pi.t3.deviceAccess ||
+                            config.pi.t3.scope === "project"
+                          )
+                            return [
+                              hint(
+                                "Device Simulator: skipped by the existing Pi or T3 Code settings",
+                              ),
+                            ]
+                          deviceReadiness = null
+                          const t3 = yield* Effect.result(devicePreparationRefusal(env))
+                          if (t3._tag === "Failure")
+                            return [
+                              hint(
+                                "Device Simulator: not prepared because T3 Code settings could not be read",
+                              ),
+                            ]
+                          if (t3.success !== undefined)
+                            return [hint(`Device Simulator: ${t3.success}`)]
+                          const mode =
+                            options.dryRun || form.form !== "normal"
+                              ? "preview"
+                              : (options.devicePreparation ?? "preview")
+                          const prepared = yield* deviceToolchains(env, {
+                            mode,
+                            cwd: piOptions.cwd,
+                          })
+                          deviceReadiness = prepared.ready ?? null
+                          return prepared.lines
+                        }),
+                        whenPiSaved,
+                      ),
+                    ]
+                  : []),
                 phase(
                   "T3 Code settings",
                   asStep(
                     "t3 settings",
-                    installT3Settings(env, piOptions.cwd, {
-                      dryRun: options.dryRun,
-                      ...(options.piProviders === undefined
-                        ? {}
-                        : { providers: options.piProviders }),
-                      ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees }),
-                      ...(options.deviceAccess === undefined
-                        ? {}
-                        : { deviceAccess: options.deviceAccess }),
-                    }),
+                    Effect.suspend(() =>
+                      installT3Settings(env, piOptions.cwd, {
+                        dryRun: options.dryRun,
+                        ...(options.piProviders === undefined
+                          ? {}
+                          : { providers: options.piProviders }),
+                        ...(options.worktrees === undefined
+                          ? {}
+                          : { worktrees: options.worktrees }),
+                        ...(options.deviceAccess === undefined
+                          ? {}
+                          : { deviceAccess: options.deviceAccess }),
+                        ...(deviceReadiness === undefined ? {} : { deviceReadiness }),
+                      }),
+                    ),
                   ),
                   whenPiSaved,
                 ),

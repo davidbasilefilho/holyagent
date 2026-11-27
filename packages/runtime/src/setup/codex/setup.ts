@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto"
-import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
-import { basename, dirname, isAbsolute, join, resolve } from "node:path"
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { basename, dirname, isAbsolute, join, posix, resolve, win32 } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
@@ -40,6 +51,19 @@ const PluginList = Schema.Struct({
 const receiptFile = join("holyagent", "setup-v1.json")
 const digest = (content: string) => Bun.CryptoHasher.hash("sha256", content, "hex")
 const fail = (detail: string) => new StartupStageError({ detail })
+const installCodex =
+  "If Codex is already installed, put it on PATH. For a new installation, use the official stable release with `npm install -g @openai/codex@latest`, then rerun setup."
+const updateCodex =
+  "Check the official release with `npm view @openai/codex@latest version --registry=https://registry.npmjs.org/`. Update through your existing installation channel only if the release is stable and newer than your installed copy."
+const codexVersion = /^codex-cli (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\s*$/m
+// An audited behavioral result for the experimental native delegation mode, not an installation
+// requirement. Plugin API capability alone cannot establish enforcement of the native depth limit.
+const verifiedRootOnlyRelease = "0.172.0"
+const nativeQueries = [
+  { path: ["plugin", "marketplace", "add"], flags: ["json"] },
+  { path: ["plugin", "add"], flags: ["json"] },
+  { path: ["plugin", "list"], flags: ["json", "marketplace"] },
+] as const
 
 /** The dedicated Codex home used when setup is not given an explicit profile. */
 export const defaultCodexHome = (env: Env): string =>
@@ -154,6 +178,176 @@ const parseToml = (content: string) =>
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+const localMarketplacePath = (path: string, platform: NodeJS.Platform): string | undefined => {
+  if (/[\p{Cc}]/u.test(path)) return undefined
+  // Never collapse parent segments before filesystem lookup. A junction or symlink can give
+  // those segments different meaning from lexical normalization.
+  if (
+    path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === "..")
+  )
+    return undefined
+  if (platform !== "win32") return posix.isAbsolute(path) ? posix.normalize(path) : undefined
+  const extended = path.startsWith("\\\\?\\")
+  if (extended && (path.includes("/") || path.slice(4).includes("\\\\"))) return undefined
+  const drivePath = extended ? path.slice(4) : path.replaceAll("/", "\\")
+  if (!/^[a-z]:\\/i.test(drivePath)) return undefined
+  if (
+    drivePath
+      .slice(3)
+      .split("\\")
+      .some((part) => /[<>:"|?*]|[. ]$/u.test(part))
+  )
+    return undefined
+  return win32.normalize(drivePath)
+}
+
+/** Compare local Win32 path spellings, including the extended prefix native Codex writes. */
+export const sameCodexMarketplacePath = (
+  first: string,
+  second: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean => {
+  const a = localMarketplacePath(first, platform)
+  const b = localMarketplacePath(second, platform)
+  if (a === undefined || b === undefined) return false
+  return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b
+}
+
+const resolvedLocalPath = (path: string) =>
+  io(path, () => realpath(path)).pipe(
+    Effect.map((actual) => localMarketplacePath(actual, process.platform)),
+    Effect.orElseSucceed(() => undefined),
+  )
+
+const sameResolvedMarketplace = Effect.fn("sameResolvedCodexMarketplace")(function* (
+  left: string,
+  right: string,
+) {
+  if (left === right) return true
+  if (process.platform !== "win32" || !sameCodexMarketplacePath(left, right)) return false
+  const a = yield* statOptional(left)
+  const b = yield* statOptional(right)
+  // NTFS can have case-sensitive directories. Only accept a casing alias when both spellings
+  // resolve to the very same existing directory, not just the same lowercased string.
+  return (
+    a !== undefined &&
+    b !== undefined &&
+    a.isDirectory() &&
+    b.isDirectory() &&
+    a.ino > 0 &&
+    a.ino === b.ino &&
+    a.dev === b.dev
+  )
+})
+
+const receiptFor = (content: string) =>
+  Schema.decodeUnknownEffect(Receipt, { onExcessProperty: "error" })(content).pipe(
+    Effect.mapError(() => fail("Invalid HolyAgent Codex setup receipt; no files changed")),
+  )
+
+// Read the actual prior profile, not a similarly named manifest in an arbitrary folder.
+const priorMarketplaceProof = Effect.fn("priorCodexMarketplaceProof")(function* (market: string) {
+  const oldHome = dirname(dirname(market))
+  const expected = join(oldHome, CODEX_STARTUP_MARKETPLACE)
+  if (!sameCodexMarketplacePath(expected, market)) return
+  const prior = yield* resolvedLocalPath(yield* inside(oldHome, CODEX_STARTUP_MARKETPLACE))
+  if (prior === undefined || !(yield* sameResolvedMarketplace(market, prior))) return
+  const snapshot = yield* read(oldHome, receiptFile)
+  if (snapshot === undefined) return
+  const receipt = yield* receiptFor(snapshot)
+  const installed = codexMarketplaceFiles().map(({ path, content }) => ({
+    path: join(CODEX_STARTUP_MARKETPLACE, path),
+    content,
+  }))
+  const catalog = installed[0]
+  if (catalog === undefined || (yield* read(oldHome, catalog.path)) !== catalog.content) return
+  const pluginRoot = join(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent")
+  yield* checkPluginTree(oldHome, pluginRoot, installed.slice(1), false)
+  for (const { path } of installed) {
+    const file = yield* read(oldHome, path)
+    if (
+      file === undefined ||
+      !Object.hasOwn(receipt.files, path) ||
+      digest(file) !== receipt.files[path]
+    )
+      return
+  }
+  return digest(snapshot)
+})
+
+const marketplaceConflict = (source: unknown) => {
+  const local =
+    typeof source === "string" ? localMarketplacePath(source, process.platform) : undefined
+  return fail(
+    `Codex already has a different marketplace named ${CODEX_MARKETPLACE}${local === undefined ? "" : ` at ${local}`}; kept it unchanged. Use a separate --codex-home, or restore the original HolyAgent marketplace and review again.`,
+  )
+}
+
+const marketplaceLink = Effect.fn("planCodexMarketplaceLink")(function* (
+  registered: Readonly<Record<string, unknown>>,
+  target: string,
+) {
+  if (Object.keys(registered).length === 0) return { kind: "add" } as const
+  const source = registered.source
+  if (registered.source_type !== "local" || typeof source !== "string")
+    return yield* marketplaceConflict(source)
+  const clean = localMarketplacePath(source, process.platform)
+  if (clean === undefined) return yield* marketplaceConflict(source)
+  if (clean === localMarketplacePath(target, process.platform)) return { kind: "keep" } as const
+  const actual = yield* resolvedLocalPath(clean)
+  const destination = yield* resolvedLocalPath(target)
+  if (
+    actual !== undefined &&
+    destination !== undefined &&
+    (yield* sameResolvedMarketplace(actual, destination))
+  )
+    return { kind: "keep" } as const
+  if (actual === undefined) return yield* marketplaceConflict(source)
+  const proof = yield* priorMarketplaceProof(actual).pipe(Effect.orElseSucceed(() => undefined))
+  if (proof === undefined) return yield* marketplaceConflict(source)
+  return { kind: "relink", source, actual, proof } as const
+})
+
+// Codex writes this standalone table. Patch only its source and verify the parsed result before
+// writing. Other TOML representations are left untouched instead of being reserialized.
+const marketplaceHeader =
+  /^[ \t]*\[[ \t]*(?:marketplaces|"marketplaces"|'marketplaces')[ \t]*\.[ \t]*(?:holyagent-local|"holyagent-local"|'holyagent-local')[ \t]*\][ \t]*(?:#[^\r\n]*)?\r?$/gm
+const sourceLine =
+  /^([ \t]*(?:source|"source"|'source')[ \t]*=[ \t]*)(?:"(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*')([ \t]*(?:#[^\r\n]*)?\r?)$/gm
+
+const relinkMarketplaceConfig = Effect.fn("relinkCodexMarketplaceConfig")(function* (
+  text: string,
+  settings: Readonly<Record<string, unknown>>,
+  target: string,
+) {
+  const headers = [...text.matchAll(marketplaceHeader)]
+  const header = headers.length === 1 ? headers[0] : undefined
+  const unsupported = fail(
+    `Kept ${CODEX_MARKETPLACE} unchanged because the registered source cannot be safely updated in this config.toml format. Use a separate --codex-home.`,
+  )
+  if (header?.index === undefined) return yield* unsupported
+  const start = header.index + header[0].length
+  const remaining = text.slice(start)
+  const nextHeader = remaining.search(/^[ \t]*\[/m)
+  const section = nextHeader === -1 ? remaining : remaining.slice(0, nextHeader)
+  if ([...section.matchAll(sourceLine)].length !== 1) return yield* unsupported
+  const replaced = section.replace(
+    sourceLine,
+    (_, prefix: string, tail: string) => `${prefix}${JSON.stringify(target)}${tail}`,
+  )
+  const next = text.slice(0, start) + replaced + remaining.slice(section.length)
+  const marketplaces = record(settings.marketplaces)
+  const expected = {
+    ...settings,
+    marketplaces: {
+      ...marketplaces,
+      [CODEX_MARKETPLACE]: { ...record(marketplaces[CODEX_MARKETPLACE]), source: target },
+    },
+  }
+  if (!same(yield* parseToml(next), expected)) return yield* unsupported
+  return next
+})
+
 const developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m
 
 const ownedInstruction = (asset: CodexAsset, before: string): boolean => {
@@ -234,6 +428,38 @@ const store = Effect.fn("writeOwnedCodexSetupFile")(function* (
   }).pipe(Effect.ensuring(io(next, () => rm(next, { force: true })).pipe(Effect.ignore)))
 })
 
+const checkNativeCodex = Effect.fn("validateNativeCodexCapabilities")(function* (
+  run: (args: ReadonlyArray<string>, profile?: string) => Effect.Effect<string, StartupStageError>,
+) {
+  // Even harmless CLI probes can initialize helper files. Keep probes out of the target profile.
+  return yield* Effect.acquireUseRelease(
+    io(tmpdir(), () => mkdtemp(join(tmpdir(), "holyagent-codex-probe-"))),
+    (probe) =>
+      Effect.gen(function* () {
+        const release = codexVersion.exec(yield* run(["--version"], probe))?.[1]
+        if (release === undefined)
+          return yield* fail("`codex --version` did not identify the native CLI.")
+        yield* Effect.forEach(nativeQueries, ({ path, flags }) =>
+          Effect.gen(function* () {
+            const help = yield* run([...path, "--help"], probe)
+            const command = `codex ${path.join(" ")}`
+            const usage = new RegExp(`^Usage: codex(?:\\.exe)? ${path.join(" ")}(?:\\s|$)`, "m")
+            if (!usage.test(help)) return yield* fail(`${command} is not available.`)
+            for (const flag of flags)
+              if (!new RegExp(`(?:^|[ \\t,])--${flag}(?:[ \\t=,]|$)`, "m").test(help))
+                return yield* fail(`${command} does not support --${flag}.`)
+          }),
+        ).pipe(Effect.mapError(({ detail }) => fail(`Detected Codex ${release}. ${detail}`)))
+        return release
+      }),
+    (probe) => io(probe, () => rm(probe, { recursive: true, force: true })).pipe(Effect.ignore),
+  ).pipe(
+    Effect.mapError((error) =>
+      fail(`Incompatible native Codex CLI. ${error.detail} ${updateCodex}`),
+    ),
+  )
+})
+
 /** Provision a dedicated Codex home using the native marketplace and plugin commands. */
 export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: CodexSetupOptions) {
   if (!isAbsolute(options.home)) return yield* fail("--codex-home must be an absolute path")
@@ -244,15 +470,14 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
     return yield* fail("Invalid HolyAgent plugin version")
   const shell = yield* Shell
-  if (!options.dryRun && Option.isNone(yield* shell.which("codex")))
-    return yield* fail(
-      "Codex is not on PATH. Apply from an environment with the verified native Codex CLI. A setup preview does not require it.",
-    )
-  const run = (args: ReadonlyArray<string>) =>
+  const native = yield* shell.which("codex", { includeBunBin: true })
+  if (!options.dryRun && Option.isNone(native))
+    return yield* fail(`Codex is not on PATH. Preview does not require it. ${installCodex}`)
+  const run = (args: ReadonlyArray<string>, profile = home) =>
     shell
       .run("codex", args, {
         cwd: homeDirectory(env),
-        env: { CODEX_HOME: home, NO_COLOR: "1" },
+        env: { CODEX_HOME: profile, NO_COLOR: "1" },
       })
       .pipe(
         Effect.flatMap((result) =>
@@ -285,14 +510,15 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     )
   if (beforeConfig !== undefined) yield* checkPolicy(settings, yield* parseToml(config))
   const market = join(home, CODEX_STARTUP_MARKETPLACE)
-  const registered = record(record(settings.marketplaces)[CODEX_MARKETPLACE])
-  if (
-    Object.keys(registered).length > 0 &&
-    (registered.source !== market || registered.source_type !== "local")
-  )
-    return yield* fail(
-      `Codex already has a different marketplace named ${CODEX_MARKETPLACE}; kept it unchanged`,
-    )
+  const registration = record(settings.marketplaces)[CODEX_MARKETPLACE]
+  const registered = record(registration)
+  if (registration !== undefined && Object.keys(registered).length === 0)
+    return yield* marketplaceConflict(undefined)
+  const link = yield* marketplaceLink(registered, market)
+  const relinkedConfig =
+    link.kind === "relink" && beforeConfig !== undefined
+      ? yield* relinkMarketplaceConfig(beforeConfig, settings, market)
+      : undefined
   const plugin = record(record(settings.plugins)[CODEX_PLUGIN])
   if (plugin.enabled === false)
     return yield* fail(
@@ -302,11 +528,7 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
   const receipt =
     beforeReceipt === undefined
       ? { files: {} as Readonly<Record<string, string>> }
-      : yield* Schema.decodeUnknownEffect(Receipt, { onExcessProperty: "error" })(
-          beforeReceipt,
-        ).pipe(
-          Effect.mapError(() => fail("Invalid HolyAgent Codex setup receipt; no files changed")),
-        )
+      : yield* receiptFor(beforeReceipt)
   const assets = yield* Effect.forEach(
     desired.filter(({ path }) => path !== "config.toml"),
     (asset) =>
@@ -355,7 +577,6 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
   const cached = yield* statOptional(yield* inside(home, cache))
   if (cached !== undefined) yield* checkPluginTree(home, cache, expectedCache, true)
   const install = plugin.enabled !== true || cached === undefined
-  const addMarket = Object.keys(registered).length === 0
   const fingerprint = digest(
     JSON.stringify([
       home,
@@ -363,7 +584,7 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       beforeConfig,
       beforeOverride,
       beforeReceipt,
-      addMarket,
+      link,
       install,
       assets.map(({ path, before, content }) => [path, before, content]),
     ]),
@@ -373,13 +594,19 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
   const lines = [
     `~ Codex home: ${home}`,
     `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
+    ...(options.dryRun && Option.isNone(native)
+      ? [`~ Codex CLI: not on PATH. ${installCodex}`]
+      : []),
     ...(beforeConfig === undefined
       ? ["+ Codex config: create a dedicated startup profile"]
       : ["= Codex config: keeping existing settings"]),
     ...assets
       .filter(({ before, content }) => before !== content)
       .map(({ path }) => `+ Codex asset: ${path}`),
-    ...(addMarket ? ["+ Codex plugin: register the local marketplace"] : []),
+    ...(link.kind === "add" ? ["+ Codex plugin: register the local marketplace"] : []),
+    ...(link.kind === "relink"
+      ? ["+ Codex plugin: relink the verified HolyAgent marketplace"]
+      : []),
     ...(install
       ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`]
       : [`= Codex plugin: ${version} already present in the local cache`]),
@@ -405,16 +632,35 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       ...(managedConflicts.length > 0 ? { managedConflicts } : {}),
     }
   const backups: string[] = []
+  let relinked = false
   const backupRoot = join("holyagent", "setup-backups", randomUUID())
+  const verifyActiveMarketplace = Effect.fn("verifyActiveCodexMarketplace")(function* () {
+    const liveConfig = yield* read(home, "config.toml")
+    if (liveConfig === undefined) return yield* fail("Codex config.toml disappeared during setup.")
+    const liveSettings = yield* parseToml(liveConfig)
+    const active = record(record(liveSettings.marketplaces)[CODEX_MARKETPLACE])
+    if ((yield* marketplaceLink(active, market)).kind !== "keep")
+      return yield* fail(
+        "The active Codex marketplace source changed during setup. Review it again.",
+      )
+    if (
+      record(liveSettings.features).plugins === false ||
+      record(record(liveSettings.plugins)[CODEX_PLUGIN]).enabled === false
+    )
+      return yield* fail("The HolyAgent plugin is now disabled. Setup kept that choice unchanged.")
+    yield* checkPolicy(liveSettings, yield* parseToml(config))
+    yield* checkPluginTree(home, sourceRoot, pluginAssets, true)
+  })
   const steps = [
     {
       label: "Codex runtime",
       run: Effect.gen(function* () {
-        const binary = yield* run(["--version"])
-        if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
+        const version = yield* checkNativeCodex(run)
+        if (options.catalog !== undefined && version !== verifiedRootOnlyRelease)
           return yield* fail(
-            "This startup profile requires the verified Codex 0.172.0 runtime line",
+            `Codex ${version} supports plugin setup, but native root-only delegation has not been verified on this build. Remove --root-only-catalog and use a separate direct-only profile. No profile files were changed.`,
           )
+        lines.push(`= Codex CLI ${version}: marketplace and plugin commands verified`)
       }),
     },
     {
@@ -424,7 +670,8 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
           (yield* canonicalProfile(options.home)) !== home ||
           (yield* read(home, "config.toml")) !== beforeConfig ||
           (yield* read(home, "AGENTS.override.md")) !== beforeOverride ||
-          (yield* read(home, receiptFile)) !== beforeReceipt
+          (yield* read(home, receiptFile)) !== beforeReceipt ||
+          !same(yield* marketplaceLink(registered, market), link)
         )
           return yield* fail(`Profile changed during setup: ${join(home, "config.toml")}`)
         if (options.expectedPlan !== undefined)
@@ -461,11 +708,22 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
         yield* store(home, receiptFile, beforeReceipt, nextReceipt)
       }),
     },
-    ...(addMarket
+    ...(link.kind === "add" || relinkedConfig !== undefined
       ? [
           {
             label: "Codex marketplace",
             run: Effect.gen(function* () {
+              if (relinkedConfig !== undefined) {
+                if (!same(yield* marketplaceLink(registered, market), link))
+                  return yield* fail(
+                    "The previous HolyAgent marketplace changed. Review setup again.",
+                  )
+                yield* Effect.gen(function* () {
+                  yield* store(home, "config.toml", beforeConfig, relinkedConfig)
+                  relinked = true
+                }).pipe(Effect.uninterruptible)
+                return
+              }
               yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MarketplaceResult))(
                 yield* run(["plugin", "marketplace", "add", market, "--json"]),
               ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected marketplace")))
@@ -478,6 +736,7 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       run: Effect.gen(function* () {
         if (install) {
           yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`)
+          yield* verifyActiveMarketplace()
           const result = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginResult))(
             yield* run(["plugin", "add", CODEX_PLUGIN, "--json"]),
           ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected plugin")))
@@ -486,6 +745,7 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
           yield* checkPluginTree(home, cache, expectedCache, true)
         }
         yield* reportSetupActivity(`Checking enabled version ${version}`)
+        yield* verifyActiveMarketplace()
         const list = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginList))(
           yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"]),
         ).pipe(Effect.mapError(() => fail("Codex did not report enabled plugins for this profile")))
@@ -498,11 +758,26 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
       }),
     },
   ]
-  for (const [index, { label, run }] of steps.entries())
-    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run).pipe(
-      Effect.mapError((error) =>
-        backups.length === 0 ? error : fail(`${error.detail}\nBackups: ${backups.join(", ")}`),
-      ),
-    )
+  yield* Effect.forEach(steps, ({ label, run }, index) =>
+    withSetupPhase({ index: index + 1, total: steps.length, label }, run),
+  ).pipe(
+    Effect.catchTag("StartupStageError", (error) =>
+      Effect.gen(function* () {
+        const detail = [error.detail]
+        if (relinked && beforeConfig !== undefined && relinkedConfig !== undefined) {
+          const rollback = yield* Effect.result(
+            store(home, "config.toml", relinkedConfig, beforeConfig),
+          )
+          detail.push(
+            rollback._tag === "Success"
+              ? "Restored the previous marketplace source."
+              : "The profile changed after relinking. Kept those changes and the original marketplace files. Review config.toml before retrying.",
+          )
+        }
+        if (backups.length > 0) detail.push(`Backups: ${backups.join(", ")}`)
+        return yield* fail(detail.join("\n"))
+      }),
+    ),
+  )
   return { ok: true, lines, fingerprint }
 })

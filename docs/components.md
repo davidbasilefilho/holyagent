@@ -46,7 +46,7 @@ When a program is missing, the command fails with `ToolMissing`, which names it 
 
 ## Context7 CLI
 
-`holyagent setup` installs the `ctx7` CLI with `bun add -g ctx7` when it is missing. Setup no longer runs Context7's external instruction installer. Existing skills, rules and credentials are left in place; inspect and manage any older installation yourself. Authentication is managed separately by Context7. `holyagent doctor` checks CLI availability, not authentication or service readiness.
+`holyagent setup` reuses `ctx7` on PATH, in Bun's global bin directory, or installed as `npm:ctx7` in mise. If the mise installation is not on PATH, setup and doctor give its path without changing PATH. Setup uses `bun add -g ctx7` only when it finds no existing installation. If a mise installation cannot be verified, it reports that instead of installing another copy. Setup no longer runs Context7's external instruction installer. Existing skills, rules and credentials are left in place; inspect and manage any older installation yourself. Authentication is managed separately by Context7. `holyagent doctor` checks CLI availability, not authentication or service readiness.
 
 ## What `holyagent setup` and `holyagent doctor` do
 
@@ -64,7 +64,7 @@ In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of 
 `holyagent doctor [--scope user|project|local] [--fix]` prints one line per check and exits 1 when any fails:
 
 - `bun` is on `PATH`;
-- `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
+- `ctx7` is available on PATH or installed by Bun or mise (it passes in a cloud session, where setup leaves it out);
 - the user settings have the keys `holyagent setup` writes;
 - for standalone search, `rg` and `fd` (or `fdfind`) are on `PATH` ([ripgrep and fd](#ripgrep-and-fd)): `ok` with the path, else a `~` warning that names what stops working (`holyagent-cli rg` or `holyagent-cli fd`) and the install commands; it never fails the report;
 - the Pi checks, run only when Pi is in use (`HOLYAGENT_HOST=pi` or `pi` on `PATH`; never in a cloud session) and `pi.enable` is on: `pi` is on `PATH` at the pinned version or newer, Node.js is 22.19 or newer, the HolyAgent Pi package is listed in Pi's global settings (for `--scope project` and `local`, the project's `.pi/settings.json` counts too), and every package the config of the chosen `--scope` enables is listed in them at its pin. With `pi.enable` off it prints no Pi line. When Pi is in use, a `~ tool settings <file> lacks <keys>` hint follows for each tool settings file that lacks keys, with `holyagent setup` as the fix. When Pi is not in use, one `~ pi: not in use` line is printed and nothing fails. These checks only report, with the install command as the fix, and `--fix` installs none of them ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do));

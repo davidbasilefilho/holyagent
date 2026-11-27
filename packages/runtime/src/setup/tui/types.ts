@@ -27,11 +27,10 @@ export interface Choices {
   readonly harnesses?: { readonly pi: boolean; readonly claude: boolean; readonly codex?: boolean }
 }
 
-/** A local browser candidate; discovering it does not prove Browse is installed or paired. */
+/** A detected Chromium candidate. Discovery does not prove either extension is installed or paired. */
 export interface BrowserOption {
   readonly id: string
   readonly name: string
-  readonly browseCompatibility: "supported" | "unverified" | "unsupported"
 }
 
 /** One capability row of the choose screen. */
@@ -167,6 +166,20 @@ export interface TerminalOutput {
   readonly env: TuiInput["env"]
   readonly lines: ReadonlyArray<TerminalOutputLine>
 }
+
+/** Content shared by the plain public help and its static terminal layout. */
+export interface PublicHelp {
+  readonly commands: ReadonlyArray<{ readonly name: string; readonly summary: string }>
+}
+
+/** Terminal dimensions and options for one static help render. */
+export interface PublicHelpInput extends PublicHelp {
+  readonly env: TuiInput["env"]
+  readonly width: number
+}
+
+/** The static help renderer exported by the public bundle. */
+export type PublicHelpRenderer = (input: PublicHelpInput) => Promise<string>
 
 /** The inline formatter exported by the packaged renderer. */
 export type TerminalOutputRenderer = (input: TerminalOutput) => string

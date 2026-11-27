@@ -1425,6 +1425,7 @@ var isSome2 = isSome;
 var getOrElse = /* @__PURE__ */ dual(2, (self, onNone) => isNone2(self) ? onNone() : self.value);
 var fromNullishOr = (a) => a == null ? none2() : some2(a);
 var getOrUndefined = /* @__PURE__ */ getOrElse(constUndefined);
+var toArray = (self) => isNone2(self) ? [] : [self.value];
 var filter = /* @__PURE__ */ dual(2, (self, predicate) => isNone2(self) ? none2() : predicate(self.value) ? some2(self.value) : none2());
 
 var ServiceTypeId = "~effect/Context/Service";
@@ -4663,6 +4664,7 @@ var suspend2 = suspend;
 var sync2 = sync;
 var void_3 = void_;
 var callback2 = callback;
+var never2 = never;
 var gen2 = gen;
 var fail5 = fail3;
 var failCauseSync2 = failCauseSync;
@@ -5446,7 +5448,7 @@ var Never = class extends ASTNodeImpl {
     return "never";
   }
 };
-var never2 = /* @__PURE__ */ new Never;
+var never3 = /* @__PURE__ */ new Never;
 var Unknown = class extends ASTNodeImpl {
   _tag = "Unknown";
   getParser() {
@@ -7599,7 +7601,7 @@ function Literal2(literal) {
   });
   return out;
 }
-var Never2 = /* @__PURE__ */ make7(never2);
+var Never2 = /* @__PURE__ */ make7(never3);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var Undefined2 = /* @__PURE__ */ make7(undefined_2);
@@ -7857,6 +7859,38 @@ function isInt(annotations) {
   });
 }
 var Int = /* @__PURE__ */ Number5.check(/* @__PURE__ */ isInt());
+function makeIsMinLength(minLength, minCodePoints, annotations) {
+  return makeFilter2((input) => input.length >= minLength, {
+    expected: `a value with a length of at least ${minLength}`,
+    representation: {
+      id: "effect/schema/isMinLength",
+      payload: {
+        minLength
+      }
+    },
+    toJsonSchema: ({
+      type
+    }) => type === "string" ? minLength <= 1 ? {
+      minLength: minCodePoints
+    } : [{
+      minLength: minCodePoints
+    }, true] : type === "array" ? {
+      minItems: minLength
+    } : type === undefined ? [{
+      minLength: minCodePoints,
+      minItems: minLength
+    }, true] : [{}, true],
+    [STRUCTURAL_ANNOTATION_KEY]: true,
+    arbitraryConstraint: {
+      minLength
+    },
+    ...annotations
+  });
+}
+function isNonEmpty(annotations) {
+  return makeIsMinLength(1, 1, annotations);
+}
+var NonEmptyString = /* @__PURE__ */ String5.check(/* @__PURE__ */ isNonEmpty());
 var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   representation: {
     id: "effect/schema/RegExp",
@@ -8737,9 +8771,9 @@ var describeFailure = (error, words = CLAUDE_WORDS) => {
   };
 };
 
-import { constants as constants7, fstatSync } from "fs";
-import { open as open8, stat as stat7 } from "fs/promises";
-import { resolve as resolve15 } from "path";
+import { constants as constants8, fstatSync } from "fs";
+import { open as open8, stat as stat9 } from "fs/promises";
+import { resolve as resolve16 } from "path";
 var version = "0.4.0";
 var package_default = {
   name: "holyagent",
@@ -8848,6 +8882,12 @@ var nodeFileSystem = {
   },
   get readdirSync() {
     return sync3.readdirSync;
+  },
+  get lstatSync() {
+    return sync3.lstatSync;
+  },
+  get realpathSync() {
+    return sync3.realpathSync;
   },
   get statSync() {
     return sync3.statSync;
@@ -15889,51 +15929,7 @@ var pr = (context, root, state, input) => gen2(function* () {
     allowWords: settings.allowWords ?? []
   });
 });
-class SetupFailure extends TaggedError2("SetupFailure") {
-}
-
-var FORM_CHOICES = CAPABILITY_FORMS;
-var DEFAULT_FORM_CHOICE = {
-  form: "normal",
-  source: "default",
-  reason: "no form was asked for"
-};
-var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
-var inCi = (env) => {
-  const value = env["CI"]?.trim().toLowerCase();
-  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
-};
-var detectForm = (env, platform = process.platform) => {
-  if (inCloudSession(env))
-    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
-  if (inCi(env))
-    return { form: "headless", source: "detected", reason: "CI is set" };
-  if (!hasDisplay(env, platform))
-    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
-  return { form: "normal", source: "detected", reason: "a graphical session is available" };
-};
-var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
-var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
-
-import { join as join17 } from "path";
-
-var WEB_KIT_PACKAGE = "pi-web-kit";
-var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
-  const { enable, features } = config.pi;
-  if (!enable)
-    return [];
-  const names = [
-    ...new Set([
-      config.pi.providers === undefined ? profile.package : undefined,
-      ...enabledPiProviders(config).map((provider) => PROVIDERS[provider].package)
-    ].filter((name) => name !== undefined)),
-    ...capabilityPackages(features, form, definitions, platform),
-    ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
-  ];
-  return names.map((name) => piPackageSource(name));
-};
-
-import { isAbsolute as isAbsolute7, join as join15 } from "path";
+import { posix as posix2, win32 as win322 } from "path";
 
 import { homedir as homedir2 } from "os";
 import { join as join13 } from "path";
@@ -15951,7 +15947,322 @@ var userFiles = (env) => {
   };
 };
 
-import { basename as basename6, dirname as dirname8, join as join14 } from "path";
+import { constants as constants5, realpathSync as realpathSync2 } from "fs";
+import { delimiter, dirname as dirname8, isAbsolute as isAbsolute7, join as join14, posix, win32 } from "path";
+import { fileURLToPath } from "url";
+
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
+var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
+
+var whichInDirectory = (fs, command, directory) => {
+  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
+  for (const name of names) {
+    const candidate = join14(directory || ".", name);
+    try {
+      fs.accessSync(candidate, process.platform === "win32" ? constants5.F_OK : constants5.X_OK);
+      if (fs.statSync(candidate).isFile())
+        return candidate;
+    } catch {}
+  }
+  return null;
+};
+var whichWith = (fs, command, options) => {
+  for (const directory of options.PATH.split(delimiter)) {
+    const found = whichInDirectory(fs, command, directory);
+    if (found !== null)
+      return found;
+  }
+  return null;
+};
+var which = (command, options) => whichWith(nodeFileSystem, command, options);
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join14(options.home, ".bun");
+  const bunBin = join14(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var comparableToolPath = (api, path) => {
+  if (api !== win32)
+    return path;
+  if (/^\\\\\?\\[a-z]:\\/i.test(path))
+    return win32.normalize(path.slice(4));
+  if (/^\\\\\?\\UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(path))
+    return win32.normalize(`\\\\${path.slice(8)}`);
+  return win32.normalize(path);
+};
+var isInside = (api, parent, path) => {
+  const relative = api.relative(comparableToolPath(api, parent), comparableToolPath(api, path));
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+};
+var checkoutAncestors = (api, cwd, fs) => {
+  const roots = [];
+  for (let dir = cwd;; dir = api.dirname(dir)) {
+    try {
+      const path = api.join(dir, ".git");
+      const marker = fs.lstatSync(path);
+      if (marker.isDirectory()) {
+        const head = fs.lstatSync(api.join(path, "HEAD"));
+        if (head.isFile() || head.isSymbolicLink())
+          roots.push(dir);
+      } else if (marker.isFile() && marker.size > 0 || marker.isSymbolicLink()) {
+        roots.push(dir);
+      }
+    } catch (error) {
+      if (!(error instanceof Error && ("code" in error) && error.code === "ENOENT"))
+        throw error;
+    }
+    if (api.dirname(dir) === dir)
+      return roots;
+  }
+};
+var toolPathExclusions = (api, cwd, options = {}, fs = nodeFileSystem) => {
+  if (!api.isAbsolute(cwd))
+    return;
+  try {
+    const lexical = comparableToolPath(api, cwd);
+    const physical = comparableToolPath(api, fs.realpathSync(cwd));
+    const roots = new Set([lexical, physical]);
+    if (options.home !== undefined) {
+      const home = comparableToolPath(api, options.home);
+      const physicalHome = comparableToolPath(api, fs.realpathSync(options.home));
+      for (const root of roots) {
+        if (api.relative(home, root) === "" || api.relative(physicalHome, root) === "")
+          roots.delete(root);
+      }
+    }
+    if (options.includeCheckout) {
+      for (const root of [
+        ...checkoutAncestors(api, lexical, fs),
+        ...checkoutAncestors(api, physical, fs)
+      ]) {
+        roots.add(root);
+        roots.add(comparableToolPath(api, fs.realpathSync(root)));
+      }
+    }
+    return [...roots];
+  } catch {
+    return;
+  }
+};
+var strictWhich = (command, path, strict, lookup = which) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  if (!api.isAbsolute(strict.cwd))
+    return null;
+  const excluded = strict.which === undefined ? toolPathExclusions(api, strict.cwd, { includeCheckout: strict.excludeCheckout === true }) : [strict.cwd];
+  if (excluded === undefined)
+    return null;
+  const excludedPath = (candidate) => excluded.some((root) => isInside(api, root, candidate));
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !excludedPath(entry));
+  if (trusted.length === 0)
+    return null;
+  const acceptable = (found) => {
+    if (found === null || !api.isAbsolute(found) || excludedPath(found))
+      return false;
+    if (windows && !found.toLowerCase().endsWith(".exe"))
+      return false;
+    if (strict.which === undefined) {
+      try {
+        if (excludedPath(realpathSync2(found)))
+          return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
+    return acceptable(found) ? found : null;
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory });
+    if (acceptable(found))
+      return found;
+  }
+  return null;
+};
+var findCommand = (env, command, options, lookup = which) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.directory !== undefined ? isAbsolute7(options.directory) ? whichInDirectory(nodeFileSystem, command, options.directory) : null : options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
+};
+var EMPTY_BUNFIG = join14(dirname8(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => {
+        const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
+        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
+        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
+        if (batch !== undefined && !batch.ok)
+          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
+        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
+          exitCode: result.code,
+          stdout: new TextDecoder().decode(result.stdout),
+          stderr: result.stderr
+        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
+      }
+    }));
+  };
+}
+
+var Installed = Struct({
+  version: String5,
+  install_path: String5,
+  installed: Boolean3,
+  active: Boolean3,
+  requested_version: optional2(String5),
+  source: optional2(Record(String5, String5)),
+  sources: optional2(ArraySchema(Record(String5, String5))),
+  symlinked_to: optional2(String5),
+  broken: optional2(Boolean3),
+  scheduled_for_pruning: optional2(Boolean3),
+  prune_after: optional2(String5)
+});
+var Inventory = fromJsonString2(ArraySchema(Installed));
+var Bins = fromJsonString2(ArraySchema(Struct({ name: String5, path: String5, symlink: Boolean3 })));
+var tool = "npm:ctx7";
+var discoveryOptions = {
+  MISE_OFFLINE: "1",
+  MISE_AUTO_INSTALL: "0",
+  MISE_NOT_FOUND_AUTO_INSTALL: "0"
+};
+var versionNumber = /^\d+\.\d+\.\d+(?:[-+][\dA-Za-z.-]+)*$/;
+var controls = /\p{Cc}/u;
+var lookupCtx7 = fn2("lookupCtx7")(function* (env, cwd = process.cwd(), platform = process.platform) {
+  const shell = yield* Shell;
+  const onPath = yield* shell.which("ctx7");
+  if (isSome2(onPath))
+    return { kind: "path", path: onPath.value };
+  const inBun = yield* shell.which("ctx7", { includeBunBin: true });
+  if (isSome2(inBun))
+    return { kind: "bun", path: inBun.value };
+  const mise = yield* shell.which("mise", { strict: { cwd, platform, excludeCheckout: true } });
+  if (isNone2(mise))
+    return { kind: isSome2(yield* shell.which("mise")) ? "unverified" : "missing" };
+  const options = { cwd: homeDirectory2(env), env: discoveryOptions };
+  const inventory = yield* shell.run(mise.value, ["--no-config", "ls", "--installed", "--json", tool], options);
+  const records = decodeUnknownOption2(Inventory)(inventory.stdout, {
+    onExcessProperty: "error"
+  });
+  if (inventory.exitCode !== 0 || isNone2(records))
+    return { kind: "unverified" };
+  if (records.value.length === 0)
+    return { kind: inventory.stderr.trim() === "" ? "missing" : "unverified" };
+  const api = platform === "win32" ? win322 : posix2;
+  const absolute = (path) => api.isAbsolute(path) && !controls.test(path) && (platform !== "win32" || /^(?:[a-z]:[\\/]|\\\\[^?.])/i.test(path));
+  const installed = records.value.filter((record) => record.installed && !record.broken && versionNumber.test(record.version) && absolute(record.install_path));
+  for (const record of installed.toReversed()) {
+    const reported = yield* shell.run(mise.value, ["--no-config", "bin-paths", "--json", `${tool}@${record.version}`], options);
+    const bins = decodeUnknownOption2(Bins)(reported.stdout, { onExcessProperty: "error" });
+    if (reported.exitCode !== 0 || isNone2(bins))
+      continue;
+    for (const bin of bins.value) {
+      if (!absolute(bin.path))
+        continue;
+      const name = api.basename(bin.path);
+      if (platform === "win32" ? !/^ctx7(?:\.(?:exe|cmd|bat))?$/i.test(name) : name !== "ctx7")
+        continue;
+      const relative = api.relative(record.install_path, bin.path);
+      if (relative === "" || relative === ".." || relative.startsWith(`..${api.sep}`) || api.isAbsolute(relative))
+        continue;
+      const found = yield* shell.which("ctx7", { directory: api.dirname(bin.path) });
+      if (isSome2(found) && api.relative(bin.path, found.value) === "")
+        return { kind: "mise", path: found.value };
+    }
+  }
+  return { kind: "unverified" };
+});
+var CTX7_MISE_UNVERIFIED = "could not verify mise's npm:ctx7 installation; make an existing ctx7 available on PATH or check mise";
+
+class SetupFailure extends TaggedError2("SetupFailure") {
+}
+
+import { release as release2 } from "os";
+var FORM_CHOICES = CAPABILITY_FORMS;
+var DEFAULT_FORM_CHOICE = {
+  form: "normal",
+  source: "default",
+  reason: "no form was asked for"
+};
+var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var localGraphicalHostUnavailable = (env, platform = process.platform, kernel = release2()) => {
+  const remote = [
+    "SSH_CLIENT",
+    "SSH_CONNECTION",
+    "SSH_TTY",
+    "WSL_DISTRO_NAME",
+    "WSL_INTEROP",
+    "CODEX_CAAS_SESSION_ID"
+  ];
+  if (inCi(env) || inCloudSession(env) || remote.some((name) => firstNonEmpty2(env[name]) !== undefined) || platform === "linux" && /microsoft|wsl/i.test(kernel))
+    return "remote";
+  if (!["darwin", "linux", "win32"].includes(platform) || !hasDisplay(env, platform) || platform === "linux" && !firstNonEmpty2(env.WAYLAND_DISPLAY) && !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "") || platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
+    return "no-display";
+  return;
+};
+var detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  if (inCi(env))
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
+};
+var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
+var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
+
+import { join as join18 } from "path";
+
+var WEB_KIT_PACKAGE = "pi-web-kit";
+var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const names = [
+    ...new Set([
+      config.pi.providers === undefined ? profile.package : undefined,
+      ...enabledPiProviders(config).map((provider) => PROVIDERS[provider].package)
+    ].filter((name) => name !== undefined)),
+    ...capabilityPackages(features, form, definitions, platform),
+    ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
+  ];
+  return names.map((name) => piPackageSource(name));
+};
+
+import { isAbsolute as isAbsolute8, join as join16 } from "path";
+
+import { basename as basename6, dirname as dirname9, join as join15 } from "path";
 var JsonObjectText = fromJsonString2(Record(String5, Unknown2), {
   space: 2
 });
@@ -15998,8 +16309,8 @@ var replaceJsonObject = (path, value, options, snapshot) => gen2(function* () {
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => fs.stat(target))).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join14(dirname8(target), `.${basename6(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname8(target), "write", () => fs.mkdir(dirname8(target), { recursive: true }));
+  const temporary = join15(dirname9(target), `.${basename6(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname9(target), "write", () => fs.mkdir(dirname9(target), { recursive: true }));
   yield* tryPromise2({
     try: () => fs.writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -16077,9 +16388,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty2(env["XDG_DATA_HOME"]);
-  return join15(data !== undefined && isAbsolute7(data) ? data : join15(homeDirectory2(env), ".local", "share"), "browse");
+  return join16(data !== undefined && isAbsolute8(data) ? data : join16(homeDirectory2(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join15(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join16(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String5, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String5.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -16118,7 +16429,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
-    const support = join15(home, "Library", "Application Support");
+    const support = join16(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -16130,22 +16441,22 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Vivaldi", "Vivaldi"],
       ["Helium", "net.imput.helium"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join15(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join16(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join15(home, "AppData", "Local");
-    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join15(home, "AppData", "Roaming");
+    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join16(home, "AppData", "Local");
+    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join16(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join15(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join15(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join15(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join15(local, "Vivaldi", "User Data") },
-      { name: "Helium", directory: join15(local, "imput", "Helium", "User Data") },
-      { name: "Opera", directory: join15(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join16(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join16(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join16(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join16(local, "Vivaldi", "User Data") },
+      { name: "Helium", directory: join16(local, "imput", "Helium", "User Data") },
+      { name: "Opera", directory: join16(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty2(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute7(configured) ? configured : join15(home, ".config");
+  const config = configured !== undefined && isAbsolute8(configured) ? configured : join16(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -16156,7 +16467,7 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"],
     ["Helium", "net.imput.helium"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join15(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join16(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String5, Open)) }), [Open]))
@@ -16171,15 +16482,15 @@ var isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
-var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join15(directory, "Local State"));
+var findBrowseProfiles = (env, platform = process.platform, includeExtensionId = false) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
+  const state = yield* readOptional(join16(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
     if (profile === "." || profile === ".." || /[/\\]/.test(profile) || profile.includes("\x00"))
       return [];
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join15(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join16(directory, profile, file)).pipe(map4((text) => {
       if (text === undefined)
         return;
       const parsed = decodeUnknownOption2(Preferences)(text, {
@@ -16189,12 +16500,13 @@ var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserD
     })));
     if (state === undefined && settings.every((value) => value === undefined))
       return [];
-    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
+    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [{ id, value: entries[id] }]))[0];
     return [
       {
         browser: name,
         profile,
-        extension: entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled"
+        extension: entry === undefined ? "missing" : isDisabled(entry.value) ? "disabled" : "enabled",
+        ...includeExtensionId && entry !== undefined ? { extensionId: entry.id } : {}
       }
     ];
   }));
@@ -16226,123 +16538,7 @@ var describeBrowseState = (state, runner = "npm") => {
 };
 
 import { existsSync as existsSync2, readdirSync as readdirSync2 } from "fs";
-import { posix as posix2, win32 as win322 } from "path";
-
-import { constants as constants5, realpathSync } from "fs";
-import { delimiter, dirname as dirname9, join as join16, posix, win32 } from "path";
-import { fileURLToPath } from "url";
-
-var UNQUOTABLE = /["%^!]|\p{Cc}/u;
-var BARE_SYNTAX = /[&|<>()]/;
-var cmdExeArguments = (command, args) => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
-      };
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
-      };
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
-};
-var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
-
-var whichWith = (fs, command, options) => {
-  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
-  for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join16(directory || ".", name);
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants5.F_OK : constants5.X_OK);
-        if (fs.statSync(candidate).isFile())
-          return candidate;
-      } catch {}
-    }
-  }
-  return null;
-};
-var which = (command, options) => whichWith(nodeFileSystem, command, options);
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join16(options.home, ".bun");
-  const bunBin = join16(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
-};
-var strictWhich = (command, path, strict, lookup = which) => {
-  const windows = (strict.platform ?? process.platform) === "win32";
-  const api = windows ? win32 : posix;
-  if (!api.isAbsolute(strict.cwd))
-    return null;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
-  if (trusted.length === 0)
-    return null;
-  const acceptable = (found) => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
-      return false;
-    if (windows && !found.toLowerCase().endsWith(".exe"))
-      return false;
-    if (strict.which === undefined) {
-      try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
-          return false;
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  };
-  if (strict.which !== undefined) {
-    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
-    return acceptable(found) ? found : null;
-  }
-  for (const directory of trusted) {
-    const found = lookup(command, { PATH: directory });
-    if (acceptable(found))
-      return found;
-  }
-  return null;
-};
-var findCommand = (env, command, options, lookup = which) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
-  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
-};
-var EMPTY_BUNFIG = join16(dirname9(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => {
-        const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
-        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
-        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
-        if (batch !== undefined && !batch.ok)
-          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
-        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
-          exitCode: result.code,
-          stdout: new TextDecoder().decode(result.stdout),
-          stderr: result.stderr
-        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
-      }
-    }));
-  };
-}
-
+import { posix as posix3, win32 as win323 } from "path";
 var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH";
 var LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
 var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
@@ -16354,7 +16550,7 @@ var BUILD_EXECUTABLES = {
   ],
   win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
 };
-var pathsOf = (platform) => platform === "win32" ? win322 : posix2;
+var pathsOf = (platform) => platform === "win32" ? win323 : posix3;
 var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
 var inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
@@ -16402,6 +16598,161 @@ var chromiumFixFor = (env, fix, exists = existsSync2, which = onPath) => {
   return given === undefined || resolveConfigured(given.path, env, exists, which) !== undefined ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
 };
 
+import { mkdtemp as mkdtemp3, rm as rm9, writeFile as writeFile6 } from "fs/promises";
+import { tmpdir as tmpdir2 } from "os";
+import { isAbsolute as isAbsolute9, join as join17, win32 as win324 } from "path";
+var PROBE_COMMAND = "holyagent-compatibility-probe";
+var PROBE_APIS = [
+  "on",
+  "registerCommand",
+  "registerTool",
+  "registerToolRenderer",
+  "registerFlag",
+  "getFlag",
+  "getAllTools",
+  "getActiveTools",
+  "setActiveTools",
+  "getSessionName",
+  "exec",
+  "registerMcpServer"
+];
+var PROBE_EXTENSION = `
+export default function (pi) {
+  if (${JSON.stringify(PROBE_APIS)}.every((name) => typeof pi[name] === "function")) {
+    pi.registerCommand(${JSON.stringify(PROBE_COMMAND)}, {
+      description: "Temporary offline capability probe",
+      handler: () => {}
+    });
+  }
+}
+`;
+var RPC_INPUT = `{"id":"ha-state","type":"get_state"}
+{"id":"ha-commands","type":"get_commands"}
+`;
+var SAFE_FLAGS = ["--offline", "--no-session", "--no-extensions", "--no-approve", "--no-skills"];
+var VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+var TIMEOUT_MS = 7000;
+var fail8 = (message) => new SetupFailure({ message });
+
+class PiProbeTransport extends Service()("holyagent/PiProbeTransport") {
+}
+var commandFor = (executable, args, env) => {
+  if (process.platform !== "win32" || !isBatchFile(executable))
+    return { program: executable, args };
+  const windows = firstNonEmpty2(caseInsensitiveEnv(env, "SYSTEMROOT"), caseInsensitiveEnv(env, "WINDIR"));
+  const wrapped = cmdExeArguments(executable, args);
+  return windows !== undefined && /^[a-z]:[/\\]/i.test(windows) && wrapped.ok ? { program: win324.join(windows, "System32", "cmd.exe"), args: wrapped.args } : undefined;
+};
+var runVerifiedPi = (shell, env, executable, args, options) => {
+  const call = commandFor(executable, args, env);
+  return call === undefined ? succeed6({
+    exitCode: 127,
+    stdout: "",
+    stderr: "The verified Pi shim cannot be started safely"
+  }) : shell.run(call.program, call.args, options);
+};
+var liveRun = ({ executable, args, cwd, env, stdin }) => gen2(function* () {
+  const call = commandFor(executable, args, env);
+  if (call === undefined)
+    return { exitCode: 127, stdout: "", stderr: "" };
+  const result = yield* spawn(call.program, call.args, { cwd, env, stdin });
+  return {
+    exitCode: result.code,
+    stdout: new TextDecoder().decode(result.stdout),
+    stderr: result.stderr
+  };
+}).pipe(catchDefect2(() => succeed6({ exitCode: 127, stdout: "", stderr: "" })));
+var caseInsensitiveEnv = (env, name) => Object.entries(env).find(([key, value]) => key.toUpperCase() === name && value !== undefined)?.[1];
+var isolatedEnv = (env, directory) => definedEnv2({
+  [pathKey(env)]: env[pathKey(env)],
+  SystemRoot: caseInsensitiveEnv(env, "SYSTEMROOT"),
+  WINDIR: caseInsensitiveEnv(env, "WINDIR"),
+  PATHEXT: caseInsensitiveEnv(env, "PATHEXT"),
+  HOME: directory,
+  USERPROFILE: directory,
+  APPDATA: directory,
+  LOCALAPPDATA: directory,
+  XDG_CONFIG_HOME: directory,
+  XDG_STATE_HOME: directory,
+  XDG_DATA_HOME: directory,
+  XDG_CACHE_HOME: directory,
+  PI_CODING_AGENT_DIR: directory,
+  PI_OFFLINE: "1",
+  PI_TELEMETRY: "0",
+  NODE_DISABLE_COMPILE_CACHE: "1",
+  TEMP: directory,
+  TMP: directory,
+  TMPDIR: directory,
+  TERM: "dumb",
+  NO_COLOR: "1"
+});
+var RecordValue = Record(String5, Unknown2);
+var Response = fromJsonString2(StructWithRest(Struct({
+  id: String5,
+  type: Literal2("response"),
+  command: String5,
+  success: Literal2(true),
+  data: RecordValue
+}), [RecordValue]));
+var State = StructWithRest(Struct({ sessionId: NonEmptyString, isStreaming: Boolean3 }), [RecordValue]);
+var Command = StructWithRest(Struct({ name: String5 }), [RecordValue]);
+var Commands = StructWithRest(Struct({ commands: ArraySchema(Command) }), [
+  RecordValue
+]);
+var hasState = is2(State);
+var hasCommands = is2(Commands);
+var parseResponse = decodeUnknownOption2(Response, { onExcessProperty: "error" });
+var hasRpc = (text) => {
+  const replies = text.split(/\r?\n/).flatMap((line) => toArray(parseResponse(line)));
+  const state = replies.find(({ id, command }) => id === "ha-state" && command === "get_state");
+  const commands = replies.find(({ id, command }) => id === "ha-commands" && command === "get_commands")?.data;
+  return hasState(state?.data) && hasCommands(commands) && commands.commands.some(({ name }) => name === PROBE_COMMAND);
+};
+var probePiHost = fn2("probePiHost")(function* (env) {
+  const shell = yield* Shell;
+  const found = yield* shell.which("pi");
+  if (isNone2(found))
+    return yield* fail8("not found on PATH");
+  const path = found.value;
+  if (!isAbsolute9(path))
+    return yield* fail8("the Pi executable is relative on PATH; use its absolute installation path");
+  const transport = yield* serviceOption2(PiProbeTransport);
+  const run = isSome2(transport) ? transport.value.run : liveRun;
+  return yield* acquireUseRelease2(tryPromise2({
+    try: () => mkdtemp3(join17(tmpdir2(), "holyagent-pi-probe-")),
+    catch: () => fail8("could not create a disposable Pi probe profile")
+  }), (directory) => gen2(function* () {
+    const childEnv = isolatedEnv(env, directory);
+    const invoke = (args, stdin) => run({
+      executable: path,
+      args,
+      cwd: directory,
+      env: childEnv,
+      ...stdin === undefined ? {} : { stdin }
+    }).pipe(timeoutOption2(TIMEOUT_MS), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(fail8(`isolated Pi ${args[0] ?? "probe"} timed out`))));
+    const versionResult = yield* invoke(["--version"]);
+    const version = versionResult.stdout.trim();
+    if (versionResult.exitCode !== 0 || !VERSION.test(version))
+      return yield* fail8(`${path} did not report a version for --version (exit ${versionResult.exitCode})`);
+    const helpResult = yield* invoke(["--help"]);
+    const help = helpResult.stdout;
+    if (helpResult.exitCode !== 0 || !/\bpi install\b[^\r\n]*\[-l\]/.test(help) || !/\bpi remove\b[^\r\n]*\[-l\]/.test(help))
+      return yield* fail8(`${version} at ${path} does not advertise local package install and remove`);
+    const options = new Set(help.match(/--[a-z][a-z0-9-]*/g));
+    if (![...SAFE_FLAGS, "--mode", "--extension"].every((flag) => options.has(flag)))
+      return yield* fail8(`${version} at ${path} does not advertise isolated RPC and extension options`);
+    const extension = join17(directory, "probe.mjs");
+    yield* tryPromise2({
+      try: () => writeFile6(extension, PROBE_EXTENSION, { mode: 384, flag: "wx" }),
+      catch: () => fail8("could not stage the disposable Pi probe extension")
+    });
+    const rpc = yield* invoke(["--mode", "rpc", ...SAFE_FLAGS, "--extension", extension], RPC_INPUT);
+    if (rpc.exitCode !== 0 || !hasRpc(rpc.stdout))
+      return yield* fail8(`${version} at ${path} did not complete the isolated RPC/extension capability check`);
+    return { path, version };
+  }), (directory) => tryPromise2(() => rm9(directory, { force: true, recursive: true, maxRetries: 3 })).pipe(ignore2));
+});
+
 var added = (text) => `+ ${text}`;
 var present = (text) => `= ${text}`;
 var skipped = (text) => `- ${text}`;
@@ -16413,48 +16764,41 @@ var failed2 = (what, result) => {
 };
 var show3 = (value) => JSON.stringify(value) ?? String(value);
 var pass = (name, detail) => `ok   ${name}: ${detail}`;
-var fail8 = (name, detail) => `FAIL ${name}: ${detail}`;
+var fail9 = (name, detail) => `FAIL ${name}: ${detail}`;
 
-var PI_HOST_VERSION = "1.5.0";
 var PI_MINIMUM_NODE = "22.19.0";
-var PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
+var PI_INSTALL = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest";
+var PI_LATEST = "npm view @earendil-works/pi-coding-agent dist-tags.latest --registry=https://registry.npmjs.org";
 var NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
-var PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
+var PI_HOST_GUIDANCE = `use a compatible Pi on PATH. If Pi is missing, install with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer; https://pi.dev). For an existing install, run \`${PI_LATEST}\` and update through your original manager only if the compatible stable release is newer`;
 var PACKAGE_COMMAND = `pi install npm:holyagent@${package_default.version}`;
 var packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`;
-var VERSION = /(\d+)\.(\d+)\.(\d+)/;
+var VERSION2 = /(\d+)\.(\d+)\.(\d+)/;
 var releaseIn = (text) => {
-  const [, major, minor, patch] = VERSION.exec(text) ?? [];
+  const [, major, minor, patch] = VERSION2.exec(text) ?? [];
   return major === undefined || minor === undefined || patch === undefined ? undefined : [Number(major), Number(minor), Number(patch)];
 };
 var compareReleases = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-var PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0];
 var MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0];
 var checkVersioned = (env, name, command, texts) => gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which(command);
   if (isNone2(found))
-    return fail8(name, `not found on PATH; ${texts.fix}`);
+    return fail9(name, `not found on PATH; ${texts.fix}`);
   const result = yield* shell.run(command, ["--version"], { cwd: homeDirectory2(env) });
   const output = `${result.stdout}
 ${result.stderr}`;
   const release = result.exitCode === 0 ? releaseIn(output) : undefined;
   if (release === undefined)
-    return fail8(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
+    return fail9(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
   const shown = release.join(".");
   const verdict = texts.judge(release, shown, found.value);
-  return verdict.ok ? pass(name, verdict.detail) : fail8(name, verdict.detail);
+  return verdict.ok ? pass(name, verdict.detail) : fail9(name, verdict.detail);
 });
-var checkPi = (env) => checkVersioned(env, "pi", "pi", {
-  fix: PI_FIX,
-  judge: (release, shown, path) => compareReleases(release, PINNED_PI) < 0 ? {
-    ok: false,
-    detail: `${shown} at ${path} is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; ${PI_FIX}`
-  } : {
-    ok: true,
-    detail: compareReleases(release, PINNED_PI) === 0 ? `${shown} (${path})` : `${shown} (${path}; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`
-  }
-});
+var checkPi = (env) => probePiHost(env).pipe(match4({
+  onSuccess: ({ version, path }) => pass("pi", `${version} (${path}; CLI and RPC compatible)`),
+  onFailure: ({ message }) => fail9("pi", `${message}; ${PI_HOST_GUIDANCE}`)
+}));
 var checkNode = (env) => checkVersioned(env, "node", "node", {
   fix: NODE_FIX,
   judge: (release, shown, path) => compareReleases(release, MINIMUM_NODE) < 0 ? {
@@ -16485,8 +16829,8 @@ var piAgentDirectory = (env) => {
   const home = homeDirectory2(env);
   const set = firstNonEmpty2(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join17(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join17(home, set.slice(2)) : set;
+    return join18(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
 };
 var piSettingsSources = (file) => gen2(function* () {
   const fs = yield* fileSystem;
@@ -16501,7 +16845,7 @@ var piSettingsSources = (file) => gen2(function* () {
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
-var piSettingsFiles = (env, cwd) => [join17(piAgentDirectory(env), "settings.json"), join17(cwd, ".pi", "settings.json")];
+var piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")];
 var piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
@@ -16573,7 +16917,7 @@ var checkPackage = (env, cwd, scope) => gen2(function* () {
   if (found !== undefined)
     return pass("pi package", `listed in ${found.file}`);
   const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
-  return fail8("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
+  return fail9("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
 });
 var listedSources = (files) => forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => []))).pipe(map4((lists) => lists.flat()));
 var installFix = (source, scope) => `install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``;
@@ -16582,7 +16926,7 @@ var checkBasePackages = (files, scope, config, listed) => {
   const missing = wanted.filter((source) => !listsAtPin(listed, source));
   if (missing.length === 0)
     return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
-  return missing.map((source) => fail8(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
+  return missing.map((source) => fail9(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
 };
 var conversionRegistration = (sources) => sources.some((source) => parseNpmSource(source.trim())?.name === "@howaboua/pi-codex-conversion") ? [
   hint("pi-codex-conversion: a separate registration is listed; HolyAgent does not install or configure it. It can replace the Codex provider and change Pi's tool loadout. Check its scope in Pi before using it alongside HolyAgent.")
@@ -16633,7 +16977,7 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
       problems.push(`${source} is not listed in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`);
   }
   if (problems.length > 0)
-    return fail8(name, problems.join("; "));
+    return fail9(name, problems.join("; "));
   const count = sources.length === 1 ? "1 package" : `${sources.length} packages`;
   const what = sources.length === 0 ? "nothing to install" : capability.health.includes("packages") ? `${count} listed at ${sources.length === 1 ? "its pin" : "their pins"}` : `${count}, not checked`;
   return pass(name, `${form} form, ${capability.applicability}, ${what}`);
@@ -16646,7 +16990,7 @@ var checkPairing = (env, capability, form, platform) => gen2(function* () {
   const name = `pi capability ${capability.name} pairing`;
   const found = yield* readBrowseState(env, platform).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (found instanceof SetupFailure)
-    return [fail8(name, found.message)];
+    return [fail9(name, found.message)];
   const { text, fix } = describeBrowseState(found);
   return found.state === "paired" ? [pass(name, text)] : [hint(`${name}: ${text}${fix === undefined ? "" : `; ${fix}`}`)];
 });
@@ -16672,7 +17016,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE, surface = piExecu
       hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
     ];
   return yield* loadPiConfig(env, cwd, scope).pipe(matchEffect3({
-    onFailure: (error) => succeed6([fail8("pi config", error.message)]),
+    onFailure: (error) => succeed6([fail9("pi config", error.message)]),
     onSuccess: (config) => config.pi.enable ? gen2(function* () {
       const files = piPresenceFiles(env, cwd, scope);
       const listed = yield* listedSources(files);
@@ -16693,7 +17037,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE, surface = piExecu
   }));
 });
 
-import { join as join20, resolve as resolve12 } from "path";
+import { join as join21, resolve as resolve12 } from "path";
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
@@ -16709,7 +17053,7 @@ var toolSettings = (config, _profile = providerProfile(config), form = "normal",
   ];
 };
 
-import { join as join18, resolve as resolve10 } from "path";
+import { join as join19, resolve as resolve10 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String5),
   value: Unknown2
@@ -16717,7 +17061,7 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String5, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join18(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var recordPath = (env) => join19(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve10(file);
 var load2 = (env) => gen2(function* () {
   const path = recordPath(env);
@@ -16772,7 +17116,7 @@ var removeRecorded = fn2("removeRecorded")(function* (env, file, removed) {
   yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]));
 });
 
-import { dirname as dirname10, isAbsolute as isAbsolute8, join as join19, relative as relative4, resolve as resolve11, sep as sep7 } from "path";
+import { dirname as dirname10, isAbsolute as isAbsolute10, join as join20, relative as relative4, resolve as resolve11, sep as sep7 } from "path";
 
 var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
 var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
@@ -16917,7 +17261,7 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
 var SCOPES = ["user", "project", "local"];
 var within = (parent, child) => {
   const path = relative4(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute8(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute10(path);
 };
 var real = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.realpath(path))), orElseSucceed2(() => {
   return;
@@ -16935,7 +17279,7 @@ var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action)
     return;
   const parts = relative4(cwd, file).split(sep7);
   for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join19(cwd, ...parts.slice(0, depth));
+    const path = join20(cwd, ...parts.slice(0, depth));
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
         message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -16950,17 +17294,17 @@ var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve11(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join19(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join20(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  return { folder: join19(root, ".claude"), root, trusted, notice };
+  return { folder: join20(root, ".claude"), root, trusted, notice };
 });
 var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
     return { file: userFiles(env).settings };
   const { folder, notice } = yield* claudeFolder(cwd);
-  const file = join19(folder, fileName(scope));
+  const file = join20(folder, fileName(scope));
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -16973,7 +17317,7 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
   const roots = [resolve11(cwd)];
   for (let folder = resolve11(cwd);; folder = dirname10(folder)) {
-    if (yield* present2(join19(folder, ".git"))) {
+    if (yield* present2(join20(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
@@ -16982,8 +17326,8 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
       break;
   }
   return roots.flatMap((root) => [
-    join19(root, ".claude", "settings.json"),
-    join19(root, ".claude", "settings.local.json")
+    join20(root, ".claude", "settings.json"),
+    join20(root, ".claude", "settings.local.json")
   ]);
 });
 var enablement = fn2("enablement")(function* (folder, file) {
@@ -17014,7 +17358,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
   const own = yield* identity3(file);
   if (own !== undefined) {
     for (const entry of tracked) {
-      if ((yield* identity3(join19(root, entry))) === own)
+      if ((yield* identity3(join20(root, entry))) === own)
         return "git tracks it";
     }
   }
@@ -17026,7 +17370,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
       if (component === folderName || seen.has(component))
         continue;
       seen.add(component);
-      if ((yield* identity3(join19(root, component))) === home)
+      if ((yield* identity3(join20(root, component))) === home)
         return `git tracks ${component} as ${folderName}`;
     }
   }
@@ -17039,8 +17383,8 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
-  const local = join19(folder, fileName("local"));
-  const project = join19(folder, fileName("project"));
+  const local = join20(folder, fileName("local"));
+  const project = join20(folder, fileName("project"));
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
@@ -17114,20 +17458,20 @@ var locate2 = (env, cwd, scope, logical) => {
     const explicit = firstNonEmpty2(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
       return resolve12(cwd, explicit);
-    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join20(home, ".config");
-    return join20(base, "billion-context", "billion-context.json");
+    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join21(home, ".config");
+    return join21(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join20(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join21(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join20(cwd, ".pi", name) : join20(piAgentDirectory(env), name);
+    return project ? join21(cwd, ".pi", name) : join21(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join20(cwd, ".pi", name) : join20(home, ".pi", name);
+    return project ? join21(cwd, ".pi", name) : join21(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join20(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join21(home, logical.slice(2));
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
@@ -17378,7 +17722,7 @@ var searchToolLines = (cwd, format) => gen2(function* () {
   return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
 });
 
-import { join as join21 } from "path";
+import { join as join22 } from "path";
 var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "");
 var isBunxPackageRoot = (root) => /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root));
 var isNpmExecPackageRoot = (root) => /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root));
@@ -17388,7 +17732,7 @@ var packageRunner = (root, env) => {
     return "bunx";
   if (/\/installs\/npm-holyagent\/[^/]+\/(?:lib\/)?node_modules\/holyagent$/i.test(path))
     return "mise";
-  const bun = portable(env.BUN_INSTALL ?? join21(homeDirectory2(env), ".bun"));
+  const bun = portable(env.BUN_INSTALL ?? join22(homeDirectory2(env), ".bun"));
   if (path === `${bun}/install/global/node_modules/holyagent`)
     return "bunx";
   if (isNpmExecPackageRoot(path))
@@ -17417,7 +17761,7 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
   const chromium = launched ? findChromiumWith(yield* fileSystem, env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present(`${label}: the headless browser is the Chromium at ${chromium}`)];
-  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map4((state) => {
+  const pairing = content?.pairing === true && withheld === undefined && !options.pairingHandledByCaller ? yield* readBrowseState(env, platform).pipe(map4((state) => {
     const runner = options.installedPackageRoot === undefined ? "npm" : packageRunner(options.installedPackageRoot, env);
     const { text, fix } = describeBrowseState(state, runner);
     return state.state === "paired" ? present(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
@@ -17441,8 +17785,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return [...headless?.lines ?? [], ...lines.flat()];
 });
 
-import { join as join22 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join22(stateDirectory(cwd), CONFIG_FILE);
+import { join as join23 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join23(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -17533,8 +17877,8 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
-import { createHash as createHash7, randomUUID as randomUUID4 } from "crypto";
-import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute9, join as join23, relative as relative5, resolve as resolve13 } from "path";
+import { constants as constants6 } from "fs";
+import { posix as posix4, win32 as win325 } from "path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
   return;
@@ -17545,6 +17889,318 @@ var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: (
 var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
 var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
 
+var STUDIO = "https://developer.android.com/studio";
+var DEVICES = "https://developer.android.com/studio/run/managing-avds";
+var ACCELERATION = "https://developer.android.com/studio/run/emulator-acceleration";
+var XCODE = "https://developer.apple.com/xcode/resources/";
+var RUNTIMES = "https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components";
+var RuntimeList = fromJsonString2(Struct({
+  runtimes: ArraySchema(Record(String5, Unknown2)),
+  devices: Record(String5, ArraySchema(Record(String5, Unknown2)))
+}));
+var report = (lines, ready) => ({
+  ready,
+  lines
+});
+var inside = (path, parent, full) => {
+  const relative = path.relative(comparableToolPath(path, parent), comparableToolPath(path, full));
+  return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+};
+var request = ["platform-tools", "emulator"];
+var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
+  const { mode } = options;
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const windows = platform === "win32";
+  const mac = platform === "darwin";
+  const path = windows ? win325 : posix4;
+  const androidSupported = windows || platform === "linux" ? arch === "x64" : mac && (arch === "arm64" || arch === "x64");
+  const appleSupported = mac && (arch === "arm64" || arch === "x64");
+  if (!androidSupported && !appleSupported)
+    return report([
+      hint(`device simulator: no supported toolchain for ${platform}-${arch}; check ${STUDIO}`)
+    ]);
+  if (mode === "apply" && localGraphicalHostUnavailable(env, platform) !== undefined)
+    return report([
+      hint("Device Simulator: installation requires a local graphical session outside CI, SSH, WSL and cloud")
+    ]);
+  const fs = yield* fileSystem;
+  const shell = yield* Shell;
+  const cwd = options.cwd ?? process.cwd();
+  const home = homeDirectory2(env);
+  const excluded = toolPathExclusions(path, cwd, { includeCheckout: true, home }, fs);
+  if (excluded === undefined)
+    return report([
+      hint("Device Simulator: could not verify checkout and home paths; no toolchain commands were started")
+    ]);
+  const absolute = (candidate) => path.isAbsolute(comparableToolPath(path, candidate)) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(comparableToolPath(path, candidate)));
+  const trusted = (candidate) => absolute(candidate) && excluded.every((root) => !inside(path, root, candidate));
+  const verifiedPath = (candidate, root) => trusted(candidate) ? try_2(() => fs.realpathSync(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved)) ? resolved : undefined), orElseSucceed2(() => {
+    return;
+  })) : succeed6(undefined);
+  const secure = (candidate, root) => map4(verifiedPath(candidate, root), (resolved) => resolved !== undefined);
+  const isDirectory = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isDirectory()), orElseSucceed2(() => false));
+  const absent = (candidate) => tryPromise2(() => fs.lstat(candidate)).pipe(match4({
+    onFailure: ({ cause }) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT",
+    onSuccess: () => false
+  }));
+  const regular = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() && entry.size > 0), orElseSucceed2(() => false));
+  const program = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)) || !(yield* regular(candidate)))
+      return false;
+    return yield* try_2(() => fs.accessSync(candidate, windows ? constants6.F_OK : constants6.X_OK)).pipe(as2(true), orElseSucceed2(() => false));
+  });
+  const textFile = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)))
+      return "";
+    const size = yield* tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() ? entry.size : 0), orElseSucceed2(() => 0));
+    return size <= 0 || size > 65536 ? "" : yield* tryPromise2(() => fs.readFile(candidate, "utf8")).pipe(orElseSucceed2(() => ""));
+  });
+  const standardRepositories = (directory) => gen2(function* () {
+    if (!trusted(directory))
+      return false;
+    const config = path.join(directory, "repositories.cfg");
+    return yield* tryPromise2(() => fs.lstat(config)).pipe(matchEffect3({
+      onFailure: ({ cause }) => succeed6(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "ENOENT"),
+      onSuccess: (entry) => !entry.isFile() || entry.size > 65536 ? succeed6(false) : gen2(function* () {
+        if (!(yield* secure(config, directory)))
+          return false;
+        return yield* tryPromise2(() => fs.readFile(config, "utf8")).pipe(map4((body) => body.split(/\r?\n/u).every((line) => /^(?:\s*|\s*#.*|\s*count\s*=\s*0\s*)$/u.test(line))), orElseSucceed2(() => false));
+      })
+    }));
+  });
+  const run = (binary, args, childEnv, timeout = 1e4) => shell.run(binary, args, {
+    cwd: home,
+    stdin: "closed",
+    ...childEnv === undefined ? {} : { env: childEnv }
+  }).pipe(timeoutOption2(timeout));
+  const failure = (line) => hint(line);
+  const lines = [];
+  let iosReady;
+  const resultWith = (more = [], androidReady) => report([...lines, ...more], androidReady ?? iosReady);
+  if (appleSupported) {
+    const selected = firstNonEmpty2(env["DEVELOPER_DIR"]);
+    const active = selected === undefined && mode !== "preview" ? yield* run("/usr/bin/xcode-select", ["-p"]) : none2();
+    const choice = selected ?? (isSome2(active) && active.value.exitCode === 0 ? active.value.stdout.trim() : undefined);
+    const chosen = choice ?? "/Applications/Xcode.app/Contents/Developer";
+    const developer = chosen.endsWith(".app") ? path.join(chosen, "Contents", "Developer") : chosen;
+    const platformDirectory = path.join(developer, "Platforms", "iPhoneSimulator.platform");
+    const xcodebuild = path.join(developer, "usr", "bin", "xcodebuild");
+    if (mode !== "preview" && choice === undefined || !(yield* secure(developer)) || !(yield* program(xcodebuild, developer)) || !(yield* isDirectory(platformDirectory))) {
+      const clt = path.basename(developer) === "CommandLineTools" ? " (Command Line Tools are not full Xcode)" : "";
+      lines.push(failure(`iOS: select full Xcode${clt} in Xcode > Settings > Locations; install it from ${XCODE}`));
+    } else if (mode === "preview") {
+      lines.push(present(`iOS: Xcode found at ${developer}; no runtime probe or download in preview`));
+    } else {
+      const xcodeEnv = { DEVELOPER_DIR: developer };
+      const version = yield* run(xcodebuild, ["-version"], xcodeEnv);
+      const firstLaunch = isSome2(version) && version.value.exitCode === 0 && /^Xcode \d/m.test(version.value.stdout) ? yield* run(xcodebuild, ["-checkFirstLaunchStatus"], xcodeEnv) : none2();
+      if (isNone2(firstLaunch) || firstLaunch.value.exitCode !== 0) {
+        lines.push(failure("iOS: open full Xcode, review its license and complete first launch with any requested admin access"));
+      } else {
+        const runtimes = yield* run("/usr/bin/xcrun", ["simctl", "list", "--json"], xcodeEnv);
+        const available = isSome2(runtimes) && runtimes.value.exitCode === 0 ? decodeUnknownOption2(RuntimeList)(runtimes.value.stdout) : none2();
+        const ios = isSome2(available) ? available.value.runtimes.flatMap((runtime) => {
+          const id = runtime["identifier"];
+          return typeof id === "string" && id.startsWith("com.apple.CoreSimulator.SimRuntime.iOS-") && runtime["isAvailable"] === true ? [id] : [];
+        }) : [];
+        if (isSome2(available) && ios.some((id) => available.value.devices[id]?.some((device) => device["isAvailable"] === true && typeof device["udid"] === "string"))) {
+          iosReady = `Xcode (${developer}) with an available iOS Simulator device and runtime`;
+          lines.push(present(`device simulator: ${iosReady}`));
+        } else if (ios.length > 0) {
+          lines.push(failure("iOS: runtime installed but no available iOS Simulator device found; add one in Xcode > Window > Devices and Simulators"));
+        } else {
+          lines.push(failure(`iOS: no available runtime verified; complete Xcode first launch, then install an iOS runtime in Xcode > Settings > Components (${RUNTIMES})`));
+        }
+      }
+    }
+  }
+  if (!androidSupported)
+    return resultWith();
+  const defaultSdk = mac ? path.join(home, "Library", "Android", "sdk") : windows ? path.join(firstNonEmpty2(env["LOCALAPPDATA"]) ?? path.join(home, "AppData", "Local"), "Android", "Sdk") : path.join(home, "Android", "Sdk");
+  const configured = firstNonEmpty2(env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"]);
+  const selected = configured ?? defaultSdk;
+  const root = yield* verifiedPath(selected);
+  if (root === undefined || !(yield* isDirectory(root)))
+    return resultWith([
+      failure(`Android: no existing SDK verified at ${selected}; use the Android Studio setup wizard or install the official command-line tools and set ANDROID_HOME (${STUDIO})`)
+    ]);
+  const executable = (name) => windows ? `${name}.exe` : name;
+  const adb = path.join(root, "platform-tools", executable("adb"));
+  const emulator = path.join(root, "emulator", executable("emulator"));
+  const installed = all2([program(adb, root), program(emulator, root)]);
+  const have = yield* installed;
+  const missing = [];
+  const existing = [];
+  for (const [index, name] of request.entries()) {
+    if (!have[index])
+      ((yield* absent(path.join(root, name))) ? missing : existing).push(name);
+  }
+  if (existing.length > 0)
+    lines.push(failure(`Android: kept existing but unverified SDK packages ${existing.join(", ")}; inspect or repair them in Android Studio's SDK Manager`));
+  const androidEnv = { ANDROID_HOME: root, ANDROID_SDK_ROOT: root, REPO_OS_OVERRIDE: undefined };
+  if (missing.length > 0 && mode !== "inspect") {
+    const licensed = yield* textFile(path.join(root, "licenses", "android-sdk-license"), root);
+    const writable = yield* try_2(() => fs.accessSync(root, constants6.W_OK)).pipe(as2(true), orElseSucceed2(() => false));
+    const userPrefs = firstNonEmpty2(env["ANDROID_USER_HOME"]);
+    const legacyPrefs = firstNonEmpty2(env["ANDROID_SDK_HOME"]);
+    const prefs = new Set([
+      path.join(home, ".android"),
+      ...userPrefs === undefined ? [] : [userPrefs],
+      ...legacyPrefs === undefined ? [] : [path.join(legacyPrefs, ".android")]
+    ]);
+    if (!/^[0-9a-f]{40}\r?$/im.test(licensed)) {
+      lines.push(failure("Android: review and accept any required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses"));
+    } else if (!writable) {
+      lines.push(failure("Android: this SDK is not writable; choose a user-writable SDK or ask its administrator to install the missing packages"));
+    } else if (!(yield* forEach2(prefs, standardRepositories)).every(Boolean)) {
+      lines.push(failure("Android: SDK repository settings are customized or unreadable; review them and install the missing packages in Android Studio's SDK Manager"));
+    } else {
+      const localAndroid = windows ? path.join(home, "AppData", "AndroidCLI", "android.exe") : path.join(home, ".local", "bin", "android");
+      const officialCli = (yield* absent(path.join(home, ".androidrc"))) && (yield* program(localAndroid, path.dirname(localAndroid))) ? localAndroid : undefined;
+      const toolRoot = path.join(root, "cmdline-tools");
+      const versions = yield* try_2(() => fs.readdirSync(toolRoot)).pipe(orElseSucceed2(() => []));
+      const candidates = [
+        "latest",
+        ...versions.filter((entry) => /^\d+(?:\.\d+)*$/.test(entry)).sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+      ];
+      let sdkmanager;
+      for (const version of candidates) {
+        const folder = path.join(toolRoot, version);
+        const script = path.join(folder, "bin", windows ? "sdkmanager.bat" : "sdkmanager");
+        if (!(yield* program(script, root)))
+          continue;
+        const metadata = yield* textFile(path.join(folder, "source.properties"), root);
+        const classpath = path.join(folder, "lib", "sdkmanager-classpath.jar");
+        if (/^Pkg\.Desc\s*=\s*Android SDK Command-line Tools\s*$/im.test(metadata) && /^Pkg\.Revision\s*=\s*\d/m.test(metadata) && (yield* secure(classpath, root)) && (yield* regular(classpath))) {
+          sdkmanager = script;
+          break;
+        }
+      }
+      if (mode === "preview") {
+        lines.push(officialCli !== undefined || sdkmanager !== undefined ? added(`Android: would request missing SDK packages ${missing.join(", ")} with the installed Google tool; package licenses and runtime are checked on apply`) : failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+      } else {
+        const verified = officialCli === undefined ? none2() : yield* run(officialCli, ["--no-metrics", "-h"]);
+        let installing = false;
+        const install = (command, args, childEnv) => gen2(function* () {
+          if (!(yield* forEach2(missing, (name) => absent(path.join(root, name)))).every(Boolean)) {
+            lines.push(failure("Android: SDK packages changed during setup; kept them unchanged, rerun setup to verify them"));
+            return none2();
+          }
+          installing = true;
+          yield* reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`);
+          return yield* run(command, args, childEnv, 600000);
+        });
+        let result = none2();
+        if (officialCli !== undefined && isSome2(verified) && verified.value.exitCode === 0 && /\bandroid cli\b/i.test(verified.value.stdout + verified.value.stderr)) {
+          result = yield* install(officialCli, ["--no-metrics", `--sdk=${root}`, "sdk", "install", ...missing], androidEnv);
+        } else if (sdkmanager !== undefined) {
+          const javaHome = firstNonEmpty2(env["JAVA_HOME"]);
+          const java = javaHome === undefined ? yield* shell.which("java", {
+            strict: {
+              cwd,
+              excludeCheckout: true,
+              platform: windows ? "win32" : mac ? "darwin" : "linux"
+            }
+          }) : (yield* program(path.join(javaHome, "bin", executable("java")))) ? some2(path.join(javaHome, "bin", executable("java"))) : none2();
+          const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* verifiedPath(java.value) : undefined;
+          if (resolvedJava === undefined || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
+            lines.push(failure("Android: sdkmanager needs a compatible JDK; set JAVA_HOME to your JDK or Android Studio JBR"));
+          } else {
+            const args = [`--sdk_root=${root}`, "--install", ...missing];
+            const javaEnv = {
+              ...androidEnv,
+              JAVA_HOME: path.dirname(path.dirname(resolvedJava)),
+              JAVA_TOOL_OPTIONS: undefined,
+              _JAVA_OPTIONS: undefined,
+              JDK_JAVA_OPTIONS: undefined,
+              CLASSPATH: undefined
+            };
+            if (windows) {
+              const cmd = path.join(firstNonEmpty2(env["SystemRoot"], env["WINDIR"]) ?? "C:\\Windows", "System32", "cmd.exe");
+              const invocation = cmdExeArguments(sdkmanager, args);
+              if (invocation.ok && (yield* program(cmd))) {
+                result = yield* install(cmd, invocation.args, javaEnv);
+              } else
+                lines.push(failure("Android: the sdkmanager batch command could not be started safely; use Android Studio's SDK Manager"));
+            } else {
+              result = yield* install(sdkmanager, args, javaEnv);
+            }
+          }
+        } else {
+          lines.push(failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+        }
+        if (installing && isNone2(result))
+          lines.push(failure("Android: the SDK package manager timed out; finish in Android Studio's SDK Manager or rerun once the network is available"));
+        if (isSome2(result)) {
+          if (result.value.exitCode === 0 && (yield* installed).every(Boolean))
+            lines.push(added(`Android: installed ${missing.join(", ")} into ${root}`));
+          else {
+            const output = result.value.stdout + result.value.stderr;
+            lines.push(/licen[cs]e/i.test(output) ? failure("Android: review the required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses") : /java|jdk|classfile/i.test(output) ? failure("Android: SDK package manager could not use Java; set JAVA_HOME to a compatible JDK") : failure("Android: SDK packages were not verified after installation; check SDK Manager, disk space, network and permissions"));
+          }
+        }
+      }
+    }
+  }
+  const verified = yield* installed;
+  if (!verified.every(Boolean))
+    return resultWith([
+      failure(`Android: SDK at ${root} is missing verified platform-tools or Emulator binaries`)
+    ]);
+  if (mode === "preview")
+    return resultWith([
+      present(`Android: SDK tools at ${root}; no AVD or acceleration probe in preview`)
+    ]);
+  const avds = yield* run(emulator, ["-list-avds"], androidEnv);
+  const avdRoots = [
+    firstNonEmpty2(env["ANDROID_AVD_HOME"]),
+    ...["ANDROID_EMULATOR_HOME", "ANDROID_USER_HOME"].flatMap((key) => env[key] === undefined ? [] : [path.join(env[key], "avd")]),
+    path.join(home, ".android", "avd")
+  ].filter((entry) => entry !== undefined);
+  let avdReady = false;
+  const names = isSome2(avds) && avds.value.exitCode === 0 ? avds.value.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[\w][\w.-]*$/.test(line)) : [];
+  for (const name of names) {
+    for (const directory of avdRoots) {
+      const pointerFile = path.join(directory, `${name}.ini`);
+      if (yield* absent(pointerFile))
+        continue;
+      const pointer = yield* textFile(pointerFile, directory);
+      const avd = /^path\s*=\s*([^\r\n]+)$/m.exec(pointer)?.[1]?.trim();
+      if (avd === undefined)
+        break;
+      const avdPath = yield* verifiedPath(avd);
+      if (avdPath === undefined)
+        break;
+      const config = yield* textFile(path.join(avdPath, "config.ini"), avdPath);
+      const imagePath = /^image\.sysdir\.1\s*=\s*([^\r\n]+)$/m.exec(config)?.[1]?.trim();
+      if (imagePath === undefined)
+        break;
+      const image = path.resolve(root, imagePath, "system.img");
+      if ((yield* secure(image, root)) && (yield* regular(image))) {
+        avdReady = true;
+      }
+      break;
+    }
+    if (avdReady)
+      break;
+  }
+  if (!avdReady)
+    return resultWith([
+      failure(`Android: SDK available at ${root}, but no Android Virtual Device verified; create an AVD with a system image in Android Studio's Device Manager (${DEVICES})`)
+    ]);
+  const acceleration = yield* run(emulator, ["-accel-check"], androidEnv);
+  if (isNone2(acceleration) || acceleration.value.exitCode !== 0 || !/^accel:\s*\n0(?:\s|$)/m.test(acceleration.value.stdout + `
+` + acceleration.value.stderr))
+    return resultWith([
+      failure(`Android: AVD configured, but hardware acceleration not verified; check ${windows ? "WHPX" : mac ? "Hypervisor.Framework" : "KVM and its permissions"} (${ACCELERATION})`)
+    ]);
+  const ready = `the Android SDK (${root}) with a configured AVD and hardware acceleration`;
+  return resultWith([present(`device simulator: ${ready}`)], ready);
+});
+
+import { createHash as createHash7, randomUUID as randomUUID4 } from "crypto";
+import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute11, join as join24, relative as relative5, resolve as resolve13 } from "path";
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -17567,19 +18223,19 @@ var installedPackage = fn2("installedPiPackage")(function* (path) {
   const invalid = new SetupFailure({
     message: `${JSON.stringify(path)} is not an installed HolyAgent ${package_default.version} package; install the CLI globally and run it again`
   });
-  if (!isAbsolute9(path) || !installedLayout(path))
+  if (!isAbsolute11(path) || !installedLayout(path))
     return yield* invalid;
   const root = resolve13(path);
   const physical = yield* realPath(root);
   if (physical === undefined || !installedLayout(physical))
     return yield* invalid;
-  const manifest = yield* readJsonObject(join23(root, "package.json"));
-  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join23(root, "extensions", "holyagent.js"))))
+  const manifest = yield* readJsonObject(join24(root, "package.json"));
+  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join24(root, "extensions", "holyagent.js"))))
     return yield* invalid;
   return { root, physical, version: String(manifest.version) };
 });
 var piLocalSourcePath = (env, file, source) => {
-  if (isAbsolute9(source))
+  if (isAbsolute11(source))
     return resolve13(source);
   if (/^(?:[a-z][a-z0-9+.-]*:|[^/\\]+@[^/\\]+:)/i.test(source))
     return;
@@ -17588,18 +18244,23 @@ var piLocalSourcePath = (env, file, source) => {
   return resolve13(dirname11(file), source);
 };
 var sourcePackageRoot = (path) => basename7(path) === "holyagent.js" && basename7(dirname11(path)) === "extensions" ? dirname11(dirname11(path)) : path;
-var localHolyagentPackageAt = (path) => readJsonObject(join23(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
+var localHolyagentPackageAt = (path) => readJsonObject(join24(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
+var matchesRegistration = (target, source, physical) => target.physical === undefined ? source === target.source : physical !== undefined && relative5(target.physical, physical) === "";
+var exactHolyagentPin = /^npm:holyagent@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*))*)?(?:\+[\dA-Za-z-]+(?:\.[\dA-Za-z-]+)*)?$/;
 var registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
   const { root, physical, version } = yield* installedPackage(path);
-  const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
+  const cached = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path));
+  const target = cached ? { source: `npm:holyagent@${version}` } : { source: root, physical };
   let listedIn;
+  let matches = 0;
   const conflicts = [];
   for (const { file, sources } of settings) {
     for (const entry of sources) {
       const local = piLocalSourcePath(env, file, entry.trim());
       const actual = local === undefined ? undefined : yield* realPath(local);
-      if (entry.trim() === source || source === root && actual !== undefined && relative5(physical, actual) === "") {
+      if (matchesRegistration(target, entry, actual)) {
         listedIn ??= file;
+        matches++;
       } else if (isHolyagentSource(entry.trim()) || actual !== undefined && (yield* localHolyagentPackageAt(actual))) {
         conflicts.push({ file, prior: entry });
       }
@@ -17607,13 +18268,14 @@ var registration = fn2("planPiPackageRegistration")(function* (env, path, settin
   }
   const [conflict] = conflicts;
   if (conflict !== undefined) {
-    if (!replace || conflicts.length !== 1 || conflict.file !== settings[0]?.file || listedIn !== undefined)
+    const repair = target.physical !== undefined && conflicts.length === 1 && conflict.file === settings[0]?.file && matches === 1 && listedIn === conflict.file && conflict.prior === conflict.prior.trim() && exactHolyagentPin.test(conflict.prior);
+    if (!replace || conflicts.length !== 1 || conflict.file !== settings[0]?.file || listedIn !== undefined && !repair)
       return yield* new SetupFailure({
-        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; review the existing registration in interactive setup at its scope before replacing it`
+        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; ${replace && (listedIn !== undefined || conflicts.length > 1) && !repair ? "the duplicate registrations cannot be repaired safely. Keep only the intended HolyAgent source in the applicable Pi settings before reopening setup" : "review the existing registration in interactive setup at its scope before replacing it"}`
       });
-    return { source, prior: conflict.prior };
+    return { target, prior: conflict.prior, repair };
   }
-  return listedIn === undefined ? { source } : { listedIn };
+  return listedIn === undefined ? { target } : { listedIn };
 });
 var entrySource = (entry) => isJsonObject2(entry) ? entry.source : entry;
 var PiRegistrationReview = Reference("holyagent/setup/PiRegistrationReview", { defaultValue: () => {
@@ -17625,6 +18287,34 @@ var registrationEntry = (settings, source) => {
   const matching = settings.packages.filter((entry) => entrySource(entry) === source);
   return matching.length === 1 ? matching[0] : undefined;
 };
+var matchingEntries = (env, file, packages, target) => filter3(packages, (entry) => gen2(function* () {
+  const source = entrySource(entry);
+  if (typeof source !== "string")
+    return false;
+  const local = target.physical === undefined ? undefined : piLocalSourcePath(env, file, source.trim());
+  return matchesRegistration(target, source, local === undefined ? undefined : yield* realPath(local));
+}));
+var packageFilters = (entry) => isJsonObject2(entry) ? Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "source")) : {};
+var planDuplicateRepair = fn2("planDuplicatePiRegistrationRepair")(function* (env, file, target, prior, settings) {
+  const packages = Array.isArray(settings.packages) ? settings.packages : [];
+  const entry = registrationEntry(settings, prior);
+  const matching = yield* matchingEntries(env, file, packages, target);
+  const [local] = matching;
+  const source = entrySource(local);
+  if (entry === undefined || matching.length !== 1 || typeof source !== "string")
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registrations changed; review them again`
+    });
+  const priorFilters = packageFilters(entry);
+  const localFilters = packageFilters(local);
+  if (Object.entries(priorFilters).some(([key, value]) => Object.hasOwn(localFilters, key) && JSON.stringify(localFilters[key]) !== JSON.stringify(value)))
+    return yield* new SetupFailure({
+      message: `${file}: the old pin and the installed HolyAgent registration have different package filters. Reconcile the filters in Pi settings and review setup again; both entries were kept`
+    });
+  const keep = isJsonObject2(entry) || isJsonObject2(local) ? { ...priorFilters, ...localFilters, source } : source;
+  const next = packages.filter((item) => item !== entry).map((item) => item === local ? keep : item);
+  return { source, entry, next, packages };
+});
 var backupRegistration = fn2("backupPiRegistration")(function* (file, source, entry) {
   const path = `${file}.holyagent-package.${randomUUID4()}.bak`;
   const fs = yield* fileSystem;
@@ -17649,21 +18339,25 @@ var restoreRegistration = fn2("restorePiRegistration")(function* (file, prior, b
     return false;
   return yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: before.packages }, current.text);
 });
-var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, source, previousEntry) {
+var retireRegistration = fn2("retirePiRegistration")(function* (env, file, prior, target, previousEntry, before) {
   const current = yield* readJsonObjectSnapshot(file);
   const packages = Array.isArray(current.value.packages) ? current.value.packages : [];
   const old = packages.filter((entry) => entrySource(entry) === prior);
-  if (current.text === undefined || packages.filter((entry) => entrySource(entry) === source).length !== 1 || old.length > 1 || old.length === 1 && JSON.stringify(old[0]) !== JSON.stringify(previousEntry))
+  const saved = yield* matchingEntries(env, file, packages, target);
+  const [installed] = saved;
+  const savedSource = entrySource(installed);
+  const replacement = isJsonObject2(previousEntry) ? { ...previousEntry, source: savedSource } : savedSource;
+  const replacedPin = old.length === 0 && target.physical === undefined && parseNpmSource(prior)?.name === parseNpmSource(target.source)?.name;
+  const expected = replacedPin ? before.filter((entry) => entrySource(entry) !== prior) : before;
+  if (current.text === undefined || saved.length !== 1 || typeof savedSource !== "string" || old.length > 1 || JSON.stringify(packages.filter((entry) => entry !== installed)) !== JSON.stringify(expected) || typeof installed !== "string" && (!replacedPin || JSON.stringify(installed) !== JSON.stringify(replacement)))
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed during install; kept the previous source where it was still present`
     });
-  const replacement = isJsonObject2(previousEntry) ? { ...previousEntry, source } : source;
   const next = packages.flatMap((entry) => {
-    const key = entrySource(entry);
-    if (key === prior)
+    if (entrySource(entry) === prior)
       return [replacement];
-    if (key === source)
-      return old.length === 0 ? [replacement] : [];
+    if (entry === installed)
+      return replacedPin ? [replacement] : [];
     return [entry];
   });
   if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text)))
@@ -17676,6 +18370,10 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices, options.providers);
   if (!config.pi.enable)
     return [skipped("pi packages: pi.enable is off in the HolyAgent config")];
+  if (options.requireVerifiedPi === true && options.verifiedPi === undefined)
+    return yield* new SetupFailure({
+      message: "Pi was enabled after setup started. Rerun setup to verify its executable"
+    });
   const projectLevel = options.scope !== "user";
   const [globalFile, projectFile] = piSettingsFiles(env, options.cwd);
   const file = projectLevel ? projectFile : globalFile;
@@ -17698,35 +18396,72 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
     lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
   const review = yield* PiRegistrationReview;
+  let repair;
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
-    if (match.source === undefined)
+    if (match.target === undefined)
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
     else {
       if (match.prior !== undefined) {
-        const { source, prior } = match;
-        const entry = registrationEntry(yield* readJsonObject(file), prior);
-        const fingerprint = createHash7("sha256").update(JSON.stringify([file, prior, source, entry])).digest("hex");
-        if (entry === undefined || !options.dryRun && review !== undefined && review.expected !== fingerprint)
+        const { target, prior } = match;
+        const settings = yield* readJsonObject(file);
+        if (match.repair && (!Array.isArray(settings.packages) || JSON.stringify(settings.packages.map(entrySource)) !== JSON.stringify(listed)))
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`
+          });
+        const pending = match.repair ? yield* planDuplicateRepair(env, file, target, prior, settings) : undefined;
+        const source = pending?.source ?? target.source;
+        const entry = pending?.entry ?? registrationEntry(settings, prior);
+        const fingerprint = createHash7("sha256").update(JSON.stringify([
+          file,
+          prior,
+          source,
+          entry,
+          ...pending === undefined ? [] : [target.physical, pending.packages]
+        ])).digest("hex");
+        if (entry === undefined || !options.dryRun && (pending !== undefined || review !== undefined) && review?.expected !== fingerprint)
           return yield* new SetupFailure({
             message: `${file}: the Pi registration changed after review; review it again`
           });
         if (options.dryRun && review?.preview !== undefined)
           yield* sync2(() => review.preview?.({ file, prior, source, fingerprint }));
-        replacement = { source, prior, entry };
-        lines.unshift(added(`pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`));
+        if (pending === undefined)
+          replacement = { target, prior, entry };
+        else
+          repair = { target, prior, source, packages: pending.packages };
+        lines.unshift(added(pending === undefined ? `pi package: replace ${JSON.stringify(prior)} with ${JSON.stringify(source)} in ${file}` : `pi package: remove ${JSON.stringify(prior)} from ${file}; keep ${JSON.stringify(source)} without reinstalling`));
       }
-      installs.unshift(match.source);
+      if (repair === undefined)
+        installs.unshift(match.target.source);
     }
   }
-  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+  if (replacement === undefined && repair === undefined && !options.dryRun && review?.expected !== undefined)
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed after review; review it again`
     });
+  if (repair !== undefined && !options.dryRun) {
+    yield* reportSetupActivity(`Keeping the verified registration ${repair.source}`);
+    yield* refuseLinks(options.cwd, options.scope, file, "repair the installed HolyAgent package registration");
+    const snapshot = yield* readJsonObjectSnapshot(file);
+    if (snapshot.text === undefined || JSON.stringify(snapshot.value.packages) !== JSON.stringify(repair.packages))
+      return [
+        ...lines,
+        `! pi package: ${file} changed after review; the previous registration was not removed`
+      ];
+    const current = yield* planDuplicateRepair(env, file, repair.target, repair.prior, snapshot.value);
+    const backup = yield* backupRegistration(file, current.source, current.entry);
+    lines.push(added(`pi package: saved the previous registration in ${backup}`));
+    if (!(yield* writeJsonObjectIfUnchanged(file, { ...snapshot.value, packages: current.next }, snapshot.text)))
+      return [
+        ...lines,
+        `! pi package: ${file} changed while repairing the package; did not remove the previous source`
+      ];
+    lines.push(present(`pi package: kept the installed HolyAgent registration in ${file}`));
+  }
   if (installs.length === 0 && removals.length === 0)
     return lines;
-  if (isNone2(yield* shell.which("pi"))) {
+  if (options.verifiedPi === undefined && isNone2(yield* shell.which("pi"))) {
     return [
       ...lines,
       `! pi packages: pi not found on PATH, so the changes to ${file} cannot run; install Pi (\`holyagent doctor\` names the command), then re-run`
@@ -17734,6 +18469,10 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   }
   const cwd = projectLevel ? options.cwd : homeDirectory2(env);
   const withScope = (args) => projectLevel ? [...args, "-l"] : args;
+  const run = (args) => {
+    const runOptions = { cwd, env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) } };
+    return options.verifiedPi === undefined ? shell.run("pi", args, runOptions) : runVerifiedPi(shell, env, options.verifiedPi, args, runOptions);
+  };
   for (const source of installs) {
     const args = withScope(["install", source]);
     const command = `pi ${args.join(" ")}`;
@@ -17741,12 +18480,9 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(added(`pi ${source}: would install with ${command}`));
       continue;
     }
-    const commit = replacement?.source === source ? replacement : undefined;
+    const commit = replacement?.target.source === source ? replacement : undefined;
     yield* reportSetupActivity(`Installing ${source}`);
-    const install = shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
-    });
+    const install = run(args);
     if (commit === undefined) {
       const result = yield* install;
       lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
@@ -17768,7 +18504,8 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
     });
     const backupHint = added(`pi package: saved the previous registration in ${backup}`);
     const beforeInstall = yield* readRegistration;
-    if (!priorIsUnchanged(beforeInstall) || Array.isArray(beforeInstall.packages) && beforeInstall.packages.some((entry) => entrySource(entry) === source))
+    const beforePackages = Array.isArray(beforeInstall.packages) ? beforeInstall.packages : [];
+    if (!priorIsUnchanged(beforeInstall) || (yield* matchingEntries(env, file, beforePackages, commit.target)).length > 0)
       return [
         ...lines,
         backupHint,
@@ -17787,7 +18524,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
         failed2(command, result)
       ];
     }
-    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(result2);
+    const retirement = yield* retireRegistration(env, file, commit.prior, commit.target, commit.entry, beforePackages).pipe(result2);
     if (retirement._tag === "Failure")
       return [
         ...lines,
@@ -17804,16 +18541,13 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       continue;
     }
     yield* reportSetupActivity(`Removing npm:${name}`);
-    const result = yield* shell.run("pi", args, {
-      cwd,
-      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
-    });
+    const result = yield* run(args);
     lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed2(command, result));
   }
   return lines;
 });
 
-import { join as join24 } from "path";
+import { join as join25 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -17834,21 +18568,29 @@ var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
     ...piUsed ? [] : ["pi: install the Pi backend from https://pi.dev and put pi on PATH"]
   ];
 });
-var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3");
-var t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join25(homeDirectory2(env), ".t3");
+var t3SettingsFile = (env) => join25(t3Home(env), "userdata", "settings.json");
+var devicePreparationRefusal = fn2("t3DevicePreparationRefusal")(function* (env) {
+  const snapshot = yield* readJsonObjectSnapshot(t3SettingsFile(env));
+  for (const key of ["enableDeviceSupport", "enableAgentDeviceAccess"]) {
+    if (snapshot.value?.[key] !== undefined && snapshot.value[key] !== true)
+      return `T3 Code's ${key} setting is not enabled; kept it unchanged`;
+  }
+  return;
+});
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty2(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join24(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join25(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty2(env["ANDROID_HOME"]),
     firstNonEmpty2(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join24(home, "Library", "Android", "sdk") : platform === "win32" ? join24(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join24(home, "AppData", "Local"), "Android", "Sdk") : join24(home, "Android", "Sdk")
+    platform === "darwin" ? join25(home, "Library", "Android", "sdk") : platform === "win32" ? join25(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join25(home, "AppData", "Local"), "Android", "Sdk") : join25(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -18031,9 +18773,9 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
     return {
       line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
     };
-  const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
+  const host = config.pi.t3.deviceAccess ? options.deviceReadiness === undefined ? yield* deviceHost(env, options.platform ?? process.platform) : options.deviceReadiness ?? undefined : undefined;
   const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
-  const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
+  const deviceNote = wantsDevices && host === undefined ? options.deviceReadiness === null ? "device access left out: simulator readiness was not verified" : "device access left out: no Xcode or Android SDK found" : undefined;
   return {
     target: {
       file: t3SettingsFile(env),
@@ -18161,7 +18903,7 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
   const decided = yield* decide(env, cwd, options);
   if (decided === undefined || "line" in decided)
     return options.required === true ? [
-      fail8(label2, "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup")
+      fail9(label2, "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup")
     ] : [];
   const { file, units: wanted } = decided.target;
   return yield* gen2(function* () {
@@ -18172,7 +18914,7 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
       const config = isJsonObject2(instance) ? instance["config"] : undefined;
       if (!isJsonObject2(instance) || instance["driver"] !== "pi" || instance["enabled"] !== true || isJsonObject2(config) && config["enabled"] === false)
         return [
-          fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
+          fail9(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
         ];
     }
     const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
@@ -18182,38 +18924,36 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
     ];
   }).pipe(catchTag2("SetupFailure", (error) => succeed6([
-    options.required === true ? fail8(label2, `${error.message}; fix the file, then run holyagent setup`) : hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+    options.required === true ? fail9(label2, `${error.message}; fix the file, then run holyagent setup`) : hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
   ])));
 });
 
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory2(env);
-var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
-  const shell = yield* Shell;
-  if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present(`${command}: already installed`)] };
-  }
-  if (dryRun) {
-    return {
-      usable: true,
-      lines: [added(`${command}: would install with bun add -g ${packageName}`)]
-    };
-  }
-  yield* reportSetupActivity(`Installing ${packageName}`);
-  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
-  if (result.exitCode !== 0)
-    return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
-  const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
-  const onPath = yield* shell.which(command);
-  const anywhere = yield* shell.which(command, { includeBunBin: true });
-  if (isNone2(onPath) && isSome2(anywhere)) {
-    lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`));
-  }
-  return { usable: true, lines };
-});
 var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
-  const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
-  return result.lines;
+  const installed = yield* lookupCtx7(env);
+  if (installed.kind === "mise")
+    return [
+      present(`ctx7: already installed with mise at ${installed.path} (not on PATH; add its directory to PATH)`)
+    ];
+  if (installed.kind === "unverified")
+    return [`! ctx7: ${CTX7_MISE_UNVERIFIED}`];
+  if (installed.kind === "path" || installed.kind === "bun")
+    return [present("ctx7: already installed")];
+  if (dryRun)
+    return [added("ctx7: would install with bun add -g ctx7")];
+  const shell = yield* Shell;
+  yield* reportSetupActivity("Installing ctx7");
+  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", "ctx7"], { cwd: neutralDirectory(env) });
+  if (result.exitCode !== 0)
+    return [failed2("bun add -g ctx7", result)];
+  const lines = [added("ctx7: installed with bun add -g ctx7")];
+  const onPath = yield* shell.which("ctx7");
+  const anywhere = yield* shell.which("ctx7", { includeBunBin: true });
+  if (isNone2(onPath) && isSome2(anywhere)) {
+    lines.push(hint(`ctx7: ${anywhere.value} is not on PATH; add its directory to PATH`));
+  }
+  return lines;
 });
 var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`])));
 var SETUP_TARGETS = ["pi", "claude"];
@@ -18253,6 +18993,7 @@ var setup = fn2("setup")(function* (env, options) {
   const cloud = inCloudSession(env);
   const piUsed = includePi && !cloud && (yield* piInUse(env));
   const surface = piExecutionSurface(env, piOnly ? "t3" : undefined);
+  let verifiedPi;
   if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed);
     if (blockers.length > 0)
@@ -18263,8 +19004,26 @@ var setup = fn2("setup")(function* (env, options) {
         ],
         ok: false
       };
+    if (!options.dryRun) {
+      const config = yield* result2(loadPiConfig(env, piOptions.cwd, scope, choices, options.piProviders));
+      if (config._tag === "Failure")
+        return {
+          ok: false,
+          lines: [`! pi config: ${config.failure.message}`]
+        };
+      if (config.success.pi.enable) {
+        const host = yield* result2(probePiHost(env));
+        if (host._tag === "Failure")
+          return {
+            ok: false,
+            lines: [`! pi: ${host.failure.message}; ${PI_HOST_GUIDANCE}`]
+          };
+        verifiedPi = host.success.path;
+      }
+    }
   }
   let piSteps = true;
+  let deviceReadiness;
   const whenPiSaved = () => piSteps;
   const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
   const report = (lines) => ({ lines });
@@ -18284,16 +19043,54 @@ var setup = fn2("setup")(function* (env, options) {
       report(() => piSteps ? [] : [
         skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
       ]),
-      phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
+      phase("Pi packages", asStep("pi packages", installPiPackages(env, {
+        ...piOptions,
+        requireVerifiedPi: piOnly && !options.dryRun,
+        ...verifiedPi === undefined ? {} : { verifiedPi }
+      })).pipe(tap2((lines) => sync2(() => {
+        if (piOnly && !options.dryRun && verifiedPi === undefined && lines.some((line) => line.startsWith("! ")))
+          piSteps = false;
+      }))), whenPiSaved),
       phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
-      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, {
+        ...piOptions,
+        surface,
+        pairingHandledByCaller: options.desktopBrowseHandoff === true
+      })), whenPiSaved),
       ...scope === "user" ? [
-        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+        ...piOnly && options.deviceAccess === true && options.devicePreparation !== undefined ? [
+          phase("Device Simulator tools", gen2(function* () {
+            const config = yield* loadPiConfig(env, piOptions.cwd, "user", choices, options.piProviders).pipe(orElseSucceed2(() => {
+              return;
+            }));
+            if (config?.pi.enable !== true || !config.pi.t3.deviceAccess || config.pi.t3.scope === "project")
+              return [
+                hint("Device Simulator: skipped by the existing Pi or T3 Code settings")
+              ];
+            deviceReadiness = null;
+            const t3 = yield* result2(devicePreparationRefusal(env));
+            if (t3._tag === "Failure")
+              return [
+                hint("Device Simulator: not prepared because T3 Code settings could not be read")
+              ];
+            if (t3.success !== undefined)
+              return [hint(`Device Simulator: ${t3.success}`)];
+            const mode = options.dryRun || form.form !== "normal" ? "preview" : options.devicePreparation ?? "preview";
+            const prepared = yield* deviceToolchains(env, {
+              mode,
+              cwd: piOptions.cwd
+            });
+            deviceReadiness = prepared.ready ?? null;
+            return prepared.lines;
+          }), whenPiSaved)
+        ] : [],
+        phase("T3 Code settings", asStep("t3 settings", suspend2(() => installT3Settings(env, piOptions.cwd, {
           dryRun: options.dryRun,
           ...options.piProviders === undefined ? {} : { providers: options.piProviders },
           ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-        })), whenPiSaved)
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess },
+          ...deviceReadiness === undefined ? {} : { deviceReadiness }
+        }))), whenPiSaved)
       ] : []
     ] : Object.keys(choices).length === 0 ? [] : [
       report(() => [
@@ -18330,21 +19127,28 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
 var checkBun = gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which("bun");
-  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
+  return isSome2(found) ? pass("bun", found.value) : fail9("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
 });
-var checkCommand = (env, command, fix = FIX) => gen2(function* () {
+var checkCtx7 = (env, fix = FIX) => gen2(function* () {
   if (inCloudSession(env))
-    return pass(command, "not installed in a claude.ai cloud session, by design");
-  const shell = yield* Shell;
-  const onPath = yield* shell.which(command);
-  if (isSome2(onPath))
-    return pass(command, onPath.value);
-  const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${fix}`);
+    return pass("ctx7", "not installed in a claude.ai cloud session, by design");
+  const found = yield* lookupCtx7(env);
+  switch (found.kind) {
+    case "path":
+      return pass("ctx7", found.path);
+    case "bun":
+      return pass("ctx7", `${found.path} (not on PATH; add its directory to PATH)`);
+    case "mise":
+      return pass("ctx7", `${found.path} (installed with mise, not on PATH; add its directory to PATH)`);
+    case "unverified":
+      return fail9("ctx7", CTX7_MISE_UNVERIFIED);
+    case "missing":
+      return fail9("ctx7", `not found on PATH, in Bun's bin directory, or installed by mise; ${fix}`);
+  }
 });
 var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
-var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message))));
-var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
+var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail9("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail9("settings", error.message))));
+var checks = (env, file, scope) => all2([checkBun, checkCtx7(env), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
   const cwd = options.cwd ?? process.cwd();
@@ -18360,14 +19164,14 @@ var doctor = fn2("doctor")(function* (env, options) {
   ];
   if (options.t3Workflow === true) {
     const blockers = yield* checkT3Prerequisites(env, piUsed);
-    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
-    const ctx7 = yield* checkCtx7;
+    const ctx7Check = checkCtx7(env, "run holyagent doctor --fix");
+    const ctx7 = yield* ctx7Check;
     const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
     const lines = [
       ...blockers.map((line) => `FAIL ${line}`),
       yield* checkBun,
       ...fixes,
-      ...fixes.length > 0 ? [yield* checkCtx7] : [ctx7],
+      ...fixes.length > 0 ? [yield* ctx7Check] : [ctx7],
       ...pi
     ];
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
@@ -18376,8 +19180,8 @@ var doctor = fn2("doctor")(function* (env, options) {
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
       checkBun,
-      checkCommand(env, "ctx7"),
-      succeed6(fail8("settings", located.message))
+      checkCtx7(env),
+      succeed6(fail9("settings", located.message))
     ]);
     return {
       lines: [...lines, ...pi, ...yield* search],
@@ -18433,6 +19237,8 @@ var schemas4 = {
     undo: optionalKey2(Boolean3),
     worktrees: optionalKey2(Boolean3),
     deviceAccess: optionalKey2(Boolean3),
+    devicePreparation: optionalKey2(Literals(["preview", "apply"])),
+    desktopBrowseHandoff: optionalKey2(Boolean3),
     capabilities: optionalKey2(Choices),
     form: optionalKey2(Form)
   }),
@@ -18625,9 +19431,9 @@ var stateMode2 = (context, input) => gen2(function* () {
   }));
 });
 import { copyFile as copyFile2, lstat as lstat8, mkdir as mkdir8, readdir as readdir4 } from "fs/promises";
-import { dirname as dirname12, join as join26, relative as relative6 } from "path";
+import { dirname as dirname12, join as join27, relative as relative6 } from "path";
 
-import { join as join25 } from "path";
+import { join as join26 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -18783,7 +19589,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join25(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join26(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -18904,13 +19710,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join25(root, folderName);
+  const legacy = join26(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join25(legacy, "intents", folder);
+    const base = join26(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -18918,7 +19724,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join25(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join26(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -18929,10 +19735,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join25(base, path), to: join25(target, path) });
+      state.notes.push({ from: join26(base, path), to: join26(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join25(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join26(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -19034,13 +19840,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join25(root, folderName);
+  const legacy = join26(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join25(legacy, folder);
+    const base = join26(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -19054,7 +19860,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join25(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join26(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -19065,10 +19871,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join25(base, path), to: join25(target, path) });
+      state.notes.push({ from: join26(base, path), to: join26(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join25(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join26(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -19197,7 +20003,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => readdir4(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join26(root, name));
+    const text = yield* readText(join27(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -19239,7 +20045,7 @@ var migrate = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { join as join27 } from "path";
+import { join as join28 } from "path";
 var setting = (raw) => raw?.trim() || undefined;
 var WorkflowSettings = Struct({
   disableWorkflows: optionalKey2(Boolean3),
@@ -19265,11 +20071,11 @@ var workflowAvailability = (options, root) => gen2(function* () {
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join27(homeDirectory(env), ".claude");
+  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join28(homeDirectory(env), ".claude");
   return !(yield* forEach2([
-    join27(claudeDir, "settings.json"),
-    join27(root, ".claude", "settings.json"),
-    join27(root, ".claude", "settings.local.json")
+    join28(claudeDir, "settings.json"),
+    join28(root, ".claude", "settings.json"),
+    join28(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 });
 var executionConfig = (options, root) => gen2(function* () {
@@ -19762,7 +20568,7 @@ var shellLive = (env) => {
   const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
   return succeed5(Shell, Shell.of({
     which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
-    run: (command, args, options) => tryPromise2({
+    run: (command, args, options) => options.stdin === "closed" ? flatMap2(Shell, (native) => native.run(command, args, options)).pipe(provide3(Shell.live(env))) : tryPromise2({
       try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
         exitCode: result.exitCode,
         stdout: result.stdout.toString(),
@@ -20480,9 +21286,9 @@ var ASSIGNMENT_COMMANDS = [
     run: coreCommand("assignment list")
   }
 ];
-import { mkdir as mkdir9, mkdtemp as mkdtemp3, rm as rm9 } from "fs/promises";
-import { tmpdir as tmpdir2 } from "os";
-import { join as join28 } from "path";
+import { mkdir as mkdir9, mkdtemp as mkdtemp4, rm as rm10 } from "fs/promises";
+import { tmpdir as tmpdir3 } from "os";
+import { join as join29 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -20574,9 +21380,9 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join28(base, FOLDERS2.profile),
-    config: join28(base, FOLDERS2.config),
-    harness: join28(base, FOLDERS2.harness)
+    profile: join29(base, FOLDERS2.profile),
+    config: join29(base, FOLDERS2.config),
+    harness: join29(base, FOLDERS2.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -20641,19 +21447,19 @@ var liveHost = {
     },
     catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join28(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join29(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp3(join28(tmpdir2(), prefix)),
+    try: () => mkdtemp4(join29(tmpdir3(), prefix)),
     catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
     try: () => mkdir9(path, { recursive: true }),
     catch: (cause) => failed3(`cannot create ${path}: ${reason(cause)}`)
   }).pipe(asVoid2),
-  removeDirectory: (path) => tryPromise2(() => rm9(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+  removeDirectory: (path) => tryPromise2(() => rm10(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
   signals: acquireRelease2(sync2(() => {
     const received = makeUnsafe2();
     const handlers = SIGNALS.map(([name, code]) => {
@@ -20761,12 +21567,12 @@ var setupNotice2 = (env, cwd) => {
   }));
 };
 import { lstat as lstat9, mkdir as mkdir10, open as open7 } from "fs/promises";
-import { tmpdir as tmpdir3, userInfo } from "os";
-import { join as join29 } from "path";
+import { tmpdir as tmpdir4, userInfo } from "os";
+import { join as join30 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join29(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join29(markers(), sessionId);
+var markers = () => join30(tmpdir4(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join30(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -28618,544 +29424,15 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join34 } from "path";
+import { join as join37 } from "path";
 
-import { randomUUID as randomUUID5 } from "crypto";
-import { lstat as lstat10, mkdir as mkdir11, readdir as readdir5, readFile as readFile6, realpath as realpath7, rename as rename7, rm as rm10, writeFile as writeFile6 } from "fs/promises";
-import { basename as basename8, dirname as dirname13, isAbsolute as isAbsolute11, join as join31, resolve as resolve14 } from "path";
+import { realpath as realpath7, stat as stat7 } from "fs/promises";
+import { release as release3 } from "os";
+import { isAbsolute as isAbsolute12, win32 as win329 } from "path";
 
-var recover_work_default = `## Recover existing work
-
-Resolve reversible blockers before asking. Check accessible prior deliveries and the authoritative source when a summary is incomplete. Recover the original rather than remaking it. Verify it at the authorized destination before reporting success. If it is unavailable, preserve independent progress and say what is missing. Keep access, approval and sandbox boundaries.
-`;
-
-var SKILL_default = `---
-name: hillclimb-iteration
-description: "Use when a task asks for iterative improvement. Test small changes against a repeatable baseline and keep the best verified result."
----
-
-# Hillclimb iteration
-
-State a testable hypothesis before measuring.
-
-1. Define the outcome and choose one primary metric, or a clear qualitative criterion for work like visual design. Decide what counts as a meaningful gain. Set the applicable correctness, security and accessibility guardrails.
-2. Establish the smallest reproducible baseline. Record the starting state, inputs, method and result. Repeat noisy measurements enough to learn their normal variation. Keep the original baseline.
-3. Try the smallest reversible change that can test the hypothesis. Isolate one variable when that helps explain the result. Remeasure under the same conditions and recheck the guardrails. Compare with the best verified result. Keep a candidate only when the evidence shows a meaningful gain and the guardrails pass. Undo just the rejected trial without disturbing unrelated work.
-4. Continue while useful trials fit the authorization. Stop when the target is met, plausible trials yield no meaningful gain, the evidence cannot resolve the comparison, or the next step needs a material decision or approval. Report the baseline, best verified result, observed change, uncertainty and any decision still needed.
-
-For visual work, capture the same viewport, state and interaction input before and after. Check contrast, alignment, readability and applicable accessibility or interaction. Explain what changed in the rendered result and why it helps. A pixel difference alone does not establish improvement. For original visuals without a reference image, judge the captures against the brief and design criteria.
-
-Use the existing guidance where available. Use \`visual-judging\` for visual acceptance, the relevant platform design skill for its checklist, \`dev-server\` for a shared render target, \`performance-iteration\` for controlled measurement, and \`evidence-judging\` for reviewing findings.
-
-Use representative before/after scenarios at the real entry point. Record both versions and conditions, and separate installation from use. Scale the checks to the impact. Use isolated, harmless fixtures for defensive changes, expected failures and recovery. Check that authorization, prior state and data stay protected. For UI, UX and DX, exercise the flow a person uses. Keep relevant accessibility and qualitative checks even when a metric improves.
-
-For a material change, keep a short record of the exact revisions, commands, samples and reasons to keep or revert each trial. Check that the treatment ran. Use a negative control when a check could pass without exercising the change. Alternate run order when it could bias the result, and report sample count and variation. A fix can pass its checks without showing a speedup.
-
-## Examples
-
-- **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.
-- **Nonvisual:** Time a fixed compiler workload over repeatable runs. Keep a faster trial only if diagnostics and output still match the baseline.
-- **Operational:** Run setup in an isolated profile with a required feature disabled. Verify that the error explains the blocker without partial writes. Restore the prerequisite in the fixture and use the capability, then repeat setup to check it does not duplicate or erase state.
-`;
-
-var SKILL_default2 = `---
-name: holyagent-workflow
-description: Use when work has independent parts, shared files or a material risk that needs separate verification. Scope the work and judge the result against concrete evidence.
----
-
-# HolyAgent workflow
-
-Handle a straightforward change or answer directly. Define the expected result and run the checks that exercise it.
-
-For substantial work, give each specialist a complete Assignment with the outcome, acceptance evidence, relevant inputs, constraints and writable paths or resources. Start work together only when it is independent. The root sequences dependencies, resolves ownership conflicts and integrates the results. Keep reviews independent of the work under review.
-
-When a decision belongs to the user, use the host's native question tool if it is available. Use a synchronous question when the answer blocks the next action, or an asynchronous question when independent work can continue. If the required question tool is missing, report the limitation. Keep questions separate from approvals. Use the native wait tool when only specialist work remains. For V1 on the supported 0.172.0 runtime, pass \`timeout_ms: 1200000\` when the tool schema allows it. Treat an activity notification as progress, not a finished result.
-
-When new input changes a task, update only the affected scope. Steer through the host's supported control when it changes what the worker does. Stop work whose authorization was withdrawn. Preserve valid results and continue independent work while a decision is pending.
-
-Use the repository's gates. Verify each material claim at its real entry point when it matters. For a performance claim compare the accepted baseline and candidate under comparable conditions. Review trust-boundary changes independently and leave enforcement with the native host. A change with a regression, a missing required check or an unresolved review is not merge-ready. Recheck the exact head and applicable protections before any authorized merge. Report verified results and what remains blocked.
-`;
-
-var CODEX_ASSET_VERSION = version;
-var CODEX_MARKETPLACE = "holyagent-local";
-var CODEX_PLUGIN = `holyagent@${CODEX_MARKETPLACE}`;
-var CODEX_MODEL = "gpt-6.2-sol";
-var CODEX_DEFAULT_EFFORT = "medium";
-var CODEX_STARTUP_GUIDANCE = `# HolyAgent
-
-If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
-
-If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, continue authorized direct work and leave required independent checks open.
-
-${recover_work_default.trim()}
-`;
-var json = (value) => `${JSON.stringify(value, null, 2)}
-`;
-var plugin = "plugins/holyagent";
-var codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
-  {
-    path: ".agents/plugins/marketplace.json",
-    content: json({
-      name: CODEX_MARKETPLACE,
-      plugins: [
-        {
-          name: "holyagent",
-          source: { source: "local", path: `./${plugin}` },
-          policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
-          category: "Productivity"
-        }
-      ]
-    })
-  },
-  {
-    path: `${plugin}/.codex-plugin/plugin.json`,
-    content: json({
-      name: "holyagent",
-      version: assetVersion,
-      description: "Scope, ownership and evidence for Codex work.",
-      skills: "./skills/",
-      interface: { displayName: "HolyAgent" }
-    })
-  },
-  { path: `${plugin}/skills/holyagent-workflow/SKILL.md`, content: SKILL_default2 },
-  { path: `${plugin}/skills/hillclimb-iteration/SKILL.md`, content: SKILL_default }
-];
-var roleProfiles = {
-  "Explorer.map": ["low", "Map the requested code paths and point to the files that own them."],
-  "Explorer.lookup": ["low", "Find a specific fact in the codebase and cite its source."],
-  "Explorer.trace": ["medium", "Trace how the target behavior reaches its callers and effects."],
-  "Librarian.lookup": ["low", "Find the requested fact in authoritative documentation."],
-  "Librarian.research": ["medium", "Reconcile primary sources and identify unresolved questions."],
-  "Worker.mechanical": ["low", "Apply the specified mechanical change and check its coverage."],
-  "Worker.implementation": ["medium", "Implement the scoped change and verify its behavior."],
-  "Worker.integration": ["medium", "Connect the components and exercise their normal entry point."],
-  "Worker.operations": ["medium", "Run the scoped operation and report its observed result."],
-  "Worker.validation": ["low", "Exercise the stated acceptance criteria and record the outcomes."],
-  "Worker.debugging": ["high", "Isolate the cause of ambiguous behavior and verify the repair."],
-  "Worker.visual": ["medium", "Implement the visual change and inspect it at the intended size."],
-  "Reviewer.visual": ["high", "Review the rendered artifact and reproduce material visual issues."],
-  "Reviewer.code": ["medium", "Find and prioritize actionable correctness regressions."],
-  "Reviewer.testing": ["medium", "Find material coverage gaps and unreliable verification."],
-  "Reviewer.audit": ["high", "Check the substantive requirements against observable evidence."],
-  "Reviewer.security": ["high", "Review security boundaries and substantiate material findings."],
-  "Reviewer.artifact": ["medium", "Review the artifact against its audience and requirements."]
-};
-var codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independence }) => {
-  const [effort, purpose] = roleProfiles[roleTask];
-  const name = `holyagent-${agent}`;
-  const scope = mutability === "ReadOnly" ? "Inspect and report without editing project files." : "Make changes within the paths or resources assigned to you.";
-  const evidence = independence === "IndependentReview" ? "Review independently of implementation. Cite concrete evidence for each material finding." : "Report what changed, the checks run and any unresolved blockers.";
-  return {
-    path: `agents/${name}.toml`,
-    content: [
-      `name = ${JSON.stringify(name)}`,
-      `description = ${JSON.stringify(purpose)}`,
-      `model = ${JSON.stringify(CODEX_MODEL)}`,
-      `model_reasoning_effort = ${JSON.stringify(effort)}`,
-      `developer_instructions = ${JSON.stringify(`${purpose} ${scope} ${evidence}`)}`,
-      ""
-    ].join(`
-`)
-  };
-});
-
-import { mkdtemp as mkdtemp4 } from "fs/promises";
-import { isAbsolute as isAbsolute10, join as join30 } from "path";
-var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace";
-var catalogName = "root-only-models.json";
-var verifiedCatalog = "d50b6749506d97e5f334dbabcb666eb1689f423cf3e88cfabdcf3c536b873068";
-var Catalog = fromJsonString2(Struct({ models: NonEmptyArray(Record(String5, Unknown2)) }));
-var codexStartupConfig = (rootOnlyCatalogPath) => [
-  `model = ${JSON.stringify(CODEX_MODEL)}`,
-  `model_reasoning_effort = ${JSON.stringify(CODEX_DEFAULT_EFFORT)}`,
-  ...rootOnlyCatalogPath === undefined ? [] : [`model_catalog_json = ${JSON.stringify(rootOnlyCatalogPath)}`],
-  "",
-  "[agents]",
-  `enabled = ${rootOnlyCatalogPath !== undefined}`,
-  "max_depth = 1",
-  "",
-  "[features]",
-  ...rootOnlyCatalogPath === undefined ? ["multi_agent_v2 = false"] : [],
-  "default_mode_request_user_input = true",
-  "context_management = true",
-  ...rootOnlyCatalogPath === undefined ? [] : [
-    "",
-    "[features.multi_agent_v2]",
-    "enabled = false",
-    "disable_native_tools = true",
-    "",
-    "[features.code_mode]",
-    'direct_only_tool_namespaces = ["multi_agent_v1"]'
-  ],
-  ""
-].join(`
-`);
-
-class StartupStageError extends TaggedError2("StartupStageError") {
-}
-var readRootOnlyCatalog = fn2("readRootOnlyCatalog")(function* (file) {
-  if (!isAbsolute10(file))
-    return yield* new StartupStageError({ detail: "Use an absolute path to the Codex catalog" });
-  const text = yield* tryPromise2({
-    try: () => Bun.file(file).text(),
-    catch: (cause) => new StartupStageError({ detail: String(cause) })
-  });
-  if (Bun.CryptoHasher.hash("sha256", text, "hex") !== verifiedCatalog)
-    return yield* new StartupStageError({ detail: "Expected the unmodified Codex 0.172.0 catalog" });
-  const original = yield* decodeUnknownEffect2(Catalog)(text, {
-    onExcessProperty: "error"
-  }).pipe(mapError2((cause) => new StartupStageError({ detail: String(cause) })));
-  return `${JSON.stringify({
-    models: original.models.map((model) => model["multi_agent_version"] === "v2" ? { ...model, multi_agent_version: "v1" } : model)
-  })}
-`;
-});
-var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile, version = CODEX_ASSET_VERSION) {
-  const catalog = catalogFile === undefined ? undefined : yield* readRootOnlyCatalog(catalogFile);
-  return [
-    {
-      path: "config.toml",
-      content: codexStartupConfig(catalog === undefined ? undefined : join30(target, catalogName))
-    },
-    ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
-    { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
-    ...codexRoleFiles(),
-    ...codexMarketplaceFiles(version).map(({ path, content }) => ({
-      path: join30(CODEX_STARTUP_MARKETPLACE, path),
-      content
-    }))
-  ];
-});
-var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile) {
-  if (!isAbsolute10(parent))
-    return yield* new StartupStageError({ detail: "Use an absolute staging directory" });
-  if (catalogFile !== undefined)
-    yield* readRootOnlyCatalog(catalogFile);
-  const target = yield* tryPromise2({
-    try: () => mkdtemp4(join30(parent, "holyagent-codex-")),
-    catch: (cause) => new StartupStageError({ detail: String(cause) })
-  });
-  const files = yield* codexStartupFiles(target, catalogFile);
-  yield* forEach2(files, ({ path, content }) => tryPromise2({
-    try: () => Bun.write(join30(target, path), content),
-    catch: (cause) => new StartupStageError({ detail: `${path}: ${String(cause)}` })
-  }));
-  return target;
-});
-
-var Receipt = fromJsonString2(Struct({
-  version: Literal2(1),
-  files: Record(String5, String5)
-}));
-var MarketplaceResult = Struct({ marketplaceName: Literal2(CODEX_MARKETPLACE) });
-var PluginResult = Struct({
-  pluginId: Literal2(CODEX_PLUGIN),
-  version: String5
-});
-var PluginList = Struct({
-  installed: ArraySchema(Struct({
-    pluginId: String5,
-    version: String5,
-    enabled: Boolean3
-  }))
-});
-var receiptFile = join31("holyagent", "setup-v1.json");
-var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
-var fail9 = (detail) => new StartupStageError({ detail });
-var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join31(homeDirectory2(env), ".holyagent"), "codex");
-var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) });
-var statOptional = (path) => tryPromise2({ try: () => lstat10(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`))));
-var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
-  const target = resolve14(candidate);
-  const root = yield* statOptional(target);
-  if (root !== undefined && !root.isDirectory())
-    return yield* fail9(`Not a real profile directory: ${target}`);
-  let ancestor = target;
-  const suffix = [];
-  while ((yield* statOptional(ancestor)) === undefined) {
-    suffix.unshift(basename8(ancestor));
-    ancestor = dirname13(ancestor);
-  }
-  return join31(yield* io2(ancestor, () => realpath7(ancestor)), ...suffix);
-});
-var inside = fn2("codexSetupPath")(function* (home, relativePath) {
-  let path = home;
-  const root = yield* statOptional(home);
-  if (root !== undefined && !root.isDirectory())
-    return yield* fail9(`Not a real profile directory: ${home}`);
-  const pieces = relativePath.split(/[\\/]/);
-  if (pieces.some((piece) => piece === "" || piece === "." || piece === ".."))
-    return yield* fail9(`Invalid relative profile path: ${relativePath}`);
-  for (const [i, piece] of pieces.entries()) {
-    path = join31(path, piece);
-    const entry = yield* statOptional(path);
-    if (entry !== undefined && (entry.isSymbolicLink() || i < pieces.length - 1 && !entry.isDirectory()))
-      return yield* fail9(`Not a real profile path: ${path}`);
-  }
-  return path;
-});
-var read2 = fn2("codexSetupRead")(function* (home, entry) {
-  const file = yield* inside(home, entry);
-  const stat = yield* statOptional(file);
-  if (stat === undefined)
-    return;
-  if (!stat.isFile())
-    return yield* fail9(`Not a regular profile file: ${file}`);
-  return yield* io2(file, () => readFile6(file, "utf8"));
-});
-var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expected, complete) {
-  const allowed = new Set(expected.map(({ path }) => path));
-  const directories = new Set([root]);
-  for (const { path } of expected)
-    for (let parent = dirname13(path);parent !== root; parent = dirname13(parent))
-      directories.add(parent);
-  for (const directory of directories) {
-    const absolute = yield* inside(home, directory);
-    const stat = yield* statOptional(absolute);
-    if (stat === undefined && !complete)
-      continue;
-    if (stat === undefined || !stat.isDirectory())
-      return yield* fail9(`Missing or invalid Codex plugin directory: ${absolute}`);
-    const names = yield* io2(absolute, () => readdir5(absolute));
-    for (const name of names) {
-      const file = join31(directory, name);
-      if (!allowed.has(file) && !directories.has(file))
-        return yield* fail9(`Kept unowned entry in Codex plugin: ${join31(home, file)}`);
-    }
-  }
-  if (complete) {
-    for (const { path, content } of expected)
-      if ((yield* read2(home, path)) !== content)
-        return yield* fail9(`Kept modified Codex plugin cache: ${join31(home, path)}`);
-  }
-});
-var record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
-var parseToml = (content) => try_2({
-  try: () => record4(Bun.TOML.parse(content)),
-  catch: () => fail9("Invalid Codex config.toml; left it unchanged")
-});
-var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-var developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m;
-var ownedInstruction = (asset, before) => {
-  if (asset.path === "AGENTS.md")
-    return true;
-  if (asset.path === join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
-    return true;
-  const line = asset.content.match(developerLine)?.[0];
-  return asset.path.startsWith("agents/holyagent-") && asset.path.endsWith(".toml") && line !== undefined && before.replace(developerLine, () => line) === asset.content;
-};
-var checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
-  const currentAgents = record4(current.agents);
-  const wantedAgents = record4(wanted.agents);
-  const currentFeatures = record4(current.features);
-  const wantedFeatures = record4(wanted.features);
-  const foundV2 = record4(currentFeatures.multi_agent_v2);
-  const wantedV2 = record4(wantedFeatures.multi_agent_v2);
-  const v2Matches = wantedFeatures.multi_agent_v2 === false ? currentFeatures.multi_agent_v2 === false : foundV2.enabled === wantedV2.enabled && foundV2.disable_native_tools === wantedV2.disable_native_tools;
-  if (currentAgents.enabled !== wantedAgents.enabled || currentAgents.max_depth !== wantedAgents.max_depth || !v2Matches || !same2(current.model_catalog_json, wanted.model_catalog_json) || wantedAgents.enabled === true && !same2(record4(currentFeatures.code_mode).direct_only_tool_namespaces, record4(wantedFeatures.code_mode).direct_only_tool_namespaces))
-    return yield* fail9("Existing Codex delegation settings do not match this mode. Use a separate --codex-home, or keep its original --root-only-catalog. Nothing was written.");
-});
-var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expected, content) {
-  if (expected === content)
-    return;
-  const path = yield* inside(home, relativePath);
-  yield* io2(path, () => mkdir11(dirname13(path), { recursive: true }));
-  if ((yield* read2(home, relativePath)) !== expected)
-    return yield* fail9(`Profile changed during setup: ${path}`);
-  if (expected === undefined) {
-    yield* io2(path, () => writeFile6(path, content, { flag: "wx", mode: 384 }));
-    return;
-  }
-  const next = `${path}.${randomUUID5()}.tmp`;
-  yield* io2(path, () => writeFile6(next, content, { flag: "wx", mode: 384 }));
-  yield* gen2(function* () {
-    if ((yield* read2(home, relativePath)) !== expected)
-      return yield* fail9(`Profile changed during setup: ${path}`);
-    yield* io2(path, () => rename7(next, path));
-  }).pipe(ensuring2(io2(next, () => rm10(next, { force: true })).pipe(ignore2)));
-});
-var setupCodex = fn2("setupCodex")(function* (env, options) {
-  if (!isAbsolute11(options.home))
-    return yield* fail9("--codex-home must be an absolute path");
-  const home = yield* canonicalProfile(options.home);
-  if (home === dirname13(home))
-    return yield* fail9("Choose a dedicated Codex profile, not a filesystem root");
-  const version = options.version ?? CODEX_ASSET_VERSION;
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
-    return yield* fail9("Invalid HolyAgent plugin version");
-  const shell = yield* Shell;
-  if (!options.dryRun && isNone2(yield* shell.which("codex")))
-    return yield* fail9("Codex is not on PATH. Apply from an environment with the verified native Codex CLI. A setup preview does not require it.");
-  const run = (args) => shell.run("codex", args, {
-    cwd: homeDirectory2(env),
-    env: { CODEX_HOME: home, NO_COLOR: "1" }
-  }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
-  const desired = yield* codexStartupFiles(home, options.catalog, version);
-  const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
-    path: join31(CODEX_STARTUP_MARKETPLACE, path),
-    content
-  }));
-  const config = desired.find(({ path }) => path === "config.toml")?.content;
-  if (config === undefined)
-    return yield* fail9("Missing bundled Codex startup configuration");
-  const beforeConfig = yield* read2(home, "config.toml");
-  const beforeOverride = yield* read2(home, "AGENTS.override.md");
-  if (beforeOverride?.trim())
-    return yield* fail9("This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.");
-  const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig);
-  if (record4(settings.features).plugins === false)
-    return yield* fail9("This profile disables Codex plugins ([features] plugins = false). No files changed.");
-  if (beforeConfig !== undefined)
-    yield* checkPolicy(settings, yield* parseToml(config));
-  const market = join31(home, CODEX_STARTUP_MARKETPLACE);
-  const registered = record4(record4(settings.marketplaces)[CODEX_MARKETPLACE]);
-  if (Object.keys(registered).length > 0 && (registered.source !== market || registered.source_type !== "local"))
-    return yield* fail9(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}; kept it unchanged`);
-  const plugin = record4(record4(settings.plugins)[CODEX_PLUGIN]);
-  if (plugin.enabled === false)
-    return yield* fail9("The HolyAgent Codex plugin is disabled in this profile; left that choice unchanged");
-  const beforeReceipt = yield* read2(home, receiptFile);
-  const receipt = beforeReceipt === undefined ? { files: {} } : yield* decodeUnknownEffect2(Receipt, { onExcessProperty: "error" })(beforeReceipt).pipe(mapError2(() => fail9("Invalid HolyAgent Codex setup receipt; no files changed")));
-  const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
-    const before = yield* read2(home, asset.path);
-    const previousDigest = receipt.files[asset.path];
-    const edited = before !== undefined && before !== asset.content && digest(before) !== previousDigest && before !== legacy.find(({ path }) => path === asset.path)?.content;
-    const conflict = edited && previousDigest !== undefined && /^[a-f0-9]{64}$/.test(previousDigest) && ownedInstruction(asset, before);
-    if (edited && !(conflict && (options.dryRun ? options.managedInstructions === "review" : options.managedInstructions === "replace" && options.expectedPlan !== undefined)))
-      return yield* fail9(`Kept modified or unowned Codex setup file: ${join31(home, asset.path)}`);
-    return { ...asset, before, conflict };
-  }));
-  const sourceRoot = join31(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
-  const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
-  yield* checkPluginTree(home, sourceRoot, pluginAssets, false);
-  const nextReceipt = `${JSON.stringify({
-    version: 1,
-    files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
-  }, null, 2)}
-`;
-  const cache = join31("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
-  const expectedCache = pluginAssets.map(({ path, content }) => ({
-    path: join31(cache, path.slice(sourceRoot.length + 1)),
-    content
-  }));
-  const cached = yield* statOptional(yield* inside(home, cache));
-  if (cached !== undefined)
-    yield* checkPluginTree(home, cache, expectedCache, true);
-  const install = plugin.enabled !== true || cached === undefined;
-  const addMarket = Object.keys(registered).length === 0;
-  const fingerprint = digest(JSON.stringify([
-    home,
-    version,
-    beforeConfig,
-    beforeOverride,
-    beforeReceipt,
-    addMarket,
-    install,
-    assets.map(({ path, before, content }) => [path, before, content])
-  ]));
-  if (options.expectedPlan !== undefined && options.expectedPlan !== fingerprint)
-    return yield* fail9("The Codex profile changed after review. Open setup and review it again.");
-  const lines = [
-    `~ Codex home: ${home}`,
-    `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
-    ...beforeConfig === undefined ? ["+ Codex config: create a dedicated startup profile"] : ["= Codex config: keeping existing settings"],
-    ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
-    ...addMarket ? ["+ Codex plugin: register the local marketplace"] : [],
-    ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present in the local cache`],
-    ...record4(settings.skills).include_instructions === false ? [
-      "~ Codex skills: this profile disables automatic skill listings. HolyAgent workflow will not be listed in the prompt under this setting."
-    ] : [],
-    "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
-  ];
-  const managedConflicts = assets.filter(({ conflict }) => conflict).map(({ path }) => ({
-    file: join31(home, path),
-    detail: "Edited since setup. Replace with the bundled instructions and save a copy of the current file."
-  }));
-  if (options.dryRun)
-    return {
-      ok: true,
-      lines,
-      fingerprint,
-      ...managedConflicts.length > 0 ? { managedConflicts } : {}
-    };
-  const backups = [];
-  const backupRoot = join31("holyagent", "setup-backups", randomUUID5());
-  const steps = [
-    {
-      label: "Codex runtime",
-      run: gen2(function* () {
-        const binary = yield* run(["--version"]);
-        if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
-          return yield* fail9("This startup profile requires the verified Codex 0.172.0 runtime line");
-      })
-    },
-    {
-      label: "Codex profile files",
-      run: gen2(function* () {
-        if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile)) !== beforeReceipt)
-          return yield* fail9(`Profile changed during setup: ${join31(home, "config.toml")}`);
-        if (options.expectedPlan !== undefined) {
-          for (const asset of assets)
-            if ((yield* read2(home, asset.path)) !== asset.before)
-              return yield* fail9(`Profile changed during setup: ${join31(home, asset.path)}. Review it again.`);
-        }
-        yield* io2(home, () => mkdir11(home, { recursive: true, mode: 448 }));
-        if (beforeConfig === undefined)
-          yield* store2(home, "config.toml", undefined, config);
-        for (const asset of assets) {
-          const replace = store2(home, asset.path, asset.before, asset.content);
-          if (!asset.conflict || asset.before === undefined) {
-            yield* replace;
-            continue;
-          }
-          const backup = join31(backupRoot, asset.path);
-          yield* store2(home, backup, undefined, asset.before);
-          const backupFile = join31(home, backup);
-          backups.push(backupFile);
-          yield* replace.pipe(uninterruptible2, onError2(() => gen2(function* () {
-            if ((yield* read2(home, asset.path)) !== asset.before)
-              return;
-            yield* io2(backupFile, () => rm10(backupFile, { force: true }));
-            backups.pop();
-          }).pipe(ignore2)));
-          lines.push(`+ Codex instructions: backup saved in ${backupFile}`);
-        }
-        yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
-        yield* store2(home, receiptFile, beforeReceipt, nextReceipt);
-      })
-    },
-    ...addMarket ? [
-      {
-        label: "Codex marketplace",
-        run: gen2(function* () {
-          yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected marketplace")));
-        })
-      }
-    ] : [],
-    {
-      label: "Codex plugin",
-      run: gen2(function* () {
-        if (install) {
-          yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`);
-          const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected plugin")));
-          if (result.version !== version)
-            return yield* fail9(`Codex installed version ${result.version}, expected ${version}`);
-          yield* checkPluginTree(home, cache, expectedCache, true);
-        }
-        yield* reportSetupActivity(`Checking enabled version ${version}`);
-        const list = yield* decodeUnknownEffect2(fromJsonString2(PluginList))(yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"])).pipe(mapError2(() => fail9("Codex did not report enabled plugins for this profile")));
-        if (!list.installed.some((item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version))
-          return yield* fail9(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`);
-      })
-    }
-  ];
-  for (const [index, { label, run }] of steps.entries())
-    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run).pipe(mapError2((error) => backups.length === 0 ? error : fail9(`${error.detail}
-Backups: ${backups.join(", ")}`)));
-  return { ok: true, lines, fingerprint };
-});
-import { constants as constants6 } from "fs";
-import { posix as posix3, win32 as win323 } from "path";
+import { constants as constants7 } from "fs";
+import { posix as posix5, win32 as win326 } from "path";
+var isChromiumBrowser = (browser) => browser.family === "chromium";
 var BROWSERS = [
   {
     id: "chrome",
@@ -29277,8 +29554,8 @@ var localPath = (value, windows) => {
   if (Array.from(value).some((char) => (char.codePointAt(0) ?? 0) < 32))
     return;
   if (windows)
-    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win323.normalize(value) : undefined;
-  return value.startsWith("/") ? posix3.normalize(value) : undefined;
+    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win326.normalize(value) : undefined;
+  return value.startsWith("/") ? posix5.normalize(value) : undefined;
 };
 var checkFile = (path, executable, windows) => gen2(function* () {
   const fs = yield* fileSystem;
@@ -29286,7 +29563,7 @@ var checkFile = (path, executable, windows) => gen2(function* () {
   if (!metadata.isFile() || executable && metadata.size === 0)
     return false;
   if (executable && !windows)
-    yield* try_2(() => fs.accessSync(path, constants6.X_OK));
+    yield* try_2(() => fs.accessSync(path, constants7.X_OK));
   return true;
 }).pipe(orElseSucceed2(() => false));
 var oneFile = (paths, windows) => findFirst2([...new Set(paths)], (path) => checkFile(path, true, windows));
@@ -29295,8 +29572,8 @@ var profileRoot = (browser, env, platform) => {
   const home = envOf(env, windows ? "USERPROFILE" : "HOME", windows) ?? homeDirectory2(env);
   if (browser.id === "firefox") {
     if (windows)
-      return localPath(win323.join(envOf(env, "APPDATA", true) ?? win323.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
-    return localPath(posix3.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
+      return localPath(win326.join(envOf(env, "APPDATA", true) ?? win326.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
+    return localPath(posix5.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
   }
   const profileEnv = windows ? {
     ...env,
@@ -29322,22 +29599,22 @@ var knownPaths = (browser, env, platform) => {
   if (platform === "win32") {
     const user = envOf(env, "USERPROFILE", true) ?? home;
     const programRoots = [
-      envOf(env, "LOCALAPPDATA", true) ?? win323.join(user, "AppData", "Local"),
+      envOf(env, "LOCALAPPDATA", true) ?? win326.join(user, "AppData", "Local"),
       ...["ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"].map((name) => envOf(env, name, true))
     ];
-    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win323.join(root, rest)) : []);
+    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win326.join(root, rest)) : []);
   }
   if (platform === "darwin" && browser.app !== undefined) {
     const app = browser.app;
-    return ["/Applications", posix3.join(home, "Applications")].filter(posix3.isAbsolute).map((root) => posix3.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
+    return ["/Applications", posix5.join(home, "Applications")].filter(posix5.isAbsolute).map((root) => posix5.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
   }
   if (platform === "linux")
-    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix3.join(root, command)));
+    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix5.join(root, command)));
   return [];
 };
 var uniqueWinNames = (browser) => (browser.winExe ?? []).filter((exe) => exe.toLowerCase() !== "launcher.exe" && BROWSERS.filter((candidate) => candidate.winExe?.includes(exe)).length === 1);
 var pathsOnPath = (browser, env, windows) => {
-  const pathApi = windows ? win323 : posix3;
+  const pathApi = windows ? win326 : posix5;
   const names = windows ? uniqueWinNames(browser) : browser.commands ?? [];
   return (envOf(env, "PATH", windows) ?? "").split(pathApi.delimiter).flatMap((entry) => {
     const root = localPath(entry, windows);
@@ -29365,23 +29642,62 @@ var registryExecutable = (stdout, env) => {
   }
   return;
 };
-var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
+var registryReader = fn2("registryReader")(function* (env) {
   const root = envOf(env, "SystemRoot", true) ?? envOf(env, "WINDIR", true);
   const local = root === undefined ? undefined : localPath(root, true);
   if (local === undefined)
-    return new Map;
-  const reg = win323.join(local, "System32", "reg.exe");
+    return;
+  const reg = win326.join(local, "System32", "reg.exe");
   if (!(yield* checkFile(reg, true, true)))
-    return new Map;
+    return;
   const shell = yield* Shell;
-  const views = ["/reg:64", "/reg:32"];
-  const query = (key, view, value) => shell.run(reg, ["query", key, ...value ? ["/ve"] : [], view], { cwd: local }).pipe(map4(({ exitCode, stdout }) => exitCode === 0 ? stdout : ""));
+  return (key, args) => shell.run(reg, ["query", key, ...args], { cwd: local }).pipe(map4(({ exitCode, stdout }) => exitCode === 0 ? stdout : ""));
+});
+var localNames = (directory) => gen2(function* () {
+  const fs = yield* fileSystem;
+  return yield* try_2(() => fs.readdirSync(directory)).pipe(orElseSucceed2(() => []));
+});
+var identityKey = (name) => name.toLowerCase().replaceAll(/[^a-z\d]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+var registeredBrowser = fn2("registeredBrowser")(function* (key, name, executable, source, platform) {
+  const windows = platform === "win32";
+  const path = windows ? win326 : posix5;
+  const folder = path.dirname(executable);
+  const isFile = (file) => checkFile(file, false, windows);
+  const isLibrary = (base) => isFile(path.join(folder, base));
+  const gecko = yield* isLibrary(windows ? "xul.dll" : "libxul.so");
+  const chromium = gecko ? false : yield* gen2(function* () {
+    if (windows) {
+      if (yield* isLibrary("chrome.dll"))
+        return true;
+      const versions = (yield* localNames(folder)).filter((entry) => /^\d+(?:\.\d+){2,4}$/.test(entry)).slice(0, 12);
+      const version = yield* findFirst2(versions, (entry) => isFile(path.join(folder, entry, "chrome.dll")));
+      if (version._tag === "Some")
+        return true;
+    }
+    return (yield* isLibrary("resources.pak")) && ((yield* isLibrary("chrome_100_percent.pak")) || (yield* isLibrary("chrome-sandbox")));
+  });
+  return {
+    id: `${source === "registry" ? "registered" : "desktop"}-${identityKey(key)}`,
+    name,
+    executable,
+    source,
+    family: gecko ? "gecko" : chromium ? "chromium" : "unknown",
+    browseCompatibility: gecko ? "unsupported" : "unverified"
+  };
+});
+var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
+  const read = yield* registryReader(env);
   const registered = new Map;
+  const extra = [];
+  if (read === undefined)
+    return { registered, extra };
+  const views = ["/reg:64", "/reg:32"];
+  const query = (key, view, value) => read(key, [...value ? ["/ve"] : [], view]);
   const roots = hives.flatMap((hive) => views.map((view) => ({ hive, view })));
   const all = yield* forEach2(roots, ({ hive, view }) => query(`${hive}\\${Clients}`, view, false).pipe(map4((text) => ({ hive, view, text }))), { concurrency: 4 });
   for (const { hive, view, text } of all) {
     const prefix = `${hive}\\${Clients}\\`;
-    const children = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.toLowerCase().startsWith(prefix.toLowerCase())).map((line) => line.slice(prefix.length)).filter((child) => /^[\w .-]{1,80}$/.test(child));
+    const children = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.toLowerCase().startsWith(prefix.toLowerCase())).map((line) => line.slice(prefix.length)).filter((child) => /^[\w .-]{1,80}$/.test(child) && identityKey(child) !== "").slice(0, 48);
     const chosen = children.flatMap((client) => {
       const name = client.toLowerCase();
       const browser = BROWSERS.find(({ clients }) => clients?.some((entry) => {
@@ -29390,38 +29706,132 @@ var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
           return true;
         return name.startsWith(registeredName + "-") && /^[a-f\d]{6,}$/i.test(name.slice(registeredName.length + 1));
       }));
-      return browser === undefined || registered.has(browser.id) ? [] : [{ client, browser }];
+      return browser !== undefined && registered.has(browser.id) ? [] : [{ client, browser }];
     });
     const verified = yield* forEach2(chosen, ({ client, browser }) => gen2(function* () {
       const output = yield* query(`${prefix}${client}\\shell\\open\\command`, view, true);
       const path = registryExecutable(output, env);
-      return path !== undefined && browser.winExe?.some((exe) => exe.toLowerCase() === win323.basename(path).toLowerCase()) && (yield* checkFile(path, true, true)) ? { id: browser.id, path } : undefined;
+      if (path === undefined || !(yield* checkFile(path, true, true)))
+        return;
+      if (browser === undefined) {
+        const display = yield* query(`${prefix}${client}`, view, true);
+        const name = /^\s*\(Default\)\s+REG_SZ\s+([^\p{Cc}]{1,100})$/imu.exec(display)?.[1]?.trim() || client;
+        return yield* registeredBrowser(client, name, path, "registry", "win32");
+      }
+      return browser.winExe?.some((exe) => exe.toLowerCase() === win326.basename(path).toLowerCase()) ? { id: browser.id, path } : undefined;
     }), { concurrency: 4 });
-    for (const entry of verified)
-      if (entry !== undefined && !registered.has(entry.id))
-        registered.set(entry.id, entry.path);
+    for (const entry of verified) {
+      if (entry === undefined)
+        continue;
+      if ("path" in entry) {
+        if (!registered.has(entry.id))
+          registered.set(entry.id, entry.path);
+      } else if (!extra.some((browser) => browser.id === entry.id))
+        extra.push(entry);
+    }
   }
   const missing = BROWSERS.filter((browser) => !registered.has(browser.id));
   const appNames = ["chrome.exe", "firefox.exe", "helium.exe"].filter((exe) => missing.some(({ winExe }) => winExe?.includes(exe)));
   const appResults = yield* forEach2(roots.flatMap(({ hive, view }) => appNames.map((exe) => ({ hive, view, exe }))), ({ hive, view, exe }) => query(`${hive}\\${AppPaths}\\${exe}`, view, true).pipe(map4((stdout) => ({ exe, path: registryExecutable(stdout, env) }))), { concurrency: 4 });
   for (const { exe, path } of appResults) {
-    if (path === undefined || win323.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
+    if (path === undefined || win326.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
       continue;
-    const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win323.normalize(suffix).toLowerCase()}`)));
+    const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win326.normalize(suffix).toLowerCase()}`)));
     if (browser !== undefined && !registered.has(browser.id))
       registered.set(browser.id, path);
   }
-  return registered;
+  return { registered, extra };
+});
+var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
+  const home = homeDirectory2(env);
+  const roots = [
+    ...new Set([
+      env.XDG_DATA_HOME ?? posix5.join(home, ".local/share"),
+      ...(env.XDG_DATA_DIRS ?? "/usr/local/share:/usr/share").split(":")
+    ])
+  ].flatMap((root) => {
+    const local = localPath(root, false);
+    return local === undefined ? [] : [posix5.join(local, "applications")];
+  });
+  const fs = yield* fileSystem;
+  const shell = yield* Shell;
+  const seen = new Set;
+  const extra = [];
+  for (const root of roots) {
+    for (const entry of (yield* localNames(root)).filter((file) => /^[\w.-]{1,120}\.desktop$/.test(file)).slice(0, 500)) {
+      if (seen.has(entry))
+        continue;
+      seen.add(entry);
+      const file = posix5.join(root, entry);
+      const metadata = yield* tryPromise2(() => fs.stat(file)).pipe(option2);
+      if (metadata._tag === "None" || !metadata.value.isFile() || metadata.value.size > 64 * 1024)
+        continue;
+      const source = yield* tryPromise2(() => fs.readFile(file, "utf8")).pipe(orElseSucceed2(() => ""));
+      const group = source.split(/^\[Desktop Entry\]\s*$/m)[1]?.split(/^\[/m)[0] ?? "";
+      const values = (field) => group.split(/\r?\n/).find((line) => line.startsWith(`${field}=`))?.slice(field.length + 1).split(";") ?? [];
+      if (!/^Type=Application\s*$/m.test(group) || /^Hidden=true\s*$/im.test(group) || !values("Categories").includes("WebBrowser") && !values("MimeType").includes("x-scheme-handler/https"))
+        continue;
+      const name = /^Name=([^\p{Cc}]{1,100})$/mu.exec(group)?.[1]?.trim();
+      const match = /^Exec=(?:"([^"\r\n]+)"|([^\s"=]+))/m.exec(group);
+      const binary = match?.[1] ?? match?.[2];
+      if (!name || binary === undefined)
+        continue;
+      const path = localPath(binary, false);
+      const located = path === undefined && /^[\w.-]+$/.test(binary) ? yield* shell.which(binary, { strict: { cwd: home } }) : undefined;
+      const executable = path ?? (located?._tag === "Some" ? located.value : undefined);
+      if (executable === undefined || !(yield* checkFile(executable, true, false)))
+        continue;
+      if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix5.basename(executable)))
+        continue;
+      extra.push({
+        ...yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"),
+        desktopEntry: entry
+      });
+    }
+  }
+  return extra;
+});
+var macRegistrations = fn2("macRegistrations")(function* (env) {
+  const home = homeDirectory2(env);
+  const extra = [];
+  for (const root of ["/Applications", posix5.join(home, "Applications")].filter(posix5.isAbsolute)) {
+    const bundles = (yield* localNames(root)).filter((name) => /^[^/\p{Cc}]{1,120}\.app$/u.test(name)).slice(0, 160);
+    for (const bundle of bundles) {
+      const name = bundle.slice(0, -4);
+      if (identityKey(name) === "" || BROWSERS.some(({ app }) => app === name))
+        continue;
+      const contents = posix5.join(root, bundle, "Contents");
+      const resources = posix5.join(contents, "Resources");
+      const macos = posix5.join(contents, "MacOS");
+      const executables = (yield* localNames(macos)).filter((entry) => /^[^/\p{Cc}]{1,120}$/u.test(entry));
+      const executable = posix5.join(macos, executables.find((entry) => entry.toLowerCase() === name.toLowerCase()) ?? name);
+      if (!(yield* checkFile(executable, true, false)))
+        continue;
+      const gecko = (yield* checkFile(posix5.join(macos, "XUL"), false, false)) && (yield* checkFile(posix5.join(resources, "browser", "omni.ja"), false, false));
+      const frameworks = posix5.join(contents, "Frameworks");
+      const engine = gecko ? undefined : yield* findFirst2((yield* localNames(frameworks)).filter((entry) => /^[^/\p{Cc}]{1,120} Framework\.framework$/u.test(entry) && entry !== "Electron Framework.framework"), (entry) => checkFile(posix5.join(frameworks, entry, "Versions/Current/Helpers/chrome_crashpad_handler"), false, false));
+      if (gecko || engine?._tag === "Some")
+        extra.push({
+          id: `app-${identityKey(name)}`,
+          name,
+          executable,
+          source: "known-path",
+          family: gecko ? "gecko" : "chromium",
+          browseCompatibility: gecko ? "unsupported" : "unverified"
+        });
+    }
+  }
+  return extra;
 });
 var discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = process.platform) {
   const windows = platform === "win32";
-  const path = windows ? win323 : posix3;
+  const path = windows ? win326 : posix5;
   if (!windows && platform !== "linux" && platform !== "darwin")
     return [];
-  const registry = windows ? yield* windowsRegistrations(env) : new Map;
+  const registry = windows ? yield* windowsRegistrations(env) : undefined;
   const browsers = yield* forEach2(BROWSERS, (browser) => gen2(function* () {
     const profileDirectory = profileRoot(browser, env, platform);
-    const registered = registry.get(browser.id);
+    const registered = registry?.registered.get(browser.id);
     if (registered !== undefined)
       return evidence(browser, "registry", platform, profileDirectory, registered);
     const known = yield* oneFile(knownPaths(browser, env, platform), windows);
@@ -29438,7 +29848,92 @@ var discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = proces
         return evidence(browser, "profile", platform, profileDirectory);
     return;
   }), { concurrency: 4 });
-  return browsers.filter((browser) => browser !== undefined);
+  const extra = registry?.extra ?? (platform === "linux" ? yield* linuxRegistrations(env) : yield* macRegistrations(env));
+  const found = browsers.filter((browser) => browser !== undefined);
+  const identity = (file) => windows ? file?.toLowerCase() : file;
+  for (const browser of extra) {
+    if (!found.some((entry) => entry.id === browser.id || identity(entry.executable) === identity(browser.executable)))
+      found.push(browser);
+  }
+  return found;
+});
+var HTTPS_CHOICE = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice";
+var LINUX_BROWSER_IDS = new Map([
+  ["google-chrome.desktop", "chrome"],
+  ["com.google.Chrome.desktop", "chrome"],
+  ["google-chrome-beta.desktop", "chrome-beta"],
+  ["google-chrome-unstable.desktop", "chrome-unstable"],
+  ["chromium.desktop", "chromium"],
+  ["chromium-browser.desktop", "chromium"],
+  ["org.chromium.Chromium.desktop", "chromium"],
+  ["microsoft-edge.desktop", "edge"],
+  ["microsoft-edge-stable.desktop", "edge"],
+  ["brave-browser.desktop", "brave"],
+  ["com.brave.Browser.desktop", "brave"],
+  ["opera.desktop", "opera"],
+  ["vivaldi-stable.desktop", "vivaldi"],
+  ["helium.desktop", "helium"],
+  ["net.imput.helium.desktop", "helium"]
+]);
+var MAC_DEFAULT = `/** Read the LaunchServices handler without opening the URL. */
+ObjC.import("AppKit");
+var app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.URLWithString("https://example.invalid/"));
+if (app) ObjC.unwrap(app.path);`;
+var systemDefaultBrowser = fn2("systemDefaultBrowser")(function* (env, cwd, detected, platform = process.platform) {
+  const candidates = detected.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser));
+  if (candidates.length === 0)
+    return;
+  if (platform === "win32") {
+    const read = yield* registryReader(env);
+    if (read === undefined)
+      return;
+    const choice = yield* read(HTTPS_CHOICE, ["/v", "ProgId"]);
+    const progId = /^\s*ProgId\s+REG_SZ\s+([\w.-]{1,128})\s*$/im.exec(choice)?.[1];
+    if (progId === undefined)
+      return;
+    const command = yield* read(`HKEY_CLASSES_ROOT\\${progId}\\shell\\open\\command`, ["/ve"]);
+    const path = registryExecutable(command, env)?.toLowerCase();
+    return path === undefined ? undefined : candidates.find(({ executable }) => executable?.toLowerCase() === path)?.id;
+  }
+  const shell = yield* Shell;
+  if (platform === "linux") {
+    const command = yield* shell.which("xdg-settings", { strict: { cwd } });
+    if (command._tag === "None")
+      return;
+    const result = yield* shell.run(command.value, ["get", "default-web-browser"], { cwd });
+    if (result.exitCode !== 0)
+      return;
+    const entry = result.stdout.trim();
+    const registered = detected.find((candidate) => candidate.desktopEntry === entry);
+    const id = registered?.id ?? LINUX_BROWSER_IDS.get(entry);
+    const direct = candidates.find((candidate) => candidate.id === id);
+    if (direct !== undefined)
+      return direct.id;
+    const executable = registered?.executable;
+    if (executable === undefined || registered?.family !== "unknown")
+      return;
+    const fs = yield* fileSystem;
+    const canonical = (path) => tryPromise2(() => fs.realpath(path)).pipe(orElseSucceed2(() => {
+      return;
+    }));
+    const target = yield* canonical(executable);
+    if (target === undefined)
+      return;
+    const aliases = yield* filter3(candidates, ({ executable: other }) => other === undefined ? succeed6(false) : canonical(other).pipe(map4((path) => path === target)));
+    return aliases.length === 1 ? aliases[0]?.id : undefined;
+  }
+  if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {
+    const result = yield* shell.run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_DEFAULT], {
+      cwd
+    });
+    if (result.exitCode !== 0)
+      return;
+    const app = localPath(result.stdout.trim(), false);
+    if (app === undefined || !app.endsWith(".app"))
+      return;
+    return candidates.find(({ executable }) => executable?.startsWith(`${app}/Contents/MacOS/`))?.id;
+  }
+  return;
 });
 var checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absolutePath, platform = process.platform) {
   const windows = platform === "win32";
@@ -29456,11 +29951,102 @@ var checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absol
     browseCompatibility: "unverified"
   } : evidence(browser, "manual", platform, profileRoot(browser, env, platform), clean);
 });
-import { dirname as dirname15, join as join33 } from "path";
+import { get as get2 } from "http";
+import { posix as posix6, win32 as win327 } from "path";
+var DEFAULT_PORT = 19988;
+var validPort = (value) => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535;
+var RelayVersion = fromJsonString2(Struct({ version: String5, runtime: optionalKey2(String5) }));
+var browseRelaySafe = (port) => callback2((resume) => {
+  const request = get2({ host: "127.0.0.1", port, path: "/version", agent: false }, (reply) => {
+    if (reply.statusCode !== 200) {
+      reply.destroy();
+      resume(succeed6(false));
+      return;
+    }
+    let body = "";
+    reply.setEncoding("utf8");
+    reply.on("data", (part) => {
+      body += part;
+      if (body.length > 16384) {
+        reply.destroy();
+        resume(succeed6(false));
+      }
+    });
+    reply.once("error", () => resume(succeed6(false)));
+    reply.once("end", () => {
+      const decoded = decodeUnknownOption2(RelayVersion)(body);
+      resume(succeed6(isSome2(decoded) && decoded.value.runtime === "rust"));
+    });
+  });
+  request.once("error", (error) => resume(succeed6(error.code === "ECONNREFUSED")));
+  return sync2(() => {
+    request.destroy();
+  });
+}).pipe(timeoutOption2(800), map4(getOrElse(() => false)));
+var checkLocalBrowseRelay = fn2("checkBrowseDesktopRelay")(function* (env, probe, platform = process.platform) {
+  const refuse = (message) => new SetupFailure({ message });
+  const windows = platform === "win32";
+  const path = windows ? win327 : posix6;
+  const absolute = (candidate) => {
+    if (!path.isAbsolute(candidate))
+      return false;
+    if (!windows || /^[a-z]:[\\/]/i.test(candidate))
+      return true;
+    if (candidate.startsWith("\\\\?\\"))
+      return /^(?:[a-z]:\\|unc\\[^\\]+\\[^\\]+(?:\\|$))/i.test(candidate.slice(4));
+    return /^[\\/]{2}[^\\/?.][^\\/]*[\\/][^\\/]+(?:[\\/]|$)/.test(candidate);
+  };
+  const custom = firstNonEmpty2(env.OPENCODE_BROWSER_HOME);
+  if (custom !== undefined && !absolute(custom))
+    return yield* refuse("OPENCODE_BROWSER_HOME must be fully qualified for automatic pairing");
+  const home = env.HOME ?? env.USERPROFILE;
+  const xdgDirectories = [env.XDG_CONFIG_HOME, env.XDG_STATE_HOME, env.XDG_DATA_HOME];
+  if (custom === undefined && windows && xdgDirectories.some((dir) => dir !== undefined && path.isAbsolute(dir) && !absolute(dir)))
+    return yield* refuse("Browse cannot verify a Windows XDG path without a complete drive or UNC share");
+  const root = (xdg, folder) => custom ?? (xdg !== undefined && absolute(xdg) ? path.join(xdg, "browse") : home !== undefined && absolute(home) ? path.join(home, folder, "browse") : undefined);
+  const config = root(env.XDG_CONFIG_HOME, ".config");
+  const state = root(env.XDG_STATE_HOME, ".local/state");
+  const data = root(env.XDG_DATA_HOME, ".local/share");
+  if (config === undefined || state === undefined || data === undefined)
+    return yield* refuse("the Browse relay folders could not be verified; use Browse's own pairing instructions");
+  const { value } = yield* readJsonObjectSnapshot(path.join(config, "config.json"));
+  const hostname = value.hostname;
+  if (hostname !== undefined && (typeof hostname !== "string" || !["127.0.0.1", "::1", "[::1]", "localhost"].includes(hostname.trim().toLowerCase())))
+    return yield* refuse("the existing Browse relay is configured for remote access. Use Browse's own instructions instead of this local handoff");
+  const rawPort = env.OPENCODE_BROWSER_PORT?.trim() ?? "";
+  const pinned = /^\+?\d+$/.test(rawPort) ? Number(rawPort) : NaN;
+  const port = validPort(pinned) ? pinned : DEFAULT_PORT;
+  const fs = yield* fileSystem;
+  const legacyPaths = [
+    path.join(data, "site-secrets"),
+    path.join(data, "secrets"),
+    path.join(data, "relays", String(port), "sessions.json")
+  ];
+  for (const entry of legacyPaths) {
+    const missing = yield* tryPromise2(() => fs.lstat(entry)).pipe(match4({
+      onSuccess: () => false,
+      onFailure: ({ cause }) => cause instanceof Error && ("code" in cause) && cause.code === "ENOENT"
+    }));
+    if (!missing)
+      return yield* refuse("Browse has legacy data or an unreadable data folder; use Browse's own instructions so setup does not change it");
+  }
+  const ports = new Set([port]);
+  if (!validPort(pinned)) {
+    const { value: receipt } = yield* readJsonObjectSnapshot(path.join(state, "relays", String(port), "relay.json"));
+    if (receipt.configuredPort === port && validPort(receipt.port))
+      ports.add(receipt.port);
+  }
+  for (const endpoint of ports) {
+    if (!(yield* probe(endpoint)))
+      return yield* refuse("an existing listener could not be verified as a native Browse relay; use Browse's own instructions so setup does not replace it");
+  }
+});
+
+import { dirname as dirname14, join as join32 } from "path";
 var {$: $2 } = globalThis.Bun;
-import { lstat as lstat11, mkdir as mkdir12, mkdtemp as mkdtemp5, readdir as readdir6, rename as rename8, rm as rm11, stat as stat6, writeFile as writeFile7 } from "fs/promises";
+import { lstat as lstat10, mkdir as mkdir11, mkdtemp as mkdtemp5, readdir as readdir5, rename as rename7, rm as rm11, stat as stat6, writeFile as writeFile7 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename9, dirname as dirname14, join as join32, posix as posix4, win32 as win324 } from "path";
+import { basename as basename8, dirname as dirname13, join as join31, posix as posix7, win32 as win328 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -30382,7 +30968,7 @@ class TuiUnavailable extends TaggedError2("TuiUnavailable") {
     return this.reason;
   }
 }
-var pathModule = (platform) => platform === "win32" ? win324 : posix4;
+var pathModule = (platform) => platform === "win32" ? win328 : posix7;
 var cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   const { join } = pathModule(platform);
@@ -30422,8 +31008,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join32(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join32(directory, file)}`, cause)
+      try: () => Bun.write(join31(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join31(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -30442,23 +31028,23 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join32(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join31(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join32(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join31(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
 var importPackagedTui = (bundle) => gen2(function* () {
   const preload = yield* try_2({
-    try: () => Bun.resolveSync("@opentui/solid/preload", dirname14(bundle)),
+    try: () => Bun.resolveSync("@opentui/solid/preload", dirname13(bundle)),
     catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
   });
   yield* importFile(preload);
   return yield* importFile(bundle);
 });
-var loadPackagedSetupTui = (bundle = join32(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+var loadPackagedSetupTui = (bundle = join31(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
   const loaded = yield* importPackagedTui(bundle);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
@@ -30469,9 +31055,9 @@ var STICKY = 512;
 var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
 var privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
-    yield* fileSystem2(`cannot create ${folder}`, () => mkdir12(folder, { recursive: true, mode: 448 }));
+    yield* fileSystem2(`cannot create ${folder}`, () => mkdir11(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
-    try: () => lstat11(folder),
+    try: () => lstat10(folder),
     catch: (cause) => cause
   }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
   if (found === undefined || uid === undefined)
@@ -30500,11 +31086,11 @@ var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined 
   const text = yield* tryPromise2(() => Bun.file(groupFile).text());
   return namesPrivateGroup(text, gid, name);
 }).pipe(orElseSucceed2(() => false));
-var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile7(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename8(temporary, target)))), (temporary) => promise2(() => rm11(temporary, { force: true })));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile7(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename7(temporary, target)))), (temporary) => promise2(() => rm11(temporary, { force: true })));
 var remove = (path) => promise2(() => rm11(path, { recursive: true, force: true }));
 var promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
-    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename8(temporary, directory)));
+    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename7(temporary, directory)));
     if (moved._tag === "Success")
       return;
     if (yield* installed(directory, packages, lock))
@@ -30515,38 +31101,38 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 });
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat11(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir6(folder)).pipe(map4((names) => names.map((name) => join32(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join32(path, "node_modules"))];
+  const modified = (entry) => tryPromise2(() => lstat10(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join31(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join31(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
 var sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname14(directory);
-  const prefix = `.${basename9(directory)}-`;
+  const parent = dirname13(directory);
+  const prefix = `.${basename8(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
-  const names = yield* tryPromise2(() => readdir6(parent));
+  const names = yield* tryPromise2(() => readdir5(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join32(parent, name);
-    const found = yield* tryPromise2(() => lstat11(path));
+    const path = join31(parent, name);
+    const found = yield* tryPromise2(() => lstat10(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp5(join32(dirname14(directory), `.${basename9(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp5(join31(dirname13(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join32(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join31(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join32(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join31(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -30556,7 +31142,7 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
   });
   if (options.directory === undefined)
     yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname14(directory)])
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname13(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);
   if (!(yield* installed(directory, packages, lock))) {
@@ -30565,9 +31151,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join32(directory, TUI_BUNDLE);
+  const target = join31(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join32(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join31(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -30576,8 +31162,8 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 
 var NAME = "OpenCode Browse";
 var PACKAGE = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
-var Receipt2 = Struct({ version: String5.check(isPattern2(/^\d+\.\d+\.\d+$/)) });
-var receiptFile2 = (env) => join33(dirname15(userConfigFile(env)), "browse-setup.json");
+var Receipt = Struct({ version: String5.check(isPattern2(/^\d+\.\d+\.\d+$/)) });
+var receiptFile = (env) => join32(dirname14(userConfigFile(env)), "browse-setup.json");
 var browseEnv = { OPENCODE_BROWSER_AUTO_UPDATE: "off" };
 var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = process.platform) {
   const runner = packageRoot === undefined ? "unknown" : packageRunner(packageRoot, env);
@@ -30588,8 +31174,8 @@ var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = proce
     const installs = profiles.flatMap(({ browser, profile, extension }) => extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }]);
     const state = pairing.state === "paired" ? pairing : installs.length > 0 ? { state: "installed", installs } : { state: "missing", scanned: browserDirectories(env, platform).map(({ name }) => name) };
     const status = describeBrowseState(state, runner);
-    const snapshot = yield* readJsonObjectSnapshot(receiptFile2(env));
-    const receipt = snapshot.text === undefined ? undefined : is2(Receipt2)(snapshot.value) ? snapshot.value : yield* new SetupFailure({ message: "Invalid HolyAgent Browse setup receipt" });
+    const snapshot = yield* readJsonObjectSnapshot(receiptFile(env));
+    const receipt = snapshot.text === undefined ? undefined : is2(Receipt)(snapshot.value) ? snapshot.value : yield* new SetupFailure({ message: "Invalid HolyAgent Browse setup receipt" });
     const next = state.state === "paired" ? "paired" : state.state === "installed" && state.installs.some(({ enabled }) => enabled) ? "pair" : "extension";
     if (next === "paired" && receipt?.version === BROWSE_VERSION)
       return {
@@ -30622,19 +31208,6 @@ var planBrowse = fn2("planBrowse")(function* (env, packageRoot, platform = proce
 });
 var browseProfileLabel = ({ browser, profile }) => `${browser}, ${profile}`;
 var targetNeeds = ({ target, guidance }) => `${NAME}: ${target}: ${guidance ?? "verify the browser and its extension manually"}`;
-var browseForProfile = (plan, index) => {
-  if (plan.next === "none" || plan.next === "paired")
-    return plan;
-  const profile = plan.profiles?.[index];
-  const target = profile === undefined ? "a compatible Chromium-family browser profile" : browseProfileLabel(profile);
-  const guidance = profile?.extension === "enabled" ? undefined : profile?.extension === "disabled" ? `enable the Browse extension in ${target}` : `add the official Browse extension in ${target} from ${BROWSE_EXTENSION_STORE}`;
-  return {
-    ...plan,
-    next: profile?.extension === "enabled" ? "pair" : "extension",
-    target,
-    ...guidance === undefined ? {} : { guidance }
-  };
-};
 var browseReview = (plan, selected, dryRun = false) => [
   present(`${NAME}: ${plan.state}`),
   ...(plan.profiles?.length ?? 0) === 0 ? [] : [
@@ -30717,7 +31290,7 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify 
           ]
         };
       previous = after;
-      targetLines.push(present(`${NAME}: a new connected profile was confirmed for the ${target.target} handoff`));
+      targetLines.push(present(`${NAME}: a new connection was confirmed during the ${target.target} handoff`));
     }
     if (ready.length === 0 && prior.state === "unpaired")
       return { ok: true, lines: [versionLine, ...targetLines] };
@@ -30743,7 +31316,7 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify 
   const pairing = yield* readBrowsePairing(env);
   if (pairing.state !== "paired" || prior.state === "unpaired" && !pairing.browsers.some(({ lastSeen }) => lastSeen !== undefined))
     return failure("the pinned CLI exited but no browser pairing was found; no update was recorded");
-  const file = receiptFile2(env);
+  const file = receiptFile(env);
   const { text } = plan.receipt;
   const record = { version: BROWSE_VERSION };
   const saved = text === undefined ? (yield* readJsonObjectSnapshot(file)).text === undefined && (yield* writeJsonObject(file, record, { mode: 384 }).pipe(as2(true))) : yield* writeJsonObjectIfUnchanged(file, record, text, { mode: 384 });
@@ -30762,24 +31335,1140 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify 
   lines: [`! ${NAME}: ${message}`]
 })));
 
-import { posix as posix5, win32 as win325 } from "path";
-var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
-var browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"];
-var desktopPlatforms = ["darwin", "win32", "linux"];
-var decodeBrowser = decodeUnknownOption2(Literals(browserIds));
-var decodePlatform = decodeUnknownOption2(Literals(desktopPlatforms));
-var labels = {
-  chrome: "Google Chrome",
-  edge: "Microsoft Edge",
-  brave: "Brave",
-  opera: "Opera",
-  vivaldi: "Vivaldi"
+import { dirname as dirname15, join as join33 } from "path";
+var Selection = Struct({
+  browsers: ArraySchema(String5.check(isPattern2(/^[a-z][a-z0-9-]{0,99}$/)))
+});
+var readBrowserPreference = fn2("readBrowserPreference")(function* (env) {
+  const file = join33(dirname15(userConfigFile(env)), "browse-selection.json");
+  const { value, text } = yield* readJsonObjectSnapshot(file);
+  if (text === undefined)
+    return { file, text, browsers: undefined };
+  if (!is2(Selection)(value) || new Set(value.browsers).size !== value.browsers.length)
+    return yield* new SetupFailure({ message: "Invalid HolyAgent browser selection record" });
+  return { file, text, browsers: value.browsers };
+});
+var writeBrowserPreference = (preference, browsers) => writeJsonObjectIfUnchanged(preference.file, { browsers }, preference.text, { mode: 384 }).pipe(flatMap2((written) => written ? void_3 : fail5(new SetupFailure({ message: "Browser selection changed since it was read" }))));
+
+var NAME2 = "OpenCode Browse";
+var WAIT_SECONDS = 180;
+var INSTALL_WAIT_MS = 120000;
+var PROFILE_CHECK_MS = 2000;
+var BrowserId = String5.check(isPattern2(/^[a-z][a-z0-9-]{0,99}$/));
+var isBrowserId = is2(BrowserId);
+var isKnownExtension = is2(Literals(BROWSE_EXTENSION_IDS));
+var failure = (message) => new SetupFailure({ message });
+var failed4 = (detail) => ({ ok: false, lines: [`! ${NAME2}: ${detail}`] });
+var pending = (detail) => ({ ok: true, lines: [hint(`${NAME2}: ${detail}`)] });
+var terminalBrowseUnavailable = (env, mode, platform = process.platform, kernel = release3()) => {
+  if (mode.dryRun)
+    return "dry run does not open a browser or start pairing";
+  if (mode.nonInteractive)
+    return "--non-interactive never opens a browser or starts pairing";
+  if (mode.form.form !== "normal")
+    return "desktop Browse requires normal form";
+  if (!mode.terminal?.stdin || !mode.terminal.stdout || env.TERM?.toLowerCase() === "dumb")
+    return "desktop Browse requires an interactive terminal";
+  const host = localGraphicalHostUnavailable(env, platform, kernel);
+  if (host === "remote")
+    return "desktop Browse is not opened in CI, SSH, WSL or a cloud session";
+  if (host === "no-display")
+    return "desktop Browse requires a local graphical session";
+  return;
 };
+var safeProfile = (profile) => profile !== "." && profile !== ".." && !/[\p{Cc}/\\]/u.test(profile) && profile.trim() === profile;
+var browserProfiles = (env, browser, platform = process.platform) => findBrowseProfiles(env, platform, true).pipe(map4((profiles) => profiles.filter(({ browser: name }) => name === browser)));
+var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requested, platform = process.platform, pinnedProfile) {
+  if (requested !== undefined && !isBrowserId(requested))
+    return yield* failure("use a detected browser id with --browse-browser, for example chrome");
+  const detected = yield* discoverBrowsers(env, platform);
+  const compatible = detected.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser));
+  const choices = compatible.map(({ id }) => id).join(", ") || "none detected";
+  const saved = requested === undefined ? (yield* readBrowserPreference(env)).browsers : undefined;
+  if (requested === undefined && saved !== undefined && saved.length !== 1)
+    return yield* failure(`saved browser selection is not a single browser; use --browse-browser (choices: ${choices})`);
+  const id = requested ?? (saved === undefined ? yield* systemDefaultBrowser(env, cwd, compatible, platform) : saved[0]);
+  if (id === undefined)
+    return yield* failure(`no compatible system default; use --browse-browser (choices: ${choices})`);
+  const browser = compatible.find((item) => item.id === id);
+  if (browser?.executable === undefined)
+    return yield* failure(`browser "${id}" has no compatible detected executable (choices: ${choices})`);
+  const { executable } = browser;
+  const inspect = (path) => tryPromise2({
+    try: () => stat7(path),
+    catch: () => failure("the detected browser executable changed or is unavailable")
+  });
+  const actual = yield* tryPromise2({
+    try: () => realpath7(executable),
+    catch: () => failure("the detected browser executable changed or is unavailable")
+  });
+  const file = yield* inspect(actual);
+  if (!file.isFile())
+    return yield* failure("the detected browser is not an executable file");
+  const executableIdentity = JSON.stringify([
+    actual,
+    file.dev,
+    file.ino,
+    file.size,
+    file.mtimeMs,
+    file.ctimeMs
+  ]);
+  const target = { id, name: browser.name, executable, executableIdentity };
+  if (browser.profileDirectory === undefined) {
+    if (pinnedProfile !== undefined)
+      return yield* failure("the selected browser profile changed");
+    return { ...target, next: "store" };
+  }
+  const profiles = yield* browserProfiles(env, browser.name, platform);
+  const enabled = profiles.filter(({ extension }) => extension === "enabled");
+  const profile = pinnedProfile !== undefined ? profiles.find(({ profile: name }) => name === pinnedProfile) : enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
+  if (pinnedProfile === undefined && profile === undefined && profiles.length > 1)
+    return yield* failure(`${browser.name} has multiple possible profiles. Open the extension's Options in the intended profile and pair manually.`);
+  const profileName = profile?.profile ?? pinnedProfile ?? "Default";
+  if (!safeProfile(profileName) || profileName === "")
+    return yield* failure("the detected profile cannot be opened safely; open it manually");
+  if (profile?.extension === "enabled" && !isKnownExtension(profile.extensionId))
+    return yield* failure("the detected extension cannot be opened safely; use its Options manually");
+  return {
+    ...target,
+    profile: profileName,
+    next: profile?.extension === "enabled" ? "pair" : profile?.extension === "disabled" ? "disabled" : "extension",
+    ...profile?.extensionId === undefined ? {} : { extensionId: profile.extensionId }
+  };
+});
+var browserEnvironment = (env) => definedEnv2(Object.fromEntries(Object.entries(env).filter(([name]) => /^(?:HOME|USERPROFILE|USER|USERNAME|LOGNAME|PATH|SHELL|SYSTEMROOT|WINDIR|PROGRAMFILES(?:\(X86\))?|PROGRAMDATA|LOCALAPPDATA|APPDATA|TMP(?:DIR)?|TEMP|LANG(?:UAGE)?|LC_.*|DISPLAY|WAYLAND_DISPLAY|XAUTHORITY|DBUS_SESSION_BUS_ADDRESS|XDG_.*|GTK_.*|QT_.*|SESSIONNAME)$/i.test(name))));
+var livePair = (command, args, { cwd, env }) => scoped2(gen2(function* () {
+  const signal = yield* liveHost.signals;
+  const path = pathWithBunBin(env, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  const resolved = getOrUndefined(findCommand(env, command, { includeBunBin: true }));
+  if (resolved === undefined || !isAbsolute12(resolved))
+    return 127;
+  const pairArgs = [...args, "--wait-seconds", String(WAIT_SECONDS)];
+  const batch = process.platform === "win32" && isBatchFile(resolved) ? cmdExeArguments(resolved, pairArgs) : undefined;
+  if (batch?.ok === false)
+    return 127;
+  const windowsRoot = Object.entries(env).find(([name, value]) => /^(systemroot|windir)$/i.test(name) && value !== undefined)?.[1];
+  const application = batch?.ok !== true ? resolved : windowsRoot !== undefined && /^[a-z]:[/\\]/i.test(windowsRoot) ? win329.join(windowsRoot, "System32", "cmd.exe") : undefined;
+  if (application === undefined)
+    return 127;
+  const child = yield* acquireRelease2(try_2({
+    try: () => Bun.spawn({
+      cmd: [application, ...batch?.ok === true ? batch.args : pairArgs],
+      cwd,
+      env: definedEnv2({ ...env, [path.key]: path.value }),
+      stdin: "ignore",
+      stdout: "inherit",
+      stderr: "inherit",
+      detached: true
+    }),
+    catch: () => failure("could not start the pinned Browse pairing command")
+  }), (child) => child.exitCode === null ? stopGroup(child) : void_3);
+  return yield* raceFirst2(promise2(() => child.exited).pipe(timeoutOption2((WAIT_SECONDS + 30) * 1000), map4(getOrElse(() => 124))), signal);
+})).pipe(orElseSucceed2(() => 127));
+var liveBrowseDesktop = {
+  open: (command, args, { cwd, env }) => gen2(function* () {
+    const child = yield* try_2({
+      try: () => Bun.spawn({
+        cmd: [command, ...args],
+        cwd,
+        env: browserEnvironment(env),
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+        detached: true
+      }),
+      catch: () => failure("could not start the selected browser")
+    });
+    child.unref();
+    const early = yield* promise2(() => child.exited).pipe(timeoutOption2(250));
+    if (isSome2(early) && early.value !== 0)
+      return yield* failure("the selected browser quit before opening Browse");
+  }),
+  pair: livePair,
+  probeRelay: browseRelaySafe,
+  signals: liveHost.signals
+};
+var label3 = (plan) => plan.profile === undefined ? plan.name : `${plan.name}, ${plan.profile}`;
+var waitForInstall = (env, target, host, wait) => scoped2(gen2(function* () {
+  const received = yield* host.signals ?? succeed6(never2);
+  const check = gen2(function* () {
+    while (true) {
+      const installed = (yield* browserProfiles(env, target.name)).find(({ profile, extension }) => profile === target.profile && extension === "enabled");
+      if (isKnownExtension(installed?.extensionId))
+        return installed.extensionId;
+      yield* sleep2(wait.intervalMs ?? PROFILE_CHECK_MS);
+    }
+  });
+  return yield* raceFirst2(check.pipe(timeoutOption2(wait.timeoutMs ?? INSTALL_WAIT_MS)), received.pipe(as2("cancelled")));
+}));
+var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoot, requested, expected, notify, host = liveBrowseDesktop, wait = {}) {
+  const shell = yield* Shell;
+  const checkLocalRelay = checkLocalBrowseRelay(env, host.probeRelay ?? (() => succeed6(true)));
+  const check = (snapshot, pin) => gen2(function* () {
+    const current = yield* planTerminalBrowse(env, cwd, requested, process.platform, pin ? snapshot.profile : undefined);
+    if (JSON.stringify(current) !== JSON.stringify(snapshot))
+      return yield* failure("the browser or selected profile changed; run setup again");
+  });
+  const profile = label3(expected);
+  const kept = `existing pairings were kept. Setup did not verify a connection for ${profile}.`;
+  const open = (url) => host.open(expected.executable, expected.profile === undefined ? [url] : [`--profile-directory=${expected.profile}`, url], {
+    cwd: homeDirectory2(env),
+    env
+  });
+  const report = yield* gen2(function* () {
+    yield* check(expected, false);
+    if (expected.next === "disabled")
+      return pending(`extension is disabled in ${profile}. Enable it in the browser and rerun setup.`);
+    if (expected.next !== "store")
+      yield* checkLocalRelay;
+    if (!wait.reopenPaired && (yield* readBrowsePairing(env)).state === "paired")
+      return pending(kept);
+    if (expected.next === "store") {
+      yield* open(BROWSE_EXTENSION_STORE);
+      return pending(`opened the official store in ${profile}. Choose the profile and complete extension installation and pairing manually. Setup did not verify a connection.`);
+    }
+    const ready = yield* gen2(function* () {
+      if (expected.next !== "extension")
+        return expected;
+      yield* open(BROWSE_EXTENSION_STORE);
+      yield* notify(`${NAME2}: add the official extension in ${profile}. Setup will wait for it, then pair. Ctrl+C stops waiting.`);
+      const installed = yield* waitForInstall(env, expected, host, wait);
+      if (installed === "cancelled")
+        return;
+      if (isNone2(installed))
+        return null;
+      return { ...expected, next: "pair", extensionId: installed.value };
+    });
+    if (ready === undefined)
+      return pending(`stopped waiting for installation in ${profile}. Pairing did not start. Rerun setup when ready.`);
+    if (ready === null)
+      return pending(`installation and pairing are pending in ${profile}. Setup did not confirm the extension. Add it in that profile, then rerun setup.`);
+    yield* check(ready, true);
+    if (!isKnownExtension(ready.extensionId))
+      return yield* failure("unsupported extension");
+    const options = `chrome-extension://${ready.extensionId}/settings.html`;
+    yield* checkLocalRelay;
+    const pairing = yield* readBrowsePairing(env);
+    if (pairing.state === "paired") {
+      if (!wait.reopenPaired)
+        return pending(kept);
+      yield* open(options);
+      return pending(`opened extension Options in ${profile}; ${kept}`);
+    }
+    const plan = yield* planBrowse(env, packageRoot);
+    if (plan.action === undefined || plan.next !== "pair")
+      return yield* failure(`automatic pairing is not available. ${plan.state}`);
+    let handoffFailure;
+    const pair = (command, args, processOptions) => gen2(function* () {
+      yield* check(ready, true);
+      yield* checkLocalRelay;
+      if ((yield* readBrowsePairing(env)).state !== "unpaired")
+        return yield* failure("pairing state changed; existing pairings were kept");
+      yield* open(options);
+      return yield* host.pair(command, args, processOptions);
+    }).pipe(provideService2(Shell, shell), catchTag2("SetupFailure", ({ message }) => {
+      handoffFailure = message;
+      return succeed6(125);
+    }));
+    const result = yield* configureBrowse(env, { ...plan, targets: [{ next: "pair", target: profile }] }, pair, notify);
+    if (handoffFailure !== undefined)
+      return failed4(handoffFailure);
+    return result.ok ? {
+      ...result,
+      lines: [
+        ...result.lines,
+        hint(`${NAME2}: Browse confirms code redemption, not which local profile received it.`)
+      ]
+    } : result;
+  }).pipe(timeoutOption2((WAIT_SECONDS + 55) * 1000 + (expected.next === "extension" ? wait.timeoutMs ?? INSTALL_WAIT_MS : 0)), map4(getOrElse(() => failed4("handoff timed out; pairing was not confirmed"))), catchTag2("SetupFailure", ({ message }) => succeed6(failed4(message))));
+  return report;
+});
+
+import { lstat as lstat12, realpath as realpath9, stat as stat8, writeFile as writeFile9 } from "fs/promises";
+import { basename as basename10, dirname as dirname17, extname, isAbsolute as isAbsolute15, join as join36, relative as relative7, resolve as resolve15, sep as sep8 } from "path";
+
+var recover_work_default = `## Recover existing work
+
+Resolve reversible blockers before asking. Check accessible prior deliveries and the authoritative source when a summary is incomplete. Recover the original rather than remaking it. Verify it at the authorized destination before reporting success. If it is unavailable, preserve independent progress and say what is missing. Keep access, approval and sandbox boundaries.
+`;
+
+var SKILL_default = `---
+name: hillclimb-iteration
+description: "Use when a task asks for iterative improvement. Test small changes against a repeatable baseline and keep the best verified result."
+---
+
+# Hillclimb iteration
+
+State a testable hypothesis before measuring.
+
+1. Define the outcome and choose one primary metric, or a clear qualitative criterion for work like visual design. Decide what counts as a meaningful gain. Set the applicable correctness, security and accessibility guardrails.
+2. Establish the smallest reproducible baseline. Record the starting state, inputs, method and result. Repeat noisy measurements enough to learn their normal variation. Keep the original baseline.
+3. Try the smallest reversible change that can test the hypothesis. Isolate one variable when that helps explain the result. Remeasure under the same conditions and recheck the guardrails. Compare with the best verified result. Keep a candidate only when the evidence shows a meaningful gain and the guardrails pass. Undo just the rejected trial without disturbing unrelated work.
+4. Continue while useful trials fit the authorization. Stop when the target is met, plausible trials yield no meaningful gain, the evidence cannot resolve the comparison, or the next step needs a material decision or approval. Report the baseline, best verified result, observed change, uncertainty and any decision still needed.
+
+For visual work, capture the same viewport, state and interaction input before and after. Check contrast, alignment, readability and applicable accessibility or interaction. Explain what changed in the rendered result and why it helps. A pixel difference alone does not establish improvement. For original visuals without a reference image, judge the captures against the brief and design criteria.
+
+Use the existing guidance where available. Use \`visual-judging\` for visual acceptance, the relevant platform design skill for its checklist, \`dev-server\` for a shared render target, \`performance-iteration\` for controlled measurement, and \`evidence-judging\` for reviewing findings.
+
+Use representative before/after scenarios at the real entry point. Record both versions and conditions, and separate installation from use. Scale the checks to the impact. Use isolated, harmless fixtures for defensive changes, expected failures and recovery. Check that authorization, prior state and data stay protected. For UI, UX and DX, exercise the flow a person uses. Keep relevant accessibility and qualitative checks even when a metric improves.
+
+For a material change, keep a short record of the exact revisions, commands, samples and reasons to keep or revert each trial. Check that the treatment ran. Use a negative control when a check could pass without exercising the change. Alternate run order when it could bias the result, and report sample count and variation. A fix can pass its checks without showing a speedup.
+
+## Examples
+
+- **Visual:** Match the keyboard-focused state of an original settings screen before and after changing one text color. Keep the trial if the contrast improves, the label is easier to read, and its alignment and focus remain intact.
+- **Nonvisual:** Time a fixed compiler workload over repeatable runs. Keep a faster trial only if diagnostics and output still match the baseline.
+- **Operational:** Run setup in an isolated profile with a required feature disabled. Verify that the error explains the blocker without partial writes. Restore the prerequisite in the fixture and use the capability, then repeat setup to check it does not duplicate or erase state.
+`;
+
+var SKILL_default2 = `---
+name: holyagent-workflow
+description: Use when work has independent parts, shared files or a material risk that needs separate verification. Scope the work and judge the result against concrete evidence.
+---
+
+# HolyAgent workflow
+
+Handle a straightforward change or answer directly. Define the expected result and run the checks that exercise it.
+
+For substantial work, give each specialist a complete Assignment with the outcome, acceptance evidence, relevant inputs, constraints and writable paths or resources. Start work together only when it is independent. The root sequences dependencies, resolves ownership conflicts and integrates the results. Keep reviews independent of the work under review.
+
+When a decision belongs to the user, use the host's native question tool if it is available. Use a synchronous question when the answer blocks the next action, or an asynchronous question when independent work can continue. If the required question tool is missing, report the limitation. Keep questions separate from approvals. Use the native wait tool when only specialist work remains. For V1 on the supported 0.172.0 runtime, pass \`timeout_ms: 1200000\` when the tool schema allows it. Treat an activity notification as progress, not a finished result.
+
+When new input changes a task, update only the affected scope. Steer through the host's supported control when it changes what the worker does. Stop work whose authorization was withdrawn. Preserve valid results and continue independent work while a decision is pending.
+
+Use the repository's gates. Verify each material claim at its real entry point when it matters. For a performance claim compare the accepted baseline and candidate under comparable conditions. Review trust-boundary changes independently and leave enforcement with the native host. A change with a regression, a missing required check or an unresolved review is not merge-ready. Recheck the exact head and applicable protections before any authorized merge. Report verified results and what remains blocked.
+`;
+
+var CODEX_ASSET_VERSION = version;
+var CODEX_MARKETPLACE = "holyagent-local";
+var CODEX_PLUGIN = `holyagent@${CODEX_MARKETPLACE}`;
+var CODEX_MODEL = "gpt-6.2-sol";
+var CODEX_DEFAULT_EFFORT = "medium";
+var CODEX_STARTUP_GUIDANCE = `# HolyAgent
+
+If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
+
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, continue authorized direct work and leave required independent checks open.
+
+${recover_work_default.trim()}
+`;
+var json = (value) => `${JSON.stringify(value, null, 2)}
+`;
+var plugin = "plugins/holyagent";
+var codexSkillFiles = [
+  { path: "skills/holyagent-workflow/SKILL.md", content: SKILL_default2 },
+  { path: "skills/hillclimb-iteration/SKILL.md", content: SKILL_default }
+];
+var codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
+  {
+    path: ".agents/plugins/marketplace.json",
+    content: json({
+      name: CODEX_MARKETPLACE,
+      plugins: [
+        {
+          name: "holyagent",
+          source: { source: "local", path: `./${plugin}` },
+          policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
+          category: "Productivity"
+        }
+      ]
+    })
+  },
+  {
+    path: `${plugin}/.codex-plugin/plugin.json`,
+    content: json({
+      name: "holyagent",
+      version: assetVersion,
+      description: "Scope, ownership and evidence for Codex work.",
+      skills: "./skills/",
+      interface: { displayName: "HolyAgent" }
+    })
+  },
+  ...codexSkillFiles.map(({ path, content }) => ({ path: `${plugin}/${path}`, content }))
+];
+var roleProfiles = {
+  "Explorer.map": ["low", "Map the requested code paths and point to the files that own them."],
+  "Explorer.lookup": ["low", "Find a specific fact in the codebase and cite its source."],
+  "Explorer.trace": ["medium", "Trace how the target behavior reaches its callers and effects."],
+  "Librarian.lookup": ["low", "Find the requested fact in authoritative documentation."],
+  "Librarian.research": ["medium", "Reconcile primary sources and identify unresolved questions."],
+  "Worker.mechanical": ["low", "Apply the specified mechanical change and check its coverage."],
+  "Worker.implementation": ["medium", "Implement the scoped change and verify its behavior."],
+  "Worker.integration": ["medium", "Connect the components and exercise their normal entry point."],
+  "Worker.operations": ["medium", "Run the scoped operation and report its observed result."],
+  "Worker.validation": ["low", "Exercise the stated acceptance criteria and record the outcomes."],
+  "Worker.debugging": ["high", "Isolate the cause of ambiguous behavior and verify the repair."],
+  "Worker.visual": ["medium", "Implement the visual change and inspect it at the intended size."],
+  "Reviewer.visual": ["high", "Review the rendered artifact and reproduce material visual issues."],
+  "Reviewer.code": ["medium", "Find and prioritize actionable correctness regressions."],
+  "Reviewer.testing": ["medium", "Find material coverage gaps and unreliable verification."],
+  "Reviewer.audit": ["high", "Check the substantive requirements against observable evidence."],
+  "Reviewer.security": ["high", "Review security boundaries and substantiate material findings."],
+  "Reviewer.artifact": ["medium", "Review the artifact against its audience and requirements."]
+};
+var codexRoleFiles = () => ROUTES.map(({ roleTask, agent, mutability, independence }) => {
+  const [effort, purpose] = roleProfiles[roleTask];
+  const name = `holyagent-${agent}`;
+  const scope = mutability === "ReadOnly" ? "Inspect and report without editing project files." : "Make changes within the paths or resources assigned to you.";
+  const evidence = independence === "IndependentReview" ? "Review independently of implementation. Cite concrete evidence for each material finding." : "Report what changed, the checks run and any unresolved blockers.";
+  return {
+    path: `agents/${name}.toml`,
+    content: [
+      `name = ${JSON.stringify(name)}`,
+      `description = ${JSON.stringify(purpose)}`,
+      `model = ${JSON.stringify(CODEX_MODEL)}`,
+      `model_reasoning_effort = ${JSON.stringify(effort)}`,
+      `developer_instructions = ${JSON.stringify(`${purpose} ${scope} ${evidence}`)}`,
+      ""
+    ].join(`
+`)
+  };
+});
+
+import { randomUUID as randomUUID5 } from "crypto";
+import {
+  lstat as lstat11,
+  mkdir as mkdir12,
+  mkdtemp as mkdtemp7,
+  readdir as readdir6,
+  readFile as readFile6,
+  realpath as realpath8,
+  rename as rename8,
+  rm as rm12,
+  writeFile as writeFile8
+} from "fs/promises";
+import { tmpdir as tmpdir5 } from "os";
+import { basename as basename9, dirname as dirname16, isAbsolute as isAbsolute14, join as join35, posix as posix8, resolve as resolve14, win32 as win3210 } from "path";
+
+import { mkdtemp as mkdtemp6 } from "fs/promises";
+import { isAbsolute as isAbsolute13, join as join34 } from "path";
+var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace";
+var catalogName = "root-only-models.json";
+var verifiedCatalog = "d50b6749506d97e5f334dbabcb666eb1689f423cf3e88cfabdcf3c536b873068";
+var Catalog = fromJsonString2(Struct({ models: NonEmptyArray(Record(String5, Unknown2)) }));
+var codexStartupConfig = (rootOnlyCatalogPath) => [
+  `model = ${JSON.stringify(CODEX_MODEL)}`,
+  `model_reasoning_effort = ${JSON.stringify(CODEX_DEFAULT_EFFORT)}`,
+  ...rootOnlyCatalogPath === undefined ? [] : [`model_catalog_json = ${JSON.stringify(rootOnlyCatalogPath)}`],
+  "",
+  "[agents]",
+  `enabled = ${rootOnlyCatalogPath !== undefined}`,
+  "max_depth = 1",
+  "",
+  "[features]",
+  ...rootOnlyCatalogPath === undefined ? ["multi_agent_v2 = false"] : [],
+  "default_mode_request_user_input = true",
+  "context_management = true",
+  ...rootOnlyCatalogPath === undefined ? [] : [
+    "",
+    "[features.multi_agent_v2]",
+    "enabled = false",
+    "disable_native_tools = true",
+    "",
+    "[features.code_mode]",
+    'direct_only_tool_namespaces = ["multi_agent_v1"]'
+  ],
+  ""
+].join(`
+`);
+
+class StartupStageError extends TaggedError2("StartupStageError") {
+}
+var readRootOnlyCatalog = fn2("readRootOnlyCatalog")(function* (file) {
+  if (!isAbsolute13(file))
+    return yield* new StartupStageError({ detail: "Use an absolute path to the Codex catalog" });
+  const text = yield* tryPromise2({
+    try: () => Bun.file(file).text(),
+    catch: (cause) => new StartupStageError({ detail: String(cause) })
+  });
+  if (Bun.CryptoHasher.hash("sha256", text, "hex") !== verifiedCatalog)
+    return yield* new StartupStageError({ detail: "Expected the unmodified Codex 0.172.0 catalog" });
+  const original = yield* decodeUnknownEffect2(Catalog)(text, {
+    onExcessProperty: "error"
+  }).pipe(mapError2((cause) => new StartupStageError({ detail: String(cause) })));
+  return `${JSON.stringify({
+    models: original.models.map((model) => model["multi_agent_version"] === "v2" ? { ...model, multi_agent_version: "v1" } : model)
+  })}
+`;
+});
+var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile, version = CODEX_ASSET_VERSION) {
+  const catalog = catalogFile === undefined ? undefined : yield* readRootOnlyCatalog(catalogFile);
+  return [
+    {
+      path: "config.toml",
+      content: codexStartupConfig(catalog === undefined ? undefined : join34(target, catalogName))
+    },
+    ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
+    { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
+    ...codexRoleFiles(),
+    ...codexMarketplaceFiles(version).map(({ path, content }) => ({
+      path: join34(CODEX_STARTUP_MARKETPLACE, path),
+      content
+    }))
+  ];
+});
+var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile) {
+  if (!isAbsolute13(parent))
+    return yield* new StartupStageError({ detail: "Use an absolute staging directory" });
+  if (catalogFile !== undefined)
+    yield* readRootOnlyCatalog(catalogFile);
+  const target = yield* tryPromise2({
+    try: () => mkdtemp6(join34(parent, "holyagent-codex-")),
+    catch: (cause) => new StartupStageError({ detail: String(cause) })
+  });
+  const files = yield* codexStartupFiles(target, catalogFile);
+  yield* forEach2(files, ({ path, content }) => tryPromise2({
+    try: () => Bun.write(join34(target, path), content),
+    catch: (cause) => new StartupStageError({ detail: `${path}: ${String(cause)}` })
+  }));
+  return target;
+});
+
+var Receipt2 = fromJsonString2(Struct({
+  version: Literal2(1),
+  files: Record(String5, String5)
+}));
+var MarketplaceResult = Struct({ marketplaceName: Literal2(CODEX_MARKETPLACE) });
+var PluginResult = Struct({
+  pluginId: Literal2(CODEX_PLUGIN),
+  version: String5
+});
+var PluginList = Struct({
+  installed: ArraySchema(Struct({
+    pluginId: String5,
+    version: String5,
+    enabled: Boolean3
+  }))
+});
+var receiptFile2 = join35("holyagent", "setup-v1.json");
+var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
+var fail10 = (detail) => new StartupStageError({ detail });
+var installCodex = "If Codex is already installed, put it on PATH. For a new installation, use the official stable release with `npm install -g @openai/codex@latest`, then rerun setup.";
+var updateCodex = "Check the official release with `npm view @openai/codex@latest version --registry=https://registry.npmjs.org/`. Update through your existing installation channel only if the release is stable and newer than your installed copy.";
+var codexVersion = /^codex-cli (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\s*$/m;
+var verifiedRootOnlyRelease = "0.172.0";
+var nativeQueries = [
+  { path: ["plugin", "marketplace", "add"], flags: ["json"] },
+  { path: ["plugin", "add"], flags: ["json"] },
+  { path: ["plugin", "list"], flags: ["json", "marketplace"] }
+];
+var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join35(homeDirectory2(env), ".holyagent"), "codex");
+var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail10(`${path}: ${String(cause)}`) });
+var statOptional = (path) => tryPromise2({ try: () => lstat11(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail10(`${path}: ${String(cause)}`))));
+var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
+  const target = resolve14(candidate);
+  const root = yield* statOptional(target);
+  if (root !== undefined && !root.isDirectory())
+    return yield* fail10(`Not a real profile directory: ${target}`);
+  let ancestor = target;
+  const suffix = [];
+  while ((yield* statOptional(ancestor)) === undefined) {
+    suffix.unshift(basename9(ancestor));
+    ancestor = dirname16(ancestor);
+  }
+  return join35(yield* io2(ancestor, () => realpath8(ancestor)), ...suffix);
+});
+var inside2 = fn2("codexSetupPath")(function* (home, relativePath) {
+  let path = home;
+  const root = yield* statOptional(home);
+  if (root !== undefined && !root.isDirectory())
+    return yield* fail10(`Not a real profile directory: ${home}`);
+  const pieces = relativePath.split(/[\\/]/);
+  if (pieces.some((piece) => piece === "" || piece === "." || piece === ".."))
+    return yield* fail10(`Invalid relative profile path: ${relativePath}`);
+  for (const [i, piece] of pieces.entries()) {
+    path = join35(path, piece);
+    const entry = yield* statOptional(path);
+    if (entry !== undefined && (entry.isSymbolicLink() || i < pieces.length - 1 && !entry.isDirectory()))
+      return yield* fail10(`Not a real profile path: ${path}`);
+  }
+  return path;
+});
+var read2 = fn2("codexSetupRead")(function* (home, entry) {
+  const file = yield* inside2(home, entry);
+  const stat = yield* statOptional(file);
+  if (stat === undefined)
+    return;
+  if (!stat.isFile())
+    return yield* fail10(`Not a regular profile file: ${file}`);
+  return yield* io2(file, () => readFile6(file, "utf8"));
+});
+var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expected, complete) {
+  const allowed = new Set(expected.map(({ path }) => path));
+  const directories = new Set([root]);
+  for (const { path } of expected)
+    for (let parent = dirname16(path);parent !== root; parent = dirname16(parent))
+      directories.add(parent);
+  for (const directory of directories) {
+    const absolute = yield* inside2(home, directory);
+    const stat = yield* statOptional(absolute);
+    if (stat === undefined && !complete)
+      continue;
+    if (stat === undefined || !stat.isDirectory())
+      return yield* fail10(`Missing or invalid Codex plugin directory: ${absolute}`);
+    const names = yield* io2(absolute, () => readdir6(absolute));
+    for (const name of names) {
+      const file = join35(directory, name);
+      if (!allowed.has(file) && !directories.has(file))
+        return yield* fail10(`Kept unowned entry in Codex plugin: ${join35(home, file)}`);
+    }
+  }
+  if (complete) {
+    for (const { path, content } of expected)
+      if ((yield* read2(home, path)) !== content)
+        return yield* fail10(`Kept modified Codex plugin cache: ${join35(home, path)}`);
+  }
+});
+var record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
+var parseToml = (content) => try_2({
+  try: () => record4(Bun.TOML.parse(content)),
+  catch: () => fail10("Invalid Codex config.toml; left it unchanged")
+});
+var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+var localMarketplacePath = (path, platform) => {
+  if (/[\p{Cc}]/u.test(path))
+    return;
+  if (path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === ".."))
+    return;
+  if (platform !== "win32")
+    return posix8.isAbsolute(path) ? posix8.normalize(path) : undefined;
+  const extended = path.startsWith("\\\\?\\");
+  if (extended && (path.includes("/") || path.slice(4).includes("\\\\")))
+    return;
+  const drivePath = extended ? path.slice(4) : path.replaceAll("/", "\\");
+  if (!/^[a-z]:\\/i.test(drivePath))
+    return;
+  if (drivePath.slice(3).split("\\").some((part) => /[<>:"|?*]|[. ]$/u.test(part)))
+    return;
+  return win3210.normalize(drivePath);
+};
+var sameCodexMarketplacePath = (first, second, platform = process.platform) => {
+  const a = localMarketplacePath(first, platform);
+  const b = localMarketplacePath(second, platform);
+  if (a === undefined || b === undefined)
+    return false;
+  return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+};
+var resolvedLocalPath = (path) => io2(path, () => realpath8(path)).pipe(map4((actual) => localMarketplacePath(actual, process.platform)), orElseSucceed2(() => {
+  return;
+}));
+var sameResolvedMarketplace = fn2("sameResolvedCodexMarketplace")(function* (left, right) {
+  if (left === right)
+    return true;
+  if (process.platform !== "win32" || !sameCodexMarketplacePath(left, right))
+    return false;
+  const a = yield* statOptional(left);
+  const b = yield* statOptional(right);
+  return a !== undefined && b !== undefined && a.isDirectory() && b.isDirectory() && a.ino > 0 && a.ino === b.ino && a.dev === b.dev;
+});
+var receiptFor = (content) => decodeUnknownEffect2(Receipt2, { onExcessProperty: "error" })(content).pipe(mapError2(() => fail10("Invalid HolyAgent Codex setup receipt; no files changed")));
+var priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market) {
+  const oldHome = dirname16(dirname16(market));
+  const expected = join35(oldHome, CODEX_STARTUP_MARKETPLACE);
+  if (!sameCodexMarketplacePath(expected, market))
+    return;
+  const prior = yield* resolvedLocalPath(yield* inside2(oldHome, CODEX_STARTUP_MARKETPLACE));
+  if (prior === undefined || !(yield* sameResolvedMarketplace(market, prior)))
+    return;
+  const snapshot = yield* read2(oldHome, receiptFile2);
+  if (snapshot === undefined)
+    return;
+  const receipt = yield* receiptFor(snapshot);
+  const installed = codexMarketplaceFiles().map(({ path, content }) => ({
+    path: join35(CODEX_STARTUP_MARKETPLACE, path),
+    content
+  }));
+  const catalog = installed[0];
+  if (catalog === undefined || (yield* read2(oldHome, catalog.path)) !== catalog.content)
+    return;
+  const pluginRoot = join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+  yield* checkPluginTree(oldHome, pluginRoot, installed.slice(1), false);
+  for (const { path } of installed) {
+    const file = yield* read2(oldHome, path);
+    if (file === undefined || !Object.hasOwn(receipt.files, path) || digest(file) !== receipt.files[path])
+      return;
+  }
+  return digest(snapshot);
+});
+var marketplaceConflict = (source) => {
+  const local = typeof source === "string" ? localMarketplacePath(source, process.platform) : undefined;
+  return fail10(`Codex already has a different marketplace named ${CODEX_MARKETPLACE}${local === undefined ? "" : ` at ${local}`}; kept it unchanged. Use a separate --codex-home, or restore the original HolyAgent marketplace and review again.`);
+};
+var marketplaceLink = fn2("planCodexMarketplaceLink")(function* (registered, target) {
+  if (Object.keys(registered).length === 0)
+    return { kind: "add" };
+  const source = registered.source;
+  if (registered.source_type !== "local" || typeof source !== "string")
+    return yield* marketplaceConflict(source);
+  const clean = localMarketplacePath(source, process.platform);
+  if (clean === undefined)
+    return yield* marketplaceConflict(source);
+  if (clean === localMarketplacePath(target, process.platform))
+    return { kind: "keep" };
+  const actual = yield* resolvedLocalPath(clean);
+  const destination = yield* resolvedLocalPath(target);
+  if (actual !== undefined && destination !== undefined && (yield* sameResolvedMarketplace(actual, destination)))
+    return { kind: "keep" };
+  if (actual === undefined)
+    return yield* marketplaceConflict(source);
+  const proof = yield* priorMarketplaceProof(actual).pipe(orElseSucceed2(() => {
+    return;
+  }));
+  if (proof === undefined)
+    return yield* marketplaceConflict(source);
+  return { kind: "relink", source, actual, proof };
+});
+var marketplaceHeader = /^[ \t]*\[[ \t]*(?:marketplaces|"marketplaces"|'marketplaces')[ \t]*\.[ \t]*(?:holyagent-local|"holyagent-local"|'holyagent-local')[ \t]*\][ \t]*(?:#[^\r\n]*)?\r?$/gm;
+var sourceLine = /^([ \t]*(?:source|"source"|'source')[ \t]*=[ \t]*)(?:"(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*')([ \t]*(?:#[^\r\n]*)?\r?)$/gm;
+var relinkMarketplaceConfig = fn2("relinkCodexMarketplaceConfig")(function* (text, settings, target) {
+  const headers = [...text.matchAll(marketplaceHeader)];
+  const header = headers.length === 1 ? headers[0] : undefined;
+  const unsupported = fail10(`Kept ${CODEX_MARKETPLACE} unchanged because the registered source cannot be safely updated in this config.toml format. Use a separate --codex-home.`);
+  if (header?.index === undefined)
+    return yield* unsupported;
+  const start = header.index + header[0].length;
+  const remaining = text.slice(start);
+  const nextHeader = remaining.search(/^[ \t]*\[/m);
+  const section = nextHeader === -1 ? remaining : remaining.slice(0, nextHeader);
+  if ([...section.matchAll(sourceLine)].length !== 1)
+    return yield* unsupported;
+  const replaced = section.replace(sourceLine, (_, prefix, tail) => `${prefix}${JSON.stringify(target)}${tail}`);
+  const next = text.slice(0, start) + replaced + remaining.slice(section.length);
+  const marketplaces = record4(settings.marketplaces);
+  const expected = {
+    ...settings,
+    marketplaces: {
+      ...marketplaces,
+      [CODEX_MARKETPLACE]: { ...record4(marketplaces[CODEX_MARKETPLACE]), source: target }
+    }
+  };
+  if (!same2(yield* parseToml(next), expected))
+    return yield* unsupported;
+  return next;
+});
+var developerLine = /^developer_instructions = "(?:[^"\\\r\n]|\\.)*"$/m;
+var ownedInstruction = (asset, before) => {
+  if (asset.path === "AGENTS.md")
+    return true;
+  if (asset.path === join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent", "skills", "holyagent-workflow", "SKILL.md"))
+    return true;
+  const line = asset.content.match(developerLine)?.[0];
+  return asset.path.startsWith("agents/holyagent-") && asset.path.endsWith(".toml") && line !== undefined && before.replace(developerLine, () => line) === asset.content;
+};
+var checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
+  const currentAgents = record4(current.agents);
+  const wantedAgents = record4(wanted.agents);
+  const currentFeatures = record4(current.features);
+  const wantedFeatures = record4(wanted.features);
+  const foundV2 = record4(currentFeatures.multi_agent_v2);
+  const wantedV2 = record4(wantedFeatures.multi_agent_v2);
+  const v2Matches = wantedFeatures.multi_agent_v2 === false ? currentFeatures.multi_agent_v2 === false : foundV2.enabled === wantedV2.enabled && foundV2.disable_native_tools === wantedV2.disable_native_tools;
+  if (currentAgents.enabled !== wantedAgents.enabled || currentAgents.max_depth !== wantedAgents.max_depth || !v2Matches || !same2(current.model_catalog_json, wanted.model_catalog_json) || wantedAgents.enabled === true && !same2(record4(currentFeatures.code_mode).direct_only_tool_namespaces, record4(wantedFeatures.code_mode).direct_only_tool_namespaces))
+    return yield* fail10("Existing Codex delegation settings do not match this mode. Use a separate --codex-home, or keep its original --root-only-catalog. Nothing was written.");
+});
+var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expected, content) {
+  if (expected === content)
+    return;
+  const path = yield* inside2(home, relativePath);
+  yield* io2(path, () => mkdir12(dirname16(path), { recursive: true }));
+  if ((yield* read2(home, relativePath)) !== expected)
+    return yield* fail10(`Profile changed during setup: ${path}`);
+  if (expected === undefined) {
+    yield* io2(path, () => writeFile8(path, content, { flag: "wx", mode: 384 }));
+    return;
+  }
+  const next = `${path}.${randomUUID5()}.tmp`;
+  yield* io2(path, () => writeFile8(next, content, { flag: "wx", mode: 384 }));
+  yield* gen2(function* () {
+    if ((yield* read2(home, relativePath)) !== expected)
+      return yield* fail10(`Profile changed during setup: ${path}`);
+    yield* io2(path, () => rename8(next, path));
+  }).pipe(ensuring2(io2(next, () => rm12(next, { force: true })).pipe(ignore2)));
+});
+var checkNativeCodex = fn2("validateNativeCodexCapabilities")(function* (run) {
+  return yield* acquireUseRelease2(io2(tmpdir5(), () => mkdtemp7(join35(tmpdir5(), "holyagent-codex-probe-"))), (probe) => gen2(function* () {
+    const release = codexVersion.exec(yield* run(["--version"], probe))?.[1];
+    if (release === undefined)
+      return yield* fail10("`codex --version` did not identify the native CLI.");
+    yield* forEach2(nativeQueries, ({ path, flags }) => gen2(function* () {
+      const help = yield* run([...path, "--help"], probe);
+      const command = `codex ${path.join(" ")}`;
+      const usage = new RegExp(`^Usage: codex(?:\\.exe)? ${path.join(" ")}(?:\\s|$)`, "m");
+      if (!usage.test(help))
+        return yield* fail10(`${command} is not available.`);
+      for (const flag of flags)
+        if (!new RegExp(`(?:^|[ \\t,])--${flag}(?:[ \\t=,]|$)`, "m").test(help))
+          return yield* fail10(`${command} does not support --${flag}.`);
+    })).pipe(mapError2(({ detail }) => fail10(`Detected Codex ${release}. ${detail}`)));
+    return release;
+  }), (probe) => io2(probe, () => rm12(probe, { recursive: true, force: true })).pipe(ignore2)).pipe(mapError2((error) => fail10(`Incompatible native Codex CLI. ${error.detail} ${updateCodex}`)));
+});
+var setupCodex = fn2("setupCodex")(function* (env, options) {
+  if (!isAbsolute14(options.home))
+    return yield* fail10("--codex-home must be an absolute path");
+  const home = yield* canonicalProfile(options.home);
+  if (home === dirname16(home))
+    return yield* fail10("Choose a dedicated Codex profile, not a filesystem root");
+  const version = options.version ?? CODEX_ASSET_VERSION;
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
+    return yield* fail10("Invalid HolyAgent plugin version");
+  const shell = yield* Shell;
+  const native = yield* shell.which("codex", { includeBunBin: true });
+  if (!options.dryRun && isNone2(native))
+    return yield* fail10(`Codex is not on PATH. Preview does not require it. ${installCodex}`);
+  const run = (args, profile = home) => shell.run("codex", args, {
+    cwd: homeDirectory2(env),
+    env: { CODEX_HOME: profile, NO_COLOR: "1" }
+  }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail10(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
+  const desired = yield* codexStartupFiles(home, options.catalog, version);
+  const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
+    path: join35(CODEX_STARTUP_MARKETPLACE, path),
+    content
+  }));
+  const config = desired.find(({ path }) => path === "config.toml")?.content;
+  if (config === undefined)
+    return yield* fail10("Missing bundled Codex startup configuration");
+  const beforeConfig = yield* read2(home, "config.toml");
+  const beforeOverride = yield* read2(home, "AGENTS.override.md");
+  if (beforeOverride?.trim())
+    return yield* fail10("This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.");
+  const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig);
+  if (record4(settings.features).plugins === false)
+    return yield* fail10("This profile disables Codex plugins ([features] plugins = false). No files changed.");
+  if (beforeConfig !== undefined)
+    yield* checkPolicy(settings, yield* parseToml(config));
+  const market = join35(home, CODEX_STARTUP_MARKETPLACE);
+  const registration = record4(settings.marketplaces)[CODEX_MARKETPLACE];
+  const registered = record4(registration);
+  if (registration !== undefined && Object.keys(registered).length === 0)
+    return yield* marketplaceConflict(undefined);
+  const link = yield* marketplaceLink(registered, market);
+  const relinkedConfig = link.kind === "relink" && beforeConfig !== undefined ? yield* relinkMarketplaceConfig(beforeConfig, settings, market) : undefined;
+  const plugin = record4(record4(settings.plugins)[CODEX_PLUGIN]);
+  if (plugin.enabled === false)
+    return yield* fail10("The HolyAgent Codex plugin is disabled in this profile; left that choice unchanged");
+  const beforeReceipt = yield* read2(home, receiptFile2);
+  const receipt = beforeReceipt === undefined ? { files: {} } : yield* receiptFor(beforeReceipt);
+  const assets = yield* forEach2(desired.filter(({ path }) => path !== "config.toml"), (asset) => gen2(function* () {
+    const before = yield* read2(home, asset.path);
+    const previousDigest = receipt.files[asset.path];
+    const edited = before !== undefined && before !== asset.content && digest(before) !== previousDigest && before !== legacy.find(({ path }) => path === asset.path)?.content;
+    const conflict = edited && previousDigest !== undefined && /^[a-f0-9]{64}$/.test(previousDigest) && ownedInstruction(asset, before);
+    if (edited && !(conflict && (options.dryRun ? options.managedInstructions === "review" : options.managedInstructions === "replace" && options.expectedPlan !== undefined)))
+      return yield* fail10(`Kept modified or unowned Codex setup file: ${join35(home, asset.path)}`);
+    return { ...asset, before, conflict };
+  }));
+  const sourceRoot = join35(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+  const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
+  yield* checkPluginTree(home, sourceRoot, pluginAssets, false);
+  const nextReceipt = `${JSON.stringify({
+    version: 1,
+    files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
+  }, null, 2)}
+`;
+  const cache = join35("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
+  const expectedCache = pluginAssets.map(({ path, content }) => ({
+    path: join35(cache, path.slice(sourceRoot.length + 1)),
+    content
+  }));
+  const cached = yield* statOptional(yield* inside2(home, cache));
+  if (cached !== undefined)
+    yield* checkPluginTree(home, cache, expectedCache, true);
+  const install = plugin.enabled !== true || cached === undefined;
+  const fingerprint = digest(JSON.stringify([
+    home,
+    version,
+    beforeConfig,
+    beforeOverride,
+    beforeReceipt,
+    link,
+    install,
+    assets.map(({ path, before, content }) => [path, before, content])
+  ]));
+  if (options.expectedPlan !== undefined && options.expectedPlan !== fingerprint)
+    return yield* fail10("The Codex profile changed after review. Open setup and review it again.");
+  const lines = [
+    `~ Codex home: ${home}`,
+    `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
+    ...options.dryRun && isNone2(native) ? [`~ Codex CLI: not on PATH. ${installCodex}`] : [],
+    ...beforeConfig === undefined ? ["+ Codex config: create a dedicated startup profile"] : ["= Codex config: keeping existing settings"],
+    ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
+    ...link.kind === "add" ? ["+ Codex plugin: register the local marketplace"] : [],
+    ...link.kind === "relink" ? ["+ Codex plugin: relink the verified HolyAgent marketplace"] : [],
+    ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present in the local cache`],
+    ...record4(settings.skills).include_instructions === false ? [
+      "~ Codex skills: this profile disables automatic skill listings. HolyAgent workflow will not be listed in the prompt under this setting."
+    ] : [],
+    "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
+  ];
+  const managedConflicts = assets.filter(({ conflict }) => conflict).map(({ path }) => ({
+    file: join35(home, path),
+    detail: "Edited since setup. Replace with the bundled instructions and save a copy of the current file."
+  }));
+  if (options.dryRun)
+    return {
+      ok: true,
+      lines,
+      fingerprint,
+      ...managedConflicts.length > 0 ? { managedConflicts } : {}
+    };
+  const backups = [];
+  let relinked = false;
+  const backupRoot = join35("holyagent", "setup-backups", randomUUID5());
+  const verifyActiveMarketplace = fn2("verifyActiveCodexMarketplace")(function* () {
+    const liveConfig = yield* read2(home, "config.toml");
+    if (liveConfig === undefined)
+      return yield* fail10("Codex config.toml disappeared during setup.");
+    const liveSettings = yield* parseToml(liveConfig);
+    const active = record4(record4(liveSettings.marketplaces)[CODEX_MARKETPLACE]);
+    if ((yield* marketplaceLink(active, market)).kind !== "keep")
+      return yield* fail10("The active Codex marketplace source changed during setup. Review it again.");
+    if (record4(liveSettings.features).plugins === false || record4(record4(liveSettings.plugins)[CODEX_PLUGIN]).enabled === false)
+      return yield* fail10("The HolyAgent plugin is now disabled. Setup kept that choice unchanged.");
+    yield* checkPolicy(liveSettings, yield* parseToml(config));
+    yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
+  });
+  const steps = [
+    {
+      label: "Codex runtime",
+      run: gen2(function* () {
+        const version = yield* checkNativeCodex(run);
+        if (options.catalog !== undefined && version !== verifiedRootOnlyRelease)
+          return yield* fail10(`Codex ${version} supports plugin setup, but native root-only delegation has not been verified on this build. Remove --root-only-catalog and use a separate direct-only profile. No profile files were changed.`);
+        lines.push(`= Codex CLI ${version}: marketplace and plugin commands verified`);
+      })
+    },
+    {
+      label: "Codex profile files",
+      run: gen2(function* () {
+        if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride || (yield* read2(home, receiptFile2)) !== beforeReceipt || !same2(yield* marketplaceLink(registered, market), link))
+          return yield* fail10(`Profile changed during setup: ${join35(home, "config.toml")}`);
+        if (options.expectedPlan !== undefined) {
+          for (const asset of assets)
+            if ((yield* read2(home, asset.path)) !== asset.before)
+              return yield* fail10(`Profile changed during setup: ${join35(home, asset.path)}. Review it again.`);
+        }
+        yield* io2(home, () => mkdir12(home, { recursive: true, mode: 448 }));
+        if (beforeConfig === undefined)
+          yield* store2(home, "config.toml", undefined, config);
+        for (const asset of assets) {
+          const replace = store2(home, asset.path, asset.before, asset.content);
+          if (!asset.conflict || asset.before === undefined) {
+            yield* replace;
+            continue;
+          }
+          const backup = join35(backupRoot, asset.path);
+          yield* store2(home, backup, undefined, asset.before);
+          const backupFile = join35(home, backup);
+          backups.push(backupFile);
+          yield* replace.pipe(uninterruptible2, onError2(() => gen2(function* () {
+            if ((yield* read2(home, asset.path)) !== asset.before)
+              return;
+            yield* io2(backupFile, () => rm12(backupFile, { force: true }));
+            backups.pop();
+          }).pipe(ignore2)));
+          lines.push(`+ Codex instructions: backup saved in ${backupFile}`);
+        }
+        yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
+        yield* store2(home, receiptFile2, beforeReceipt, nextReceipt);
+      })
+    },
+    ...link.kind === "add" || relinkedConfig !== undefined ? [
+      {
+        label: "Codex marketplace",
+        run: gen2(function* () {
+          if (relinkedConfig !== undefined) {
+            if (!same2(yield* marketplaceLink(registered, market), link))
+              return yield* fail10("The previous HolyAgent marketplace changed. Review setup again.");
+            yield* gen2(function* () {
+              yield* store2(home, "config.toml", beforeConfig, relinkedConfig);
+              relinked = true;
+            }).pipe(uninterruptible2);
+            return;
+          }
+          yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail10("Codex did not confirm the expected marketplace")));
+        })
+      }
+    ] : [],
+    {
+      label: "Codex plugin",
+      run: gen2(function* () {
+        if (install) {
+          yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`);
+          yield* verifyActiveMarketplace();
+          const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail10("Codex did not confirm the expected plugin")));
+          if (result.version !== version)
+            return yield* fail10(`Codex installed version ${result.version}, expected ${version}`);
+          yield* checkPluginTree(home, cache, expectedCache, true);
+        }
+        yield* reportSetupActivity(`Checking enabled version ${version}`);
+        yield* verifyActiveMarketplace();
+        const list = yield* decodeUnknownEffect2(fromJsonString2(PluginList))(yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"])).pipe(mapError2(() => fail10("Codex did not report enabled plugins for this profile")));
+        if (!list.installed.some((item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version))
+          return yield* fail10(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`);
+      })
+    }
+  ];
+  yield* forEach2(steps, ({ label, run }, index) => withSetupPhase({ index: index + 1, total: steps.length, label }, run)).pipe(catchTag2("StartupStageError", (error) => gen2(function* () {
+    const detail = [error.detail];
+    if (relinked && beforeConfig !== undefined && relinkedConfig !== undefined) {
+      const rollback = yield* result2(store2(home, "config.toml", relinkedConfig, beforeConfig));
+      detail.push(rollback._tag === "Success" ? "Restored the previous marketplace source." : "The profile changed after relinking. Kept those changes and the original marketplace files. Review config.toml before retrying.");
+    }
+    if (backups.length > 0)
+      detail.push(`Backups: ${backups.join(", ")}`);
+    return yield* fail10(detail.join(`
+`));
+  })));
+  return { ok: true, lines, fingerprint };
+});
+
+var failed5 = (message) => new SetupFailure({ message });
+var portableFiles = (version) => [
+  {
+    path: "plugin.json",
+    content: `${JSON.stringify({
+      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      name: "holyagent",
+      version,
+      description: "Scope, ownership and evidence for Codex work.",
+      extensions: { "com.openai": { interface: { displayName: "HolyAgent" } } }
+    }, null, 2)}
+`
+  },
+  ...codexSkillFiles
+];
+var DOS_EPOCH = 33;
+var UTF8 = 2048;
+var MAX_ARCHIVE_CONTENT = 1024 * 1024;
+var zip2 = (files) => {
+  const body = [];
+  const directory = [];
+  let offset = 0;
+  for (const { path, content } of files) {
+    const name = Buffer.from(path);
+    const data = Buffer.from(content);
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(67324752, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(UTF8, 6);
+    local.writeUInt16LE(DOS_EPOCH, 12);
+    local.writeUInt32LE(Bun.hash.crc32(data), 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    name.copy(local, 30);
+    const entry = Buffer.alloc(46 + name.length);
+    entry.writeUInt32LE(33639248, 0);
+    entry.writeUInt16LE(20, 4);
+    local.copy(entry, 6, 4, 28);
+    entry.writeUInt32LE(offset, 42);
+    name.copy(entry, 46);
+    directory.push(entry);
+    body.push(local, data);
+    offset += local.length + data.length;
+  }
+  const central = Buffer.concat(directory);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(101010256, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...body, central, end]);
+};
+var inside3 = (root, path) => {
+  const rest = relative7(root, path);
+  return rest !== ".." && !rest.startsWith(`..${sep8}`) && !isAbsolute15(rest);
+};
+var isOrdinaryZip = (path) => !/\p{Cc}/u.test(path) && !/[/\\]$/.test(path) && extname(path).toLowerCase() === ".zip" && (process.platform !== "win32" || !/^[/\\]{2}/.test(path) && !/^\w:(?![/\\])/.test(path) && !/[:<>|?*"]/.test(path.replace(/^[a-z]:/i, "")) && !/^(?:con|prn|aux|nul|com[1-9\u00B9\u00B2\u00B3]|lpt[1-9\u00B9\u00B2\u00B3])(?:\.|$)/iu.test(basename10(path)));
+var existsAt = (path, failure) => tryPromise2({ try: () => lstat12(path).then(() => true), catch: (cause) => cause }).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed6(false) : fail5(failed5(failure))));
+var canonicalHome = fn2("codexCloudCanonicalHome")(function* (home) {
+  const failure = "A Codex profile path could not be resolved safely.";
+  let ancestor = home;
+  const missing = [];
+  while (true) {
+    const canonical = yield* tryPromise2({
+      try: () => realpath9(ancestor),
+      catch: (cause) => cause
+    }).pipe(catch_2((cause) => hasCode(cause, "ENOENT") ? succeed6(undefined) : fail5(failed5(failure))));
+    if (canonical !== undefined)
+      return join36(canonical, ...missing);
+    if (yield* existsAt(ancestor, failure))
+      return yield* failed5(failure);
+    const parent = dirname17(ancestor);
+    if (parent === ancestor)
+      return yield* failed5(failure);
+    missing.unshift(basename10(ancestor));
+    ancestor = parent;
+  }
+});
+var destination = fn2("codexCloudArchiveDestination")(function* (env, cwd, output) {
+  if (!isOrdinaryZip(output))
+    return yield* failed5("Choose a local .zip file after --output.");
+  const requested = resolve15(cwd, output);
+  if (!isOrdinaryZip(requested))
+    return yield* failed5("Choose a local directory for the plugin ZIP.");
+  const directory = yield* tryPromise2({
+    try: () => realpath9(dirname17(requested)),
+    catch: () => failed5("The output directory must already exist.")
+  });
+  const metadata = yield* tryPromise2({
+    try: () => stat8(directory),
+    catch: () => failed5("The output directory could not be inspected.")
+  });
+  if (!metadata.isDirectory())
+    return yield* failed5("The output parent must be a directory.");
+  if (process.platform === "win32" && directory.startsWith("\\\\"))
+    return yield* failed5("Choose a local directory for the plugin ZIP.");
+  const target = join36(directory, basename10(requested));
+  const homes = [
+    join36(homeDirectory2(env), ".codex"),
+    defaultCodexHome(env),
+    ...env["CODEX_HOME"] ? [resolve15(cwd, env["CODEX_HOME"])] : []
+  ];
+  for (const home of homes) {
+    if (inside3(home, requested))
+      return yield* failed5("Choose an output path outside Codex profile directories.");
+    const canonical = yield* canonicalHome(home);
+    if (inside3(canonical, target))
+      return yield* failed5("Choose an output path outside Codex profile directories.");
+  }
+  const exists = yield* existsAt(target, "The output path could not be inspected.");
+  if (exists)
+    return yield* failed5("The output path already exists. Choose a new .zip file.");
+  return target;
+});
+var exportCodexCloud = fn2("exportCodexCloud")(function* (env, cwd, output, dryRun, version = CODEX_ASSET_VERSION) {
+  const path = yield* destination(env, cwd, output);
+  const files = portableFiles(version);
+  const size = files.reduce((total, { content }) => total + Buffer.byteLength(content), 0);
+  if (size > MAX_ARCHIVE_CONTENT)
+    return yield* failed5("The bundled plugin exceeds the export limit.");
+  if (!dryRun)
+    yield* tryPromise2({
+      try: () => writeFile9(path, zip2(files), { flag: "wx", mode: 384 }),
+      catch: (cause) => hasCode(cause, "EEXIST") ? failed5("The output path already exists. Choose a new .zip file.") : failed5(`Could not write the plugin ZIP at ${path}. If a partial file was created, choose a new output path.`)
+    });
+  return {
+    ok: true,
+    lines: [
+      added(dryRun ? `Would export the HolyAgent plugin ZIP to ${path}` : `Exported the HolyAgent plugin ZIP to ${path}`),
+      hint("Workspace availability was not checked. An eligible workspace administrator can upload the ZIP in Admin console \u2192 Plugins \u2192 Add \u2192 Upload plugin, subject to the workspace's permissions."),
+      hint("If HolyAgent is available to your account and the Cloud task offers plugin selection, select it in Sources \u2192 Use plugins when starting a new task."),
+      hint("Cloud activation is unverified. Check that the new task can see the HolyAgent skills. This export does not change a Cloud environment or a running task.")
+    ]
+  };
+});
+import { posix as posix9, win32 as win3211 } from "path";
+var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
+var desktopPlatforms = ["darwin", "win32", "linux"];
+var decodePlatform = decodeUnknownOption2(Literals(desktopPlatforms));
 var windowsDesktop = "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | " + "Where-Object PackageFamilyName -CEQ 'OpenAI.Codex_2p2nqsd0c76g0' | " + "Select-Object -First 1 | ForEach-Object { $_.Version.ToString() }";
 var windowsDrivePath = /^[a-z]:[\\/]/i;
 var powershell = (env) => {
   const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
-  return root !== undefined && windowsDrivePath.test(root) ? win325.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
+  return root !== undefined && windowsDrivePath.test(root) ? win3211.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
 };
 var powershellArgs = (command) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command];
 var versionText = decodeUnknownOption2(String5.check(isPattern2(/^\d[\w.+:~-]{0,63}$/)));
@@ -30802,9 +32491,9 @@ var detectDesktop = fn2("detectCodexDesktop")(function* (env, platform, cwd) {
     return result.exitCode === 0 && version !== undefined ? desktopEvidence(platform, version) : undefined;
   }
   if (platform === "darwin") {
-    for (const directory of ["/Applications", posix5.join(home, "Applications")]) {
+    for (const directory of ["/Applications", posix9.join(home, "Applications")]) {
       for (const app of ["ChatGPT.app", "Codex.app"]) {
-        const plist = posix5.join(directory, app, "Contents", "Info.plist");
+        const plist = posix9.join(directory, app, "Contents", "Info.plist");
         const read = (key) => shell.run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], input);
         const id = yield* read("CFBundleIdentifier");
         if (id.exitCode !== 0 || id.stdout.trim() !== "com.openai.codex")
@@ -30835,7 +32524,7 @@ var nonlocal = (env, platform) => {
     return "Use the native desktop outside WSL to connect your browser.";
   return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
 };
-var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix5.isAbsolute(executable));
+var browserPath = (executable, platform) => executable !== undefined && !/[\p{Cc}"]/u.test(executable) && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix9.isAbsolute(executable));
 var steps = [
   "Update the ChatGPT desktop app. Find your browser in Settings > Computer Use, under More browsers if needed.",
   "Follow any plugin prompt. Use Install to open the extension store and review the permission prompts there.",
@@ -30859,23 +32548,22 @@ var detectCodexBrowserHandoff = fn2("detectCodexBrowserHandoff")(function* (env,
     };
   const choices = [];
   for (const browser of browsers) {
-    const id = getOrUndefined(decodeBrowser(browser.id));
-    if (id === undefined || platform === "linux" && id !== "chrome" || !browserPath(browser.executable, platform) || choices.some((choice) => choice.id === id))
+    if (!isChromiumBrowser(browser) || !browserPath(browser.executable, platform) || choices.some(({ id }) => id === browser.id))
       continue;
-    choices.push({ id, name: labels[id], executable: browser.executable });
+    choices.push({ id: browser.id, name: browser.name, executable: browser.executable });
   }
   if (choices.length === 0)
     return {
       status: "unavailable",
       desktop,
-      reason: platform === "linux" ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions." : "No documented local browser installation was detected."
+      reason: "No installed Chromium browser with a local executable was detected."
     };
   return {
     status: "candidate",
     desktop,
     browsers: choices,
     url: CODEX_BROWSER_GUIDE,
-    detail: "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
+    detail: "This console can open the guide, not confirm a connection. Check browser availability in ChatGPT desktop. Support depends on rollout and your workspace settings.",
     steps
   };
 });
@@ -30902,7 +32590,7 @@ var openCodexBrowserHandoff = fn2("openCodexBrowserHandoff")(function* (env, off
   return result.exitCode === 0 ? {
     ok: true,
     lines: [
-      `~ browser extension: requested the setup guide in ${labels[selected]}. Finish in ChatGPT desktop.`
+      `= browser extension: requested the setup guide in ${target.name}. Finish in ChatGPT desktop.`
     ]
   } : {
     ok: false,
@@ -31068,6 +32756,9 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const explicit = options.browse?.executable;
   const manual = browse === undefined || explicit === undefined ? undefined : yield* checkBrowserExecutable(options.env, explicit);
   const browsers = manual === undefined ? detected : [...detected.filter(({ id }) => id !== manual.id), manual];
+  const preference = browse === undefined ? undefined : yield* readBrowserPreference(options.env).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+  const defaultBrowser = preference !== undefined && !(preference instanceof SetupFailure) && preference.browsers === undefined ? yield* systemDefaultBrowser(options.env, options.cwd, detected) : undefined;
+  const initialBrowsers = preference === undefined ? undefined : preference instanceof SetupFailure ? [] : preference.browsers ?? (defaultBrowser === undefined ? [] : [defaultBrowser]);
   const codexHandoff = detectDesktop ? yield* detectCodexBrowserHandoff(options.env, detected, desktopOptions) : undefined;
   const desktop = codexHandoff?.desktop;
   if (onlyCodex && desktop === undefined)
@@ -31078,25 +32769,41 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   if (loaded instanceof TuiUnavailable)
     return fail(`unavailable (${loaded.reason})`);
   const requestedHandoff = (choices) => choices.harnesses?.codex === true && codexHandoff?.status === "candidate" ? codexHandoff.browsers.find(({ id }) => id === choices.codexBrowserHandoff) : undefined;
-  const browserOptions = browsers.map(({ id, name, browseCompatibility }) => ({ id, name, browseCompatibility }));
-  const selectedBrowsers = (choices) => browserOptions.filter(({ id }) => choices.browseBrowserIds?.includes(id));
+  const chromium = browsers.filter((browser) => browser.executable !== undefined && isChromiumBrowser(browser)).map((browser) => ({ ...browser, name: plain(browser.name) }));
+  const browserOptions = chromium.map(({ id, name }) => ({
+    id,
+    name
+  }));
+  const selectedBrowsers = (choices) => chromium.filter(({ id }) => choices.browseBrowserIds?.includes(id));
+  const browserSelectionToSave = (choices) => {
+    const chosen = choices.browseBrowserIds;
+    const enabled = choices.capabilities["browserUse"] === true;
+    const saved = preference !== undefined && !(preference instanceof SetupFailure) && preference.browsers !== undefined;
+    return options.scope === "user" && choices.harnesses?.pi !== false && (enabled || saved) && preference !== undefined && initialBrowsers !== undefined && chosen !== undefined && (enabled && !(preference instanceof SetupFailure) && !saved || chosen.length !== initialBrowsers.length || chosen.some((id) => !initialBrowsers.includes(id))) ? chosen : undefined;
+  };
   const browseFor = (choices) => {
     if (browse === undefined || choices.harnesses?.pi === false || choices.capabilities["browserUse"] !== true)
       return;
-    if (choices.browseBrowserIds === undefined)
-      return browseForProfile(browse, choices.browseProfile ?? 0);
     const selected = selectedBrowsers(choices);
     if (selected.length === 0)
       return;
     const requested = browse.profiles?.[choices.browseProfile ?? -1];
-    const targets = selected.map(({ name, browseCompatibility }) => {
-      if (browseCompatibility !== "supported")
+    const targets = selected.map(({ name, profileDirectory }) => {
+      if (profileDirectory === undefined)
         return {
           target: name,
           next: "manual",
-          guidance: "compatibility is unverified; nothing will be started"
+          guidance: `open the official Browse extension store (${BROWSE_EXTENSION_STORE}) in the intended profile and pair manually; setup could not verify a profile directory`
         };
-      const profile = requested?.browser === name ? requested : browse.profiles?.find(({ browser }) => browser === name);
+      const profiles = (browse.profiles ?? []).filter(({ browser }) => browser === name);
+      const enabled = profiles.filter(({ extension }) => extension === "enabled");
+      const profile = requested?.browser === name ? requested : enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
+      if (profile === undefined && profiles.length > 1)
+        return {
+          target: name,
+          next: "manual",
+          guidance: "more than one profile is possible; open the Browse extension in the intended profile and pair manually"
+        };
       const target = profile === undefined ? name : `${name}, ${profile.profile}`;
       if (profile?.extension === "enabled") {
         if (browse.alreadyPaired === true)
@@ -31113,6 +32820,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         guidance: profile?.extension === "disabled" ? "enable the existing Browse extension in this profile, then review setup again" : `add the official Browse extension from ${BROWSE_EXTENSION_STORE}, then review setup again`
       };
     });
+    if (!browse.alreadyPaired && targets.every(({ next }) => next === "manual")) {
+      const { action: _action, ...manual } = browse;
+      return { ...manual, next: "none", targets };
+    }
     const ready = targets.find(({ next }) => next === "pair");
     return {
       ...browse,
@@ -31186,7 +32897,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
               ...codexHandoff?.status === "candidate" ? {
                 extensionBrowsers: codexHandoff.browsers.map(({ id, name }) => ({
                   id,
-                  name
+                  name: plain(name)
                 }))
               } : {}
             }
@@ -31197,6 +32908,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
+      ...initialBrowsers === undefined ? {} : { browseBrowserIds: initialBrowsers },
       ...browse?.action === undefined || initialSwitches["browserUse"] !== true ? {} : { browseSetup: true },
       ...providerChoices === undefined ? {} : { piProviders: providerChoices },
       ...combined === undefined ? {} : {
@@ -31214,10 +32926,11 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         reviewedChoices = undefined;
         return yield* fail5(noProvider());
       }
+      const sequence = ++reviewSequence;
       const plan = browseFor(choices);
       const selection = selectedBrowsers(choices);
-      const selectedNotes = browse === undefined || choices.harnesses?.pi === false || choices.browseBrowserIds === undefined ? [] : [
-        hint(`Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name, browseCompatibility }) => browseCompatibility === "supported" ? name : `${name} (compatibility unverified)`).join(", ")}`),
+      const selectedNotes = browse === undefined || choices.harnesses?.pi === false || choices.capabilities["browserUse"] !== true ? [] : [
+        hint(`Browser Use: ${selection.length === 0 ? "no browser selected" : selection.map(({ name }) => name).join(", ")}`),
         ...plan === undefined ? [hint("OpenCode Browse: no compatible selected profile will be paired")] : []
       ];
       const browserReview = plan === undefined && selectedNotes.length === 0 ? {} : {
@@ -31227,7 +32940,6 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         ].map(plain)
       };
       if (combined !== undefined) {
-        const sequence = ++reviewSequence;
         reviewedChoices = undefined;
         const targets = selectionOf(choices);
         if (targets.length === 0)
@@ -31282,7 +32994,6 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       }
       const chosen = withProviderChanges(choices);
       if (options.previewPi !== undefined) {
-        const sequence = ++reviewSequence;
         reviewedChoices = undefined;
         const { report, registration } = yield* previewRegistration(options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities)));
         if (!report.ok)
@@ -31312,6 +33023,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       });
       if (preview !== undefined && (next === undefined || ("line" in next)))
         return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
+      if (sequence === reviewSequence)
+        reviewedChoices = choices;
       return {
         ...reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form)),
         ...browserReview
@@ -31321,7 +33034,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       if (needsProvider(choices))
         return runPromise2(fail5(noProvider()));
       const chosen = withProviderChanges(choices);
-      if ((combined !== undefined || options.previewPi !== undefined || chosen.piProviders !== undefined || choices.browseSetup === true && browseFor(choices)?.action !== undefined) && reviewedChoices !== choices)
+      const browserChanges = browserSelectionToSave(choices);
+      if ((combined !== undefined || options.previewPi !== undefined || chosen.piProviders !== undefined || browserChanges !== undefined || choices.browseSetup === true && browseFor(choices)?.action !== undefined) && reviewedChoices !== choices)
         return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
       const registration = reviewedChoices === choices ? reviewedPi : undefined;
       const codexConflict = reviewedChoices === choices && reviewedCodexConflict;
@@ -31338,6 +33052,8 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       const changed = changedSwitches(initialSwitches, choices.capabilities);
       const targets = selectionOf(choices).filter((target) => !(target === "pi" && keepPi) && !(target === "codex" && keepCodex));
       const validate = gen2(function* () {
+        if (!keepPi && browserChanges !== undefined && preference instanceof SetupFailure)
+          return yield* fail5(new Error("The saved HolyAgent browser selection is invalid. It was not changed."));
         if (!keepPi) {
           const preview = combined === undefined ? options.previewPi?.(chosen, changed) : targets.includes("pi") ? combined.run("pi", chosen, changed, true, false, true) : undefined;
           if (preview !== undefined) {
@@ -31373,7 +33089,20 @@ var runInteractive = fn2("runInteractive")(function* (options) {
           ...keepCodex ? [skippedConflicts("codex")] : [],
           ...reports.flatMap(({ lines }) => lines)
         ]
-      })))), map4((report) => {
+      })))), flatMap2((report) => {
+        if (!report.ok || options.dryRun || keepPi || browserChanges === undefined || preference === undefined || preference instanceof SetupFailure)
+          return succeed6(report);
+        return writeBrowserPreference(preference, browserChanges).pipe(map4(() => ({
+          ...report,
+          lines: [...report.lines, hint("Browser selection saved")]
+        })), catchTag2("SetupFailure", () => succeed6({
+          ok: false,
+          lines: [
+            ...report.lines,
+            "! Browser selection could not be saved. Existing selection was not replaced."
+          ]
+        })));
+      }), map4((report) => {
         if (report.ok && handoff !== undefined && !options.dryRun)
           stagedHandoff = handoff;
         const lines = [
@@ -31460,14 +33189,15 @@ var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) 
 });
 var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]";
 var CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]";
-var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive]");
+var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--no-open-browse|--browse-browser <id>]");
 var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]";
 var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
+var installedVersion2 = (installedPackageRoot) => installedPackageRoot === undefined ? succeed6(undefined) : tryPromise2(() => Bun.file(join37(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4(({ version }) => Bun.semver.satisfies(version, version) ? version : undefined), orElseSucceed2(() => {
+  return;
+}));
 var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
-  const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join34(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map4((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
-    return;
-  }));
+  const version = yield* installedVersion2(installedPackageRoot);
   return yield* setupCodex(env, {
     home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
     dryRun,
@@ -31491,6 +33221,25 @@ var reviewedCodexPlan = (args, env, installedPackageRoot) => {
     return plan;
   });
 };
+var CLOUD_USAGE = "setup codex cloud --output <path.zip> [--dry-run]";
+var codexCloudCommand = {
+  path: ["setup", "codex", "cloud"],
+  usage: CLOUD_USAGE,
+  summary: "Export HolyAgent as a portable skills plugin for workspace import",
+  output: "The ZIP path and the separate workspace import and Cloud task selection steps",
+  notes: [
+    "--output is a new local ZIP path. Relative paths use the selected project directory; the parent directory must already exist. Existing paths are kept.",
+    "--dry-run plans the export without writing files. Neither mode connects to a workspace or changes a Codex profile."
+  ],
+  flags: { output: "string", "dry-run": "boolean" },
+  stateless: true,
+  positionals: 0,
+  run: ({ args, env, cwd, installedPackageRoot }) => gen2(function* () {
+    const output = yield* requiredFlag(args, "output", CLOUD_USAGE);
+    const version = yield* installedVersion2(installedPackageRoot);
+    return yield* exportCodexCloud(env, cwd, output, booleanFlag(args, "dry-run"), version).pipe(map4(printed), catchTag2("SetupFailure", ({ message }) => succeed6(printed({ ok: false, lines: [`! Codex Cloud export: ${message}`] }))));
+  })
+};
 var codexCommand = {
   path: ["setup", "codex"],
   usage: CODEX_USAGE,
@@ -31498,11 +33247,13 @@ var codexCommand = {
   output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
   notes: [
     "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
-    "Apply requires the verified Codex 0.172.0 runtime on PATH. Preview does not. Setup never changes a running session.",
+    "Apply verifies the native marketplace and plugin commands in your installed Codex CLI. Preview does not require Codex. Setup never installs or updates Codex itself and never changes a running session.",
+    "If Codex is missing, install the official stable release with npm install -g @openai/codex@latest, then rerun setup. If it is installed but incompatible, update through your existing installer only when its stable release is newer.",
     "This command configures only Codex. It does not require Pi, T3 Code or Claude Code.",
     "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
     "In a local terminal with a detected ChatGPT desktop app, Codex setup offers a separate optional handoff to the official browser extension guide.",
-    "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide."
+    "--dry-run never installs or writes. --form headless and --non-interactive keep line-based setup without opening the desktop guide.",
+    "Use holyagent setup codex cloud --help to export a skills ZIP for managed Cloud."
   ],
   flags: {
     "codex-home": "string",
@@ -31585,7 +33336,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "in graphical Pi setup, open browser-use to enable or disable it and mark compatible detected browsers. If nothing was saved, only a compatible detected system default is selected. Apply saves the selection. Setup runs the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
     ],
     flags: {
@@ -31624,6 +33375,35 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       };
       const capabilities = yield* capabilitySwitches(args, usage);
       const form = yield* formOf(args, env, usage);
+      const skipBrowse = booleanFlag(args, "no-open-browse");
+      const browseBrowser = stringFlag(args, "browse-browser");
+      if (skipBrowse && !booleanFlag(args, "no-tui"))
+        return yield* new Usage({
+          message: "--no-open-browse requires --no-tui",
+          hint: `Usage: holyagent ${usage}`
+        });
+      if (skipBrowse && (booleanFlag(args, "open-browse") || browseBrowser !== undefined))
+        return yield* new Usage({
+          message: "--no-open-browse cannot be combined with --open-browse or --browse-browser",
+          hint: `Usage: holyagent ${usage}`
+        });
+      const openBrowse = !skipBrowse && surface === "public" && target === "pi" && booleanFlag(args, "no-tui") && capabilities.browserUse === true;
+      if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
+        return yield* new Usage({
+          message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
+          hint: `Usage: holyagent ${usage}`
+        });
+      if (openBrowse && stringFlag(args, "browser-executable") !== undefined)
+        return yield* new Usage({
+          message: "Terminal Browse selects a detected browser by id, not --browser-executable",
+          hint: `Usage: holyagent ${usage}`
+        });
+      const browseUnavailable = openBrowse ? terminalBrowseUnavailable(env, {
+        terminal,
+        form,
+        dryRun: booleanFlag(args, "dry-run"),
+        nonInteractive: booleanFlag(args, "non-interactive")
+      }) : undefined;
       if (booleanFlag(args, "undo") && (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined))
         return yield* new Usage({
           message: "--undo takes no capability flag and no --form",
@@ -31631,6 +33411,12 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         });
       const apply = (choices, chosen, notes = [], selected) => gen2(function* () {
         const selectedTarget = selected?.target ?? target;
+        const devicePreparation = selected === undefined && surface === "public" && selectedTarget === "pi" && resolved.scope === "user" && booleanFlag(args, "no-tui") && choices.deviceAccess === true && !booleanFlag(args, "undo") ? terminalBrowseUnavailable(env, {
+          terminal,
+          form,
+          dryRun: booleanFlag(args, "dry-run"),
+          nonInteractive: booleanFlag(args, "non-interactive")
+        }) === undefined ? "apply" : "preview" : undefined;
         const report = yield* setup2(coreContext2(cwd, env), {
           scope: resolved.scope,
           ...selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget },
@@ -31642,6 +33428,8 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
           skipCtx7: selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
           ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
           ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
+          ...devicePreparation === undefined ? {} : { devicePreparation },
+          ...openBrowse && browseUnavailable === undefined && selected === undefined ? { desktopBrowseHandoff: true } : {},
           capabilities: selectedTarget === "claude" ? {} : chosen,
           ...selectedTarget === "claude" || choices.piProviders === undefined ? {} : { piProviders: choices.piProviders },
           form
@@ -31733,7 +33521,23 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
             });
         }
       }
-      return printed(yield* apply(flagged, capabilities, interactive.notes));
+      const report = yield* apply(flagged, capabilities, [
+        ...interactive.notes,
+        ...browseUnavailable === undefined ? [] : [hint(`OpenCode Browse: ${browseUnavailable}`)]
+      ]);
+      if (!report.ok || !openBrowse || browseUnavailable !== undefined)
+        return printed(report);
+      const handoff = yield* gen2(function* () {
+        const config = yield* loadPiConfig(env, cwd, resolved.scope);
+        if (!(yield* piInUse(env)) || !config.pi.enable || !config.pi.features.mcp || !config.pi.features.browserUse)
+          return yield* new SetupFailure({
+            message: "enable Pi, MCP and Browser Use before running the desktop handoff"
+          });
+        const plan = yield* planTerminalBrowse(env, cwd, browseBrowser);
+        return yield* runTerminalBrowse(env, cwd, installedPackageRoot, browseBrowser, plan, (line) => emit(`${line.trimEnd()}
+`), undefined, { reopenPaired: booleanFlag(args, "open-browse") });
+      }).pipe(catchTag2("SetupFailure", ({ message }) => succeed6({ ok: true, lines: [hint(`OpenCode Browse pending: ${message}`)] })), provide3(Shell.live(env)));
+      return printed({ ok: handoff.ok, lines: [...report.lines, ...handoff.lines] });
     }).pipe(provide3(shellLive(env)))
   };
 };
@@ -31757,7 +33561,7 @@ var SETUP_COMMANDS = [
     run: ({ args, env, cwd, t3Workflow }) => gen2(function* () {
       const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
-        return printed({ lines: [fail8("scope", resolved.message)], ok: false });
+        return printed({ lines: [fail9("scope", resolved.message)], ok: false });
       }
       const form = yield* formOf(args, env, DOCTOR_USAGE);
       const report = yield* doctor2(coreContext2(cwd, env), {
@@ -31787,6 +33591,7 @@ var publicPiSetup = (target) => {
       ...flags,
       "non-interactive": "boolean",
       "browser-executable": "string",
+      ...target === "pi" ? { "open-browse": "boolean", "no-open-browse": "boolean", "browse-browser": "string" } : {},
       ...target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}
     },
     notes: [
@@ -31795,11 +33600,17 @@ var publicPiSetup = (target) => {
       ] : [],
       ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
       "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
-      "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
+      "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
+      ...target === "pi" ? [
+        "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. Use --no-open-browse to skip this handoff and keep Browser Use enabled.",
+        "The older --open-browse flag is optional. It can reopen the extension Options without replacing an existing pairing.",
+        "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode."
+      ] : []
     ]
   };
 };
 var PUBLIC_SETUP_COMMANDS = [
+  codexCloudCommand,
   codexCommand,
   publicPiSetup("pi"),
   {
@@ -32005,12 +33816,12 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute12, join as join35, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute16, join as join38, relative as relative8 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
 var USAGE = "update [--version <0.x.y>] [--dry-run]";
-var failure = (message, result) => {
+var failure2 = (message, result) => {
   const details = result?.stderr.trim() || result?.stdout.trim();
   return new Verbatim("", details ? `${message}
 ${details}
@@ -32021,9 +33832,9 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
   const target = requested === undefined ? undefined : yield* choiceFlag(RELEASE, "version", requested, USAGE);
   const shell = yield* Shell;
   if (isNone2(yield* shell.which("npm")))
-    return failure("npm was not found. Install Node.js and reopen your terminal.");
+    return failure2("npm was not found. Install Node.js and reopen your terminal.");
   if (isNone2(yield* shell.which("pi")))
-    return failure("Pi was not found. Install the Pi backend from the HolyAgent quickstart.");
+    return failure2("Pi was not found. Install the Pi backend from the HolyAgent quickstart.");
   const cwd = homeDirectory2(env);
   const [settings] = piSettingsFiles(env, cwd);
   const sources = yield* piSettingsSources(settings);
@@ -32037,33 +33848,33 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
       continue;
     }
     const local = piLocalSourcePath(env, settings, source);
-    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute12(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
+    if (local !== undefined && installedPackageRoot !== undefined && isAbsolute16(installedPackageRoot) && relative8(installedPackageRoot, local) === "") {
       managed++;
       continue;
     }
     if (isHolyagentSource(source) || local !== undefined && (yield* localHolyagentPackageAt(local)))
-      return failure("Pi is loading HolyAgent from Git or a local path. Remove that source before switching to npm with the HolyAgent quickstart.");
+      return failure2("Pi is loading HolyAgent from Git or a local path. Remove that source before switching to npm with the HolyAgent quickstart.");
   }
   if (managed > 1 || managed === 1 && npmRegistered)
-    return failure("Pi has multiple HolyAgent registrations. Keep the intended source and retry.");
+    return failure2("Pi has multiple HolyAgent registrations. Keep the intended source and retry.");
   const registeredRoot = managed === 1 ? installedPackageRoot : undefined;
   if (registeredRoot !== undefined) {
     const root = yield* shell.run("npm", ["root", "--global"], { cwd });
     if (root.exitCode !== 0)
-      return failure("Could not verify npm's global installation path.", root);
+      return failure2("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute12(location) || relative7(registeredRoot, join35(location, "holyagent")) !== "")
-      return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
+    if (!isAbsolute16(location) || relative8(registeredRoot, join38(location, "holyagent")) !== "")
+      return failure2("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
   if (selected.exitCode !== 0)
-    return failure("Could not resolve the HolyAgent release on npm.", selected);
+    return failure2("Could not resolve the HolyAgent release on npm.", selected);
   const decoded = yield* decodeUnknownEffect2(VERSION_RESPONSE)(selected.stdout).pipe(option2);
   if (isNone2(decoded) || target !== undefined && decoded.value !== target)
-    return failure("npm did not return the requested stable HolyAgent version.");
+    return failure2("npm did not return the requested stable HolyAgent version.");
   const version2 = decoded.value;
   if (Bun.semver.order(version2, version) < 0)
-    return failure(`HolyAgent ${version2} is older than the running version ${version}.`);
+    return failure2(`HolyAgent ${version2} is older than the running version ${version}.`);
   if (dryRun)
     return new Verbatim(`Would install HolyAgent ${version2} in Pi and on the npm global PATH.
 `, "", 0);
@@ -32078,7 +33889,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
       }
     });
     if (pi.exitCode !== 0)
-      return failure("The Pi backend update failed. The global commands were left in place.", pi);
+      return failure2("The Pi backend update failed. The global commands were left in place.", pi);
   }
   const npm = yield* shell.run("npm", [
     "install",
@@ -32090,11 +33901,11 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join35(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join38(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
-      return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
+      return failure2(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)
-    return failure(`Pi has HolyAgent ${version2}. The global command update failed. Retry with holyagent update --version ${version2}.`, npm);
+    return failure2(`Pi has HolyAgent ${version2}. The global command update failed. Retry with holyagent update --version ${version2}.`, npm);
   return new Verbatim(`Installed HolyAgent ${version2} in Pi and on the npm global PATH. Restart T3 Code to load it.
 `, "", 0);
 });
@@ -32216,11 +34027,11 @@ var aliasesStdin = (file) => try_2({ try: () => fstatSync(0), catch: () => {
 } }).pipe(map4((stdin) => stdin.isFile() && stdin.dev === file.dev && stdin.ino === file.ino), orElseSucceed2(() => false));
 var readAgentReport = (path) => gen2(function* () {
   const fail = () => agentReportError(path);
-  const file = yield* tryPromise2({ try: () => stat7(path), catch: fail });
+  const file = yield* tryPromise2({ try: () => stat9(path), catch: fail });
   if (!file.isFile() || (yield* aliasesStdin(file)))
     return yield* fail();
   return yield* acquireUseRelease2(tryPromise2({
-    try: () => open8(path, constants7.O_RDONLY | constants7.O_NONBLOCK),
+    try: () => open8(path, constants8.O_RDONLY | constants8.O_NONBLOCK),
     catch: fail
   }), (handle) => gen2(function* () {
     const opened = yield* tryPromise2({ try: () => handle.stat(), catch: fail });
@@ -32293,9 +34104,9 @@ var projectContext = (given, host, surface) => gen2(function* () {
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve15(host.cwd, directory);
+  const cwd = resolve16(host.cwd, directory);
   const location = yield* tryPromise2({
-    try: () => stat7(cwd),
+    try: () => stat9(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
   });
   if (!location.isDirectory())
@@ -32313,7 +34124,17 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const commands = commandsFor(surface);
   if (first === undefined || isHelp(first)) {
     const agent = yield* hostForText(host.env);
-    return showHelp(listed(commands, agent), agent, surface);
+    const visible = listed(commands, agent);
+    const result = showHelp(visible, agent, surface);
+    return surface === "public" && given.length === 0 ? {
+      ...result,
+      publicHelp: {
+        commands: visible.flatMap((command) => {
+          const [name] = command.path;
+          return command.path.length === 1 && name !== undefined && name !== "setup" ? [{ name, summary: forWords(command, wordsFor(agent)).summary }] : [];
+        })
+      }
+    } : result;
   }
   if (first === "--version" || first === "-v") {
     if (surface === "agent" && argv.length > 1)
@@ -32362,10 +34183,10 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve15(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve16(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve15(host.cwd, args.positionals[0] ?? "");
-    const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
+    const path = resolve16(host.cwd, args.positionals[0] ?? "");
+    const source = yield* tryPromise2(() => stat9(path)).pipe(orElseSucceed2(() => {
       return;
     }));
     if (source !== undefined && (yield* aliasesStdin(source)))
@@ -32412,7 +34233,7 @@ var agentHint = (tag, hint) => {
     return "Save the corrected specialist report to a regular file and pass it with --report-file to assignment close or assignment accept.";
   return agentCommandNames(hint);
 };
-var failed4 = (error, env, surface) => hostForText(env).pipe(map4((agent) => {
+var failed6 = (error, env, surface) => hostForText(env).pipe(map4((agent) => {
   const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   if (surface === "agent")
     return toon({ error: { tag, message, hint: agentHint(tag, hint), code } }, code);
@@ -32424,7 +34245,7 @@ ${hint}
 hint: ${hint}
 `, code };
 }));
-var run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed4(error, host.env, surface)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
+var run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed6(error, host.env, surface)), catchCause2((cause) => failed6({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),
@@ -32458,7 +34279,7 @@ var main = (interactiveSetup = false, surface = "host", installedPackageRoot, pr
       terminal
     } : {}
   }, surface);
-  const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result.setupResult);
+  const stdout = yield* present(result.stdout, "stdout", terminal.stdout, result);
   const stderr = yield* present(result.stderr, "stderr", Boolean(process.stderr.isTTY));
   yield* write2(process.stdout, stdout);
   yield* write2(process.stderr, stderr);

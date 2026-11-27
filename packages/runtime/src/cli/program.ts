@@ -8,6 +8,7 @@ import { version as bundledVersion } from "../../../../package.json" with { type
 import { type AgentHost, type HostWords, wordsFor } from "../domain/host.ts"
 import { PI_PROJECT_FLAG, projectOf } from "../hooks/pi-project.ts"
 import { renderSetupResult, SetupResult } from "../setup/tui/result-file.ts"
+import type { PublicHelp } from "../setup/tui/types.ts"
 import { StateIo } from "../state/errors.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
@@ -40,6 +41,8 @@ export interface Result {
   readonly code: number
   /** Public setup presentation data, separate from its plain stdout. */
   readonly setupResult?: SetupResult
+  /** Extra layout information for bare public help, independent of its plain stdout. */
+  readonly publicHelp?: PublicHelp
 }
 
 export { encodeRecord } from "../toon.ts"
@@ -357,7 +360,21 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
     const commands = commandsFor(surface)
     if (first === undefined || isHelp(first)) {
       const agent = yield* hostForText(host.env)
-      return showHelp(listed(commands, agent), agent, surface)
+      const visible = listed(commands, agent)
+      const result = showHelp(visible, agent, surface)
+      return surface === "public" && given.length === 0
+        ? {
+            ...result,
+            publicHelp: {
+              commands: visible.flatMap((command) => {
+                const [name] = command.path
+                return command.path.length === 1 && name !== undefined && name !== "setup"
+                  ? [{ name, summary: forWords(command, wordsFor(agent)).summary }]
+                  : []
+              }),
+            },
+          }
+        : result
     }
     if (first === "--version" || first === "-v") {
       if (surface === "agent" && argv.length > 1)

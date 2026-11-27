@@ -11,6 +11,7 @@ export const promotionPrefix = "release/0.4.0/promote/"
 const stableMain = "56d8b8758b001c4eb0599ee9276aa02607310795"
 const devBaseline = "7b0aca66b52f0c2ce47f8ae9eb84ae1474a90863"
 const workflow = ".github/workflows/publish.yml"
+const validationWorkflow = ".github/workflows/validation.yml"
 const required = ["branch-model", "version", "check", "windows", "installers"]
 const sha = "[a-f0-9]{40}"
 const RefPattern = new RegExp(`^${promotionPrefix}(${sha})/(${sha})/(${sha})$`)
@@ -22,20 +23,32 @@ const branch = open({ protected: Schema.Boolean, commit: open({ sha: Sha }) })
 const ref = open({ object: open({ sha: Sha, type: Schema.Literal("commit") }) })
 const tree = open({ sha: Sha, tree: open({ sha: Sha }), parents: Schema.Array(open({ sha: Sha })) })
 const history = open({ status: Schema.String })
-const run = open({
-  id: Schema.Int,
+const attemptIdentity = { id: Schema.Int, run_attempt: Schema.Int }
+const runFields = {
+  ...attemptIdentity,
   path: Schema.String,
   event: Schema.String,
   head_branch: Schema.String,
   head_sha: Sha,
   status: Schema.String,
   conclusion: Schema.NullOr(Schema.String),
-})
+}
+const run = open(runFields)
 const runs = open({ workflow_runs: Schema.Array(run) })
+const associatedRef = open({ ref: Schema.String, sha: Sha, repo: open({ id: Schema.Int }) })
+const candidateRun = open({
+  ...runFields,
+  pull_requests: Schema.Array(
+    open({ number: Schema.Int, base: associatedRef, head: associatedRef }),
+  ),
+})
+const candidateRuns = open({ workflow_runs: Schema.Array(candidateRun) })
+const repositoryIdentity = open({ id: Schema.Int })
 const jobs = open({
   jobs: Schema.Array(
     open({
       name: Schema.String,
+      head_sha: Sha,
       status: Schema.String,
       conclusion: Schema.NullOr(Schema.String),
     }),
@@ -70,6 +83,7 @@ const pr = open({
   mergeStateStatus: Schema.String,
   isDraft: Schema.Boolean,
   isCrossRepository: Schema.Boolean,
+  autoMergeRequest: Schema.NullOr(open({})),
   statusCheckRollup: rollup,
 })
 
@@ -152,23 +166,87 @@ export const checkExactPromotion = (
 /** Confirm that the official dev run did not skip validation or publication. */
 export const checkSourceJobs = (
   evidence: typeof jobs.Type,
+  head: string,
 ): Effect.Effect<void, PromotionBlocked> =>
-  Effect.gen(function* () {
-    const requiredJobs = [
+  checkJobNames(
+    evidence,
+    [
       "validation / check",
       "validation / windows",
+      "validation / macos",
       "validation / installers",
       "dev / publish",
       "dev / prerelease",
-    ]
-    for (const name of requiredJobs) {
+    ],
+    head,
+    "Source dev",
+  )
+
+const checkJobNames = (
+  evidence: typeof jobs.Type,
+  names: readonly string[],
+  head: string,
+  description: string,
+) =>
+  Effect.gen(function* () {
+    for (const name of names) {
       const rows = evidence.jobs.filter((job) => job.name === name)
-      if (rows.length !== 1 || rows[0]?.status !== "completed" || rows[0]?.conclusion !== "success")
-        return yield* reject(`Source dev run did not finish ${name} successfully`)
+      if (
+        rows.length !== 1 ||
+        rows[0]?.head_sha !== head ||
+        rows[0]?.status !== "completed" ||
+        rows[0]?.conclusion !== "success"
+      )
+        return yield* reject(`${description} run did not finish ${name} successfully`)
     }
   })
 
-/** An optional release-operator preflight, not another required job or a merge command. */
+/** Immutable PR identity expected from the official Validation workflow. */
+export interface CandidateValidationIdentity {
+  readonly number: number
+  readonly repositoryId: number
+  readonly base: { readonly ref: string; readonly sha: string }
+  readonly head: { readonly ref: string; readonly sha: string }
+}
+
+/** Bind candidate checks to one specific official workflow, PR, base, head and attempt. */
+export const checkCandidateRun = (
+  evidence: typeof candidateRun.Type | undefined,
+  expected: CandidateValidationIdentity,
+): Effect.Effect<typeof candidateRun.Type, PromotionBlocked> =>
+  Effect.gen(function* () {
+    const linked = evidence?.pull_requests[0]
+    if (
+      evidence?.path !== validationWorkflow ||
+      evidence.event !== "pull_request" ||
+      evidence.head_branch !== expected.head.ref ||
+      evidence.head_sha !== expected.head.sha ||
+      evidence.status !== "completed" ||
+      evidence.conclusion !== "success" ||
+      evidence.id < 1 ||
+      evidence.run_attempt < 1 ||
+      evidence.pull_requests.length !== 1 ||
+      linked === undefined ||
+      linked.number !== expected.number ||
+      linked.base.ref !== expected.base.ref ||
+      linked.base.sha !== expected.base.sha ||
+      linked.head.ref !== expected.head.ref ||
+      linked.head.sha !== expected.head.sha ||
+      linked.base.repo.id !== expected.repositoryId ||
+      linked.head.repo.id !== expected.repositoryId
+    )
+      return yield* reject("Official Validation is not green at the exact PR, base and head")
+    return evidence
+  })
+
+/** Required promotion jobs must run on the verified candidate attempt. */
+export const checkCandidateJobs = (
+  evidence: typeof jobs.Type,
+  head: string,
+): Effect.Effect<void, PromotionBlocked> =>
+  checkJobNames(evidence, [...required, "macos"], head, "Candidate Validation")
+
+/** Read-only release-operator preflight, not a human review or a merge command. */
 export const checkPromotionReadiness = (
   row: typeof pr.Type,
   activeRules: typeof rules.Type,
@@ -183,6 +261,7 @@ export const checkPromotionReadiness = (
       row.state !== "OPEN" ||
       row.isDraft ||
       row.isCrossRepository ||
+      row.autoMergeRequest !== null ||
       row.mergeStateStatus !== "CLEAN"
     )
       return yield* reject("The live PR is not clean and open at the exact head on main")
@@ -240,19 +319,9 @@ export const verify = (
     if (target !== stableMain) return yield* reject("The main SHA is not the audited 0.4.0 base")
     const api = <S extends Schema.Top>(path: string, schema: S) =>
       runJson($`gh api ${`repos/${repository}/${path}`}`, schema)
-    if (number !== undefined) {
-      const [row, activeRules] = yield* Effect.all(
-        [
-          runJson(
-            $`gh pr view ${number} -R ${repository} --json headRefName,headRefOid,baseRefName,state,mergeStateStatus,isDraft,isCrossRepository,statusCheckRollup`,
-            pr,
-          ),
-          api("rules/branches/main", rules),
-        ],
-        { concurrency: 2 },
-      )
-      yield* checkPromotionReadiness(row, activeRules, headRef, head)
-    }
+    const readMain = () => api("branches/main", branch)
+    const readDev = () => api("branches/dev", branch)
+    const readHead = () => api(`git/ref/heads/${headRef}`, ref)
     const [
       currentMain,
       currentDev,
@@ -265,9 +334,9 @@ export const verify = (
       version,
     ] = yield* Effect.all(
       [
-        api("branches/main", branch),
-        api("branches/dev", branch),
-        api(`git/ref/heads/${headRef}`, ref),
+        readMain(),
+        readDev(),
+        readHead(),
         api(`git/commits/${head}`, tree),
         api(`git/commits/${source}`, tree),
         api(`compare/${devBaseline}...${source}?per_page=1`, history),
@@ -284,7 +353,7 @@ export const verify = (
       { concurrency: 5 },
     )
     const publishRun = publication.workflow_runs[0]
-    yield* checkExactPromotion({
+    const evidence: PromotionEvidence = {
       headRef,
       eventBase,
       eventHead,
@@ -297,11 +366,60 @@ export const verify = (
       version,
       devContainsBaseline: ancestry.status === "ahead" || ancestry.status === "identical",
       publishRun,
-    })
-    if (publishRun === undefined || publishRun.id < 1)
-      return yield* reject("Source dev run ID is missing")
-    const exactJobs = yield* api(`actions/runs/${publishRun.id}/jobs?filter=latest`, jobs)
-    yield* checkSourceJobs(exactJobs)
+    }
+    yield* checkExactPromotion(evidence)
+    if (publishRun === undefined || publishRun.id < 1 || publishRun.run_attempt < 1)
+      return yield* reject("Source dev run or attempt ID is missing")
+    const exactJobs = yield* api(
+      `actions/runs/${publishRun.id}/attempts/${publishRun.run_attempt}/jobs`,
+      jobs,
+    )
+    yield* checkSourceJobs(exactJobs, source)
+    if (number !== undefined) {
+      const [candidate, repo] = yield* Effect.all(
+        [
+          api(
+            `actions/workflows/validation.yml/runs?event=pull_request&head_sha=${head}&per_page=1`,
+            candidateRuns,
+          ),
+          runJson($`gh api ${`repos/${repository}`}`, repositoryIdentity),
+        ],
+        { concurrency: 2 },
+      )
+      const validated = yield* checkCandidateRun(candidate.workflow_runs[0], {
+        number: Number(number),
+        repositoryId: repo.id,
+        base: { ref: "main", sha: target },
+        head: { ref: headRef, sha: head },
+      })
+      const candidateJobs = yield* api(
+        `actions/runs/${validated.id}/attempts/${validated.run_attempt}/jobs`,
+        jobs,
+      )
+      yield* checkCandidateJobs(candidateJobs, head)
+
+      // Read mutable merge metadata after verifying both sets of immutable job receipts.
+      const [row, activeRules, latestMain, latestDev, latestHead] = yield* Effect.all(
+        [
+          runJson(
+            $`gh pr view ${number} -R ${repository} --json headRefName,headRefOid,baseRefName,state,mergeStateStatus,isDraft,isCrossRepository,autoMergeRequest,statusCheckRollup`,
+            pr,
+          ),
+          api("rules/branches/main", rules),
+          readMain(),
+          readDev(),
+          readHead(),
+        ],
+        { concurrency: 5 },
+      )
+      yield* checkPromotionReadiness(row, activeRules, headRef, head)
+      yield* checkExactPromotion({
+        ...evidence,
+        currentMain: latestMain,
+        currentDev: latestDev,
+        currentHead: latestHead.object.sha,
+      })
+    }
   })
 
 if (import.meta.main) {

@@ -55,6 +55,8 @@ The T3 Code 0.1.12 web client was exercised locally with Pi 1.5.0 and the pinned
 - **The todo tool works, but its list is not rendered.** `@juicesharp/rpiv-todo` created a task and returned it to Pi. Its `setWidget` panel did not appear in T3. The [Pi adapter capabilities](https://github.com/pingdotgg/t3code/blob/v0.1.12/packages/provider-pi/src/server/adapter.ts#L159-L164) do not advertise a todo list, and the [adapter's widget handler](https://github.com/pingdotgg/t3code/blob/v0.1.12/packages/provider-pi/src/server/adapter.ts#L1838-L1857) only handles the subagent widget.
 - **Pi does not have a native asynchronous question in this T3 release.** The adapter handles Pi’s `select`, `confirm`, `input` and `editor` as dialog requests. The subagent widget reports background work, not questions. A status message or a notification cannot collect an answer and is not a substitute.
 
+The official [T3 Code 0.1.13](https://github.com/pingdotgg/t3code/releases/tag/v0.1.13) server and [Pi 1.7.0](https://github.com/earendil-works/pi/releases/tag/v1.7.0) also passed local RPC runs with the published HolyAgent build `gd653c0d` and both question and todo extensions at `2.16.0`. On each of the OpenAI Codex and Kimi routes, a loopback provider drove a successful synchronous question and todo call. Neither run exposed a native asynchronous question or projected a task into T3's Tasks pane. These runs exercised real client and extension code, but did not sign in to either provider or test request conversion.
+
 ## Full access is required
 
 The maintainer's words: "Require Full access". HolyAgent threads in T3 run in T3's Full access mode, consistent with full access as the default ([auto-mode.md](auto-mode.md)).

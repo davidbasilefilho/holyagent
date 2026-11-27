@@ -6,7 +6,7 @@ A first setup needs at least one checked provider before you can review or apply
 
 **Status: the Kimi provider and the Codex provider, their readiness and catalog checks and the routing are implemented in `packages/runtime/src/pi/`, and the extension runs the checks and sets the provider's variables at session start; the instructions are in the `kimi-k3.1`, `gpt-6` and `gpt-6.2` families under `packages/runtime/src/instructions/`. The Kimi section and [Routing](#routing) describe Kimi; [Codex](#codex-openai-codex) describes the Codex provider. The sections after them are research on Pi's provider layer and are not shipped behaviour.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks a conclusion drawn here, not a stated fact.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the original integration targeted 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ### `pi-codex-conversion` compatibility
 

@@ -2,7 +2,7 @@
 
 **Status: research behind a decided 0.3.0 plan. The package runs with full access and loads no approval gate ([Decision for 0.3.0](#decision-for-030)); the rest of this page is research.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the original integration targeted 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ## Pi deliberately has no native approval mechanism
 
