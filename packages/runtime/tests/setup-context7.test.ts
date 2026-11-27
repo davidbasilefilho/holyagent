@@ -9,9 +9,11 @@ import { Shell, type ShellResult, type WhichOptions } from "../src/setup/shell.t
 import { installCtx7 } from "../src/setup/steps.ts"
 import { scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
-const MISE = "/user/bin/mise"
-const ROOT = "/user/mise-data/installs/npm-ctx7/0.13.1"
-const BIN = `${ROOT}/node_modules/.bin/ctx7`
+const windows = process.platform === "win32"
+const fixtureHome = windows ? "C:\\Fixture" : "/user"
+const MISE = join(fixtureHome, "bin", windows ? "mise.exe" : "mise")
+const ROOT = join(fixtureHome, "mise-data", "installs", "npm-ctx7", "0.13.1")
+const BIN = join(ROOT, "node_modules", ".bin", windows ? "ctx7.cmd" : "ctx7")
 const list = ["--no-config", "ls", "--installed", "--json", "npm:ctx7"]
 const bins = ["--no-config", "bin-paths", "--json", "npm:ctx7@0.13.1"]
 
@@ -124,7 +126,7 @@ test("a real run, dry run and doctor --fix report the same already-installed mis
   try {
     await writeCompleteSettings(join(directory, ".claude"))
     const fixture = mock({})
-    const env = { HOME: directory }
+    const env = { HOME: directory, USERPROFILE: directory }
     for (const dryRun of [false, true]) {
       const lines = await Effect.runPromise(
         installCtx7(env, dryRun).pipe(Effect.provide(fixture.shell)),
@@ -145,7 +147,7 @@ test("a real run, dry run and doctor --fix report the same already-installed mis
 })
 
 test("PATH short-circuits mise and an empty installed inventory allows the existing Bun fallback", async () => {
-  const existing = mock({ path: "/user/bin/ctx7" })
+  const existing = mock({ path: join(fixtureHome, "bin", windows ? "ctx7.cmd" : "ctx7") })
   expect(
     await Effect.runPromise(installCtx7({}, true).pipe(Effect.provide(existing.shell))),
   ).toEqual(["= ctx7: already installed"])
@@ -165,9 +167,9 @@ test.each([
   { binInventory: "{}" },
   { verify: false },
   { root: "relative/path" },
-  { root: "/user/ctx7/not-the-parent", bin: "/user/ctx7" },
-  { bin: "/outside/the/install/ctx7" },
-  { bin: `${ROOT}/ctx7\nother-line` },
+  { root: join(fixtureHome, "ctx7", "not-the-parent"), bin: join(fixtureHome, "ctx7") },
+  { bin: join(fixtureHome, "outside", "the", "install", windows ? "ctx7.cmd" : "ctx7") },
+  { bin: join(ROOT, "ctx7\nother-line") },
 ])(
   "unverified mise output never selects the claimed command or requests a duplicate install %#",
   async (options) => {
