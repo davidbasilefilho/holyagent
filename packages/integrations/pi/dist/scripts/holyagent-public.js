@@ -4666,6 +4666,7 @@ var suspend2 = suspend;
 var sync2 = sync;
 var void_3 = void_;
 var callback2 = callback;
+var never2 = never;
 var gen2 = gen;
 var fail5 = fail3;
 var failCauseSync2 = failCauseSync;
@@ -5449,7 +5450,7 @@ var Never = class extends ASTNodeImpl {
     return "never";
   }
 };
-var never2 = /* @__PURE__ */ new Never;
+var never3 = /* @__PURE__ */ new Never;
 var Unknown = class extends ASTNodeImpl {
   _tag = "Unknown";
   getParser() {
@@ -7602,7 +7603,7 @@ function Literal2(literal) {
   });
   return out;
 }
-var Never2 = /* @__PURE__ */ make7(never2);
+var Never2 = /* @__PURE__ */ make7(never3);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var Undefined2 = /* @__PURE__ */ make7(undefined_2);
@@ -8740,7 +8741,7 @@ var describeFailure = (error, words = CLAUDE_WORDS) => {
   };
 };
 
-import { constants as constants7, fstatSync } from "fs";
+import { constants as constants8, fstatSync } from "fs";
 import { open as open8, stat as stat8 } from "fs/promises";
 import { resolve as resolve15 } from "path";
 var version = "0.4.0";
@@ -16142,6 +16143,7 @@ var CTX7_MISE_UNVERIFIED = "could not verify mise's npm:ctx7 installation; make 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
+import { release as release2 } from "os";
 var FORM_CHOICES = CAPABILITY_FORMS;
 var DEFAULT_FORM_CHOICE = {
   form: "normal",
@@ -16152,6 +16154,21 @@ var hasDisplay = (env, platform = process.platform) => platform === "darwin" || 
 var inCi = (env) => {
   const value = env["CI"]?.trim().toLowerCase();
   return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var localGraphicalHostUnavailable = (env, platform = process.platform, kernel = release2()) => {
+  const remote = [
+    "SSH_CLIENT",
+    "SSH_CONNECTION",
+    "SSH_TTY",
+    "WSL_DISTRO_NAME",
+    "WSL_INTEROP",
+    "CODEX_CAAS_SESSION_ID"
+  ];
+  if (inCi(env) || inCloudSession(env) || remote.some((name) => firstNonEmpty2(env[name]) !== undefined) || platform === "linux" && /microsoft|wsl/i.test(kernel))
+    return "remote";
+  if (!["darwin", "linux", "win32"].includes(platform) || !hasDisplay(env, platform) || platform === "linux" && !firstNonEmpty2(env.WAYLAND_DISPLAY) && !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "") || platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
+    return "no-display";
+  return;
 };
 var detectForm = (env, platform = process.platform) => {
   if (inCloudSession(env))
@@ -17536,7 +17553,7 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
   const chromium = launched ? findChromiumWith(yield* fileSystem, env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present(`${label}: the headless browser is the Chromium at ${chromium}`)];
-  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map4((state) => {
+  const pairing = content?.pairing === true && withheld === undefined && !options.pairingHandledByCaller ? yield* readBrowseState(env, platform).pipe(map4((state) => {
     const runner = options.installedPackageRoot === undefined ? "npm" : packageRunner(options.installedPackageRoot, env);
     const { text, fix } = describeBrowseState(state, runner);
     return state.state === "paired" ? present(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
@@ -17652,8 +17669,8 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
-import { createHash as createHash7, randomUUID as randomUUID4 } from "crypto";
-import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute10, join as join23, relative as relative5, resolve as resolve13 } from "path";
+import { constants as constants6 } from "fs";
+import { posix as posix4, win32 as win324 } from "path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
   return;
@@ -17664,6 +17681,299 @@ var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: (
 var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
 var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
 
+var STUDIO = "https://developer.android.com/studio";
+var DEVICES = "https://developer.android.com/studio/run/managing-avds";
+var ACCELERATION = "https://developer.android.com/studio/run/emulator-acceleration";
+var XCODE = "https://developer.apple.com/xcode/resources/";
+var RUNTIMES = "https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components";
+var RuntimeList = fromJsonString2(Struct({
+  runtimes: ArraySchema(Record(String5, Unknown2)),
+  devices: Record(String5, ArraySchema(Record(String5, Unknown2)))
+}));
+var report = (lines, ready) => ({
+  ready,
+  lines
+});
+var inside = (path, parent, full) => {
+  const relative = path.relative(parent, full);
+  return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+};
+var request = ["platform-tools", "emulator"];
+var deviceToolchains = fn2("deviceToolchains")(function* (env, options) {
+  const { mode } = options;
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const windows = platform === "win32";
+  const mac = platform === "darwin";
+  const path = windows ? win324 : posix4;
+  const androidSupported = windows || platform === "linux" ? arch === "x64" : mac && (arch === "arm64" || arch === "x64");
+  const appleSupported = mac && (arch === "arm64" || arch === "x64");
+  if (!androidSupported && !appleSupported)
+    return report([
+      hint(`device simulator: no supported toolchain for ${platform}-${arch}; check ${STUDIO}`)
+    ]);
+  if (mode === "apply" && localGraphicalHostUnavailable(env, platform) !== undefined)
+    return report([
+      hint("Device Simulator: installation requires a local graphical session outside CI, SSH, WSL and cloud")
+    ]);
+  const fs = yield* fileSystem;
+  const shell = yield* Shell;
+  const cwd = options.cwd ?? process.cwd();
+  const home = homeDirectory2(env);
+  const absolute = (candidate) => path.isAbsolute(candidate) && !/\p{Cc}/u.test(candidate) && (!windows || /^[a-z]:[\\/]/i.test(candidate));
+  const trusted = (candidate) => absolute(candidate) && (!path.isAbsolute(cwd) || path.relative(home, cwd) === "" || !inside(path, cwd, candidate));
+  const secure = (candidate, root) => trusted(candidate) ? tryPromise2(() => fs.realpath(candidate)).pipe(map4((resolved) => trusted(resolved) && (root === undefined || inside(path, root, resolved))), orElseSucceed2(() => false)) : succeed6(false);
+  const isDirectory = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isDirectory()), orElseSucceed2(() => false));
+  const absent = (candidate) => tryPromise2(() => fs.lstat(candidate)).pipe(match4({
+    onFailure: ({ cause }) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT",
+    onSuccess: () => false
+  }));
+  const regular = (candidate) => tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() && entry.size > 0), orElseSucceed2(() => false));
+  const program = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)) || !(yield* regular(candidate)))
+      return false;
+    return yield* try_2(() => fs.accessSync(candidate, windows ? constants6.F_OK : constants6.X_OK)).pipe(as2(true), orElseSucceed2(() => false));
+  });
+  const textFile = (candidate, root) => gen2(function* () {
+    if (!(yield* secure(candidate, root)))
+      return "";
+    const size = yield* tryPromise2(() => fs.stat(candidate)).pipe(map4((entry) => entry.isFile() ? entry.size : 0), orElseSucceed2(() => 0));
+    return size <= 0 || size > 65536 ? "" : yield* tryPromise2(() => fs.readFile(candidate, "utf8")).pipe(orElseSucceed2(() => ""));
+  });
+  const standardRepositories = (directory) => gen2(function* () {
+    if (!trusted(directory))
+      return false;
+    const config = path.join(directory, "repositories.cfg");
+    return yield* tryPromise2(() => fs.lstat(config)).pipe(matchEffect3({
+      onFailure: ({ cause }) => succeed6(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "ENOENT"),
+      onSuccess: (entry) => !entry.isFile() || entry.size > 65536 ? succeed6(false) : gen2(function* () {
+        if (!(yield* secure(config, directory)))
+          return false;
+        return yield* tryPromise2(() => fs.readFile(config, "utf8")).pipe(map4((body) => body.split(/\r?\n/u).every((line) => /^(?:\s*|\s*#.*|\s*count\s*=\s*0\s*)$/u.test(line))), orElseSucceed2(() => false));
+      })
+    }));
+  });
+  const run = (binary, args, childEnv, timeout = 1e4) => shell.run(binary, args, {
+    cwd: home,
+    stdin: "closed",
+    ...childEnv === undefined ? {} : { env: childEnv }
+  }).pipe(timeoutOption2(timeout));
+  const failure = (line) => hint(line);
+  const lines = [];
+  let iosReady;
+  const resultWith = (more = [], androidReady) => report([...lines, ...more], androidReady ?? iosReady);
+  if (appleSupported) {
+    const selected = firstNonEmpty2(env["DEVELOPER_DIR"]);
+    const active = selected === undefined && mode !== "preview" ? yield* run("/usr/bin/xcode-select", ["-p"]) : none2();
+    const choice = selected ?? (isSome2(active) && active.value.exitCode === 0 ? active.value.stdout.trim() : undefined);
+    const chosen = choice ?? "/Applications/Xcode.app/Contents/Developer";
+    const developer = chosen.endsWith(".app") ? path.join(chosen, "Contents", "Developer") : chosen;
+    const platformDirectory = path.join(developer, "Platforms", "iPhoneSimulator.platform");
+    const xcodebuild = path.join(developer, "usr", "bin", "xcodebuild");
+    if (mode !== "preview" && choice === undefined || !(yield* secure(developer)) || !(yield* program(xcodebuild, developer)) || !(yield* isDirectory(platformDirectory))) {
+      const clt = path.basename(developer) === "CommandLineTools" ? " (Command Line Tools are not full Xcode)" : "";
+      lines.push(failure(`iOS: select full Xcode${clt} in Xcode > Settings > Locations; install it from ${XCODE}`));
+    } else if (mode === "preview") {
+      lines.push(present(`iOS: Xcode found at ${developer}; no runtime probe or download in preview`));
+    } else {
+      const xcodeEnv = { DEVELOPER_DIR: developer };
+      const version = yield* run(xcodebuild, ["-version"], xcodeEnv);
+      const firstLaunch = isSome2(version) && version.value.exitCode === 0 && /^Xcode \d/m.test(version.value.stdout) ? yield* run(xcodebuild, ["-checkFirstLaunchStatus"], xcodeEnv) : none2();
+      if (isNone2(firstLaunch) || firstLaunch.value.exitCode !== 0) {
+        lines.push(failure("iOS: open full Xcode, review its license and complete first launch with any requested admin access"));
+      } else {
+        const runtimes = yield* run("/usr/bin/xcrun", ["simctl", "list", "--json"], xcodeEnv);
+        const available = isSome2(runtimes) && runtimes.value.exitCode === 0 ? decodeUnknownOption2(RuntimeList)(runtimes.value.stdout) : none2();
+        const ios = isSome2(available) ? available.value.runtimes.flatMap((runtime) => {
+          const id = runtime["identifier"];
+          return typeof id === "string" && id.startsWith("com.apple.CoreSimulator.SimRuntime.iOS-") && runtime["isAvailable"] === true ? [id] : [];
+        }) : [];
+        if (isSome2(available) && ios.some((id) => available.value.devices[id]?.some((device) => device["isAvailable"] === true && typeof device["udid"] === "string"))) {
+          iosReady = `Xcode (${developer}) with an available iOS Simulator device and runtime`;
+          lines.push(present(`device simulator: ${iosReady}`));
+        } else if (ios.length > 0) {
+          lines.push(failure("iOS: runtime installed but no available iOS Simulator device found; add one in Xcode > Window > Devices and Simulators"));
+        } else {
+          lines.push(failure(`iOS: no available runtime verified; complete Xcode first launch, then install an iOS runtime in Xcode > Settings > Components (${RUNTIMES})`));
+        }
+      }
+    }
+  }
+  if (!androidSupported)
+    return resultWith();
+  const defaultSdk = mac ? path.join(home, "Library", "Android", "sdk") : windows ? path.join(firstNonEmpty2(env["LOCALAPPDATA"]) ?? path.join(home, "AppData", "Local"), "Android", "Sdk") : path.join(home, "Android", "Sdk");
+  const configured = firstNonEmpty2(env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"]);
+  const selected = configured ?? defaultSdk;
+  if (!(yield* secure(selected)) || !(yield* isDirectory(selected)))
+    return resultWith([
+      failure(`Android: no existing SDK verified at ${selected}; use the Android Studio setup wizard or install the official command-line tools and set ANDROID_HOME (${STUDIO})`)
+    ]);
+  const root = yield* tryPromise2(() => fs.realpath(selected)).pipe(orElseSucceed2(() => selected));
+  const executable = (name) => windows ? `${name}.exe` : name;
+  const adb = path.join(root, "platform-tools", executable("adb"));
+  const emulator = path.join(root, "emulator", executable("emulator"));
+  const installed = all2([program(adb, root), program(emulator, root)]);
+  const have = yield* installed;
+  const missing = [];
+  const existing = [];
+  for (const [index, name] of request.entries()) {
+    if (!have[index])
+      ((yield* absent(path.join(root, name))) ? missing : existing).push(name);
+  }
+  if (existing.length > 0)
+    lines.push(failure(`Android: kept existing but unverified SDK packages ${existing.join(", ")}; inspect or repair them in Android Studio's SDK Manager`));
+  const androidEnv = { ANDROID_HOME: root, ANDROID_SDK_ROOT: root, REPO_OS_OVERRIDE: undefined };
+  if (missing.length > 0 && mode !== "inspect") {
+    const licensed = yield* textFile(path.join(root, "licenses", "android-sdk-license"), root);
+    const writable = yield* try_2(() => fs.accessSync(root, constants6.W_OK)).pipe(as2(true), orElseSucceed2(() => false));
+    const userPrefs = firstNonEmpty2(env["ANDROID_USER_HOME"]);
+    const legacyPrefs = firstNonEmpty2(env["ANDROID_SDK_HOME"]);
+    const prefs = new Set([
+      path.join(home, ".android"),
+      ...userPrefs === undefined ? [] : [userPrefs],
+      ...legacyPrefs === undefined ? [] : [path.join(legacyPrefs, ".android")]
+    ]);
+    if (!/^[0-9a-f]{40}\r?$/im.test(licensed)) {
+      lines.push(failure("Android: review and accept any required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses"));
+    } else if (!writable) {
+      lines.push(failure("Android: this SDK is not writable; choose a user-writable SDK or ask its administrator to install the missing packages"));
+    } else if (!(yield* forEach2(prefs, standardRepositories)).every(Boolean)) {
+      lines.push(failure("Android: SDK repository settings are customized or unreadable; review them and install the missing packages in Android Studio's SDK Manager"));
+    } else {
+      const localAndroid = windows ? path.join(home, "AppData", "AndroidCLI", "android.exe") : path.join(home, ".local", "bin", "android");
+      const officialCli = (yield* absent(path.join(home, ".androidrc"))) && (yield* program(localAndroid, path.dirname(localAndroid))) ? localAndroid : undefined;
+      const toolRoot = path.join(root, "cmdline-tools");
+      const versions = yield* try_2(() => fs.readdirSync(toolRoot)).pipe(orElseSucceed2(() => []));
+      const candidates = [
+        "latest",
+        ...versions.filter((entry) => /^\d+(?:\.\d+)*$/.test(entry)).sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+      ];
+      let sdkmanager;
+      for (const version of candidates) {
+        const folder = path.join(toolRoot, version);
+        const script = path.join(folder, "bin", windows ? "sdkmanager.bat" : "sdkmanager");
+        if (!(yield* program(script, root)))
+          continue;
+        const metadata = yield* textFile(path.join(folder, "source.properties"), root);
+        const classpath = path.join(folder, "lib", "sdkmanager-classpath.jar");
+        if (/^Pkg\.Desc\s*=\s*Android SDK Command-line Tools\s*$/im.test(metadata) && /^Pkg\.Revision\s*=\s*\d/m.test(metadata) && (yield* secure(classpath, root)) && (yield* regular(classpath))) {
+          sdkmanager = script;
+          break;
+        }
+      }
+      if (mode === "preview") {
+        lines.push(officialCli !== undefined || sdkmanager !== undefined ? added(`Android: would request missing SDK packages ${missing.join(", ")} with the installed Google tool; package licenses and runtime are checked on apply`) : failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+      } else {
+        const verified = officialCli === undefined ? none2() : yield* run(officialCli, ["--no-metrics", "-h"]);
+        let installing = false;
+        const install = (command, args, childEnv) => reportSetupActivity(`Installing Android SDK packages ${missing.join(", ")}`).pipe(andThen2(run(command, args, childEnv, 600000)));
+        let result = none2();
+        if (officialCli !== undefined && isSome2(verified) && verified.value.exitCode === 0 && /\bandroid cli\b/i.test(verified.value.stdout + verified.value.stderr)) {
+          installing = true;
+          result = yield* install(officialCli, ["--no-metrics", `--sdk=${root}`, "sdk", "install", ...missing], androidEnv);
+        } else if (sdkmanager !== undefined) {
+          const javaHome = firstNonEmpty2(env["JAVA_HOME"]);
+          const java = javaHome === undefined ? yield* shell.which("java", {
+            strict: { cwd, platform: windows ? "win32" : mac ? "darwin" : "linux" }
+          }) : (yield* program(path.join(javaHome, "bin", executable("java")))) ? some2(path.join(javaHome, "bin", executable("java"))) : none2();
+          const resolvedJava = isSome2(java) && (yield* program(java.value)) && !(mac && java.value === "/usr/bin/java") ? yield* tryPromise2(() => fs.realpath(java.value)).pipe(orElseSucceed2(() => "")) : "";
+          if (!absolute(resolvedJava) || path.basename(path.dirname(resolvedJava)).toLowerCase() !== "bin") {
+            lines.push(failure("Android: sdkmanager needs a compatible JDK; set JAVA_HOME to your JDK or Android Studio JBR"));
+          } else {
+            const args = [`--sdk_root=${root}`, "--install", ...missing];
+            const javaEnv = {
+              ...androidEnv,
+              JAVA_HOME: path.dirname(path.dirname(resolvedJava)),
+              JAVA_TOOL_OPTIONS: undefined,
+              _JAVA_OPTIONS: undefined,
+              JDK_JAVA_OPTIONS: undefined,
+              CLASSPATH: undefined
+            };
+            if (windows) {
+              const cmd = path.join(firstNonEmpty2(env["SystemRoot"], env["WINDIR"]) ?? "C:\\Windows", "System32", "cmd.exe");
+              const invocation = cmdExeArguments(sdkmanager, args);
+              if (invocation.ok && (yield* program(cmd))) {
+                installing = true;
+                result = yield* install(cmd, invocation.args, javaEnv);
+              } else
+                lines.push(failure("Android: the sdkmanager batch command could not be started safely; use Android Studio's SDK Manager"));
+            } else {
+              installing = true;
+              result = yield* install(sdkmanager, args, javaEnv);
+            }
+          }
+        } else {
+          lines.push(failure(`Android: install Google's Android CLI or SDK Command-line Tools to add ${missing.join(", ")} (${STUDIO})`));
+        }
+        if (installing && isNone2(result))
+          lines.push(failure("Android: the SDK package manager timed out; finish in Android Studio's SDK Manager or rerun once the network is available"));
+        if (isSome2(result)) {
+          if (result.value.exitCode === 0 && (yield* installed).every(Boolean))
+            lines.push(added(`Android: installed ${missing.join(", ")} into ${root}`));
+          else {
+            const output = result.value.stdout + result.value.stderr;
+            lines.push(/licen[cs]e/i.test(output) ? failure("Android: review the required package licenses yourself in Android Studio's SDK Manager or with sdkmanager --licenses") : /java|jdk|classfile/i.test(output) ? failure("Android: SDK package manager could not use Java; set JAVA_HOME to a compatible JDK") : failure("Android: SDK packages were not verified after installation; check SDK Manager, disk space, network and permissions"));
+          }
+        }
+      }
+    }
+  }
+  const verified = yield* installed;
+  if (!verified.every(Boolean))
+    return resultWith([
+      failure(`Android: SDK at ${root} is missing verified platform-tools or Emulator binaries`)
+    ]);
+  if (mode === "preview")
+    return resultWith([
+      present(`Android: SDK tools at ${root}; no AVD or acceleration probe in preview`)
+    ]);
+  const avds = yield* run(emulator, ["-list-avds"], androidEnv);
+  const avdRoots = [
+    firstNonEmpty2(env["ANDROID_AVD_HOME"]),
+    ...["ANDROID_EMULATOR_HOME", "ANDROID_USER_HOME"].flatMap((key) => env[key] === undefined ? [] : [path.join(env[key], "avd")]),
+    path.join(home, ".android", "avd")
+  ].filter((entry) => entry !== undefined);
+  let avdReady = false;
+  const names = isSome2(avds) && avds.value.exitCode === 0 ? avds.value.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[\w][\w.-]*$/.test(line)) : [];
+  for (const name of names) {
+    for (const directory of avdRoots) {
+      const pointerFile = path.join(directory, `${name}.ini`);
+      if (yield* absent(pointerFile))
+        continue;
+      const pointer = yield* textFile(pointerFile, directory);
+      const avd = /^path\s*=\s*([^\r\n]+)$/m.exec(pointer)?.[1]?.trim();
+      if (avd === undefined || !(yield* secure(avd)))
+        break;
+      const avdPath = yield* tryPromise2(() => fs.realpath(avd)).pipe(orElseSucceed2(() => avd));
+      const config = yield* textFile(path.join(avdPath, "config.ini"), avdPath);
+      const imagePath = /^image\.sysdir\.1\s*=\s*([^\r\n]+)$/m.exec(config)?.[1]?.trim();
+      if (imagePath === undefined)
+        break;
+      const image = path.resolve(root, imagePath, "system.img");
+      if ((yield* secure(image, root)) && (yield* regular(image))) {
+        avdReady = true;
+      }
+      break;
+    }
+    if (avdReady)
+      break;
+  }
+  if (!avdReady)
+    return resultWith([
+      failure(`Android: SDK available at ${root}, but no Android Virtual Device verified; create an AVD with a system image in Android Studio's Device Manager (${DEVICES})`)
+    ]);
+  const acceleration = yield* run(emulator, ["-accel-check"], androidEnv);
+  if (isNone2(acceleration) || acceleration.value.exitCode !== 0 || !/^accel:\s*\n0(?:\s|$)/m.test(acceleration.value.stdout + `
+` + acceleration.value.stderr))
+    return resultWith([
+      failure(`Android: AVD configured, but hardware acceleration not verified; check ${windows ? "WHPX" : mac ? "Hypervisor.Framework" : "KVM and its permissions"} (${ACCELERATION})`)
+    ]);
+  const ready = `the Android SDK (${root}) with a configured AVD and hardware acceleration`;
+  return resultWith([present(`device simulator: ${ready}`)], ready);
+});
+
+import { createHash as createHash7, randomUUID as randomUUID4 } from "crypto";
+import { basename as basename7, dirname as dirname11, isAbsolute as isAbsolute10, join as join23, relative as relative5, resolve as resolve13 } from "path";
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -18031,6 +18341,14 @@ var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
 });
 var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3");
 var t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json");
+var devicePreparationRefusal = fn2("t3DevicePreparationRefusal")(function* (env) {
+  const snapshot = yield* readJsonObjectSnapshot(t3SettingsFile(env));
+  for (const key of ["enableDeviceSupport", "enableAgentDeviceAccess"]) {
+    if (snapshot.value?.[key] !== undefined && snapshot.value[key] !== true)
+      return `T3 Code's ${key} setting is not enabled; kept it unchanged`;
+  }
+  return;
+});
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory2(env);
@@ -18226,9 +18544,9 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
     return {
       line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
     };
-  const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
+  const host = config.pi.t3.deviceAccess ? options.deviceReadiness === undefined ? yield* deviceHost(env, options.platform ?? process.platform) : options.deviceReadiness ?? undefined : undefined;
   const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
-  const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
+  const deviceNote = wantsDevices && host === undefined ? options.deviceReadiness === null ? "device access left out: simulator readiness was not verified" : "device access left out: no Xcode or Android SDK found" : undefined;
   return {
     target: {
       file: t3SettingsFile(env),
@@ -18458,6 +18776,7 @@ var setup = fn2("setup")(function* (env, options) {
       };
   }
   let piSteps = true;
+  let deviceReadiness;
   const whenPiSaved = () => piSteps;
   const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
   const report = (lines) => ({ lines });
@@ -18479,14 +18798,45 @@ var setup = fn2("setup")(function* (env, options) {
       ]),
       phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
       phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
-      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, {
+        ...piOptions,
+        surface,
+        pairingHandledByCaller: options.desktopBrowseHandoff === true
+      })), whenPiSaved),
       ...scope === "user" ? [
-        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+        ...piOnly && options.deviceAccess === true && options.devicePreparation !== undefined ? [
+          phase("Device Simulator tools", gen2(function* () {
+            const config = yield* loadPiConfig(env, piOptions.cwd, "user", choices, options.piProviders).pipe(orElseSucceed2(() => {
+              return;
+            }));
+            if (config?.pi.enable !== true || !config.pi.t3.deviceAccess || config.pi.t3.scope === "project")
+              return [
+                hint("Device Simulator: skipped by the existing Pi or T3 Code settings")
+              ];
+            deviceReadiness = null;
+            const t3 = yield* result2(devicePreparationRefusal(env));
+            if (t3._tag === "Failure")
+              return [
+                hint("Device Simulator: not prepared because T3 Code settings could not be read")
+              ];
+            if (t3.success !== undefined)
+              return [hint(`Device Simulator: ${t3.success}`)];
+            const mode = options.dryRun || form.form !== "normal" ? "preview" : options.devicePreparation ?? "preview";
+            const prepared = yield* deviceToolchains(env, {
+              mode,
+              cwd: piOptions.cwd
+            });
+            deviceReadiness = prepared.ready ?? null;
+            return prepared.lines;
+          }), whenPiSaved)
+        ] : [],
+        phase("T3 Code settings", asStep("t3 settings", suspend2(() => installT3Settings(env, piOptions.cwd, {
           dryRun: options.dryRun,
           ...options.piProviders === undefined ? {} : { providers: options.piProviders },
           ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-        })), whenPiSaved)
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess },
+          ...deviceReadiness === undefined ? {} : { deviceReadiness }
+        }))), whenPiSaved)
       ] : []
     ] : Object.keys(choices).length === 0 ? [] : [
       report(() => [
@@ -18633,6 +18983,8 @@ var schemas4 = {
     undo: optionalKey2(Boolean3),
     worktrees: optionalKey2(Boolean3),
     deviceAccess: optionalKey2(Boolean3),
+    devicePreparation: optionalKey2(Literals(["preview", "apply"])),
+    desktopBrowseHandoff: optionalKey2(Boolean3),
     capabilities: optionalKey2(Choices),
     form: optionalKey2(Form)
   }),
@@ -19962,7 +20314,7 @@ var shellLive = (env) => {
   const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
   return succeed5(Shell, Shell.of({
     which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
-    run: (command, args, options) => tryPromise2({
+    run: (command, args, options) => options.stdin === "closed" ? flatMap2(Shell, (native) => native.run(command, args, options)).pipe(provide3(Shell.live(env))) : tryPromise2({
       try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
         exitCode: result.exitCode,
         stdout: result.stdout.toString(),
@@ -28821,11 +29173,11 @@ var MIGRATE_COMMANDS = [
 import { join as join35 } from "path";
 
 import { realpath as realpath7, stat as stat7 } from "fs/promises";
-import { release as release2 } from "os";
-import { isAbsolute as isAbsolute11, win32 as win327 } from "path";
+import { release as release3 } from "os";
+import { isAbsolute as isAbsolute11, win32 as win328 } from "path";
 
-import { constants as constants6 } from "fs";
-import { posix as posix4, win32 as win324 } from "path";
+import { constants as constants7 } from "fs";
+import { posix as posix5, win32 as win325 } from "path";
 var BROWSERS = [
   {
     id: "chrome",
@@ -28947,8 +29299,8 @@ var localPath = (value, windows) => {
   if (Array.from(value).some((char) => (char.codePointAt(0) ?? 0) < 32))
     return;
   if (windows)
-    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win324.normalize(value) : undefined;
-  return value.startsWith("/") ? posix4.normalize(value) : undefined;
+    return /^[a-z]:[/\\]/i.test(value) && !value.includes('"') ? win325.normalize(value) : undefined;
+  return value.startsWith("/") ? posix5.normalize(value) : undefined;
 };
 var checkFile = (path, executable, windows) => gen2(function* () {
   const fs = yield* fileSystem;
@@ -28956,7 +29308,7 @@ var checkFile = (path, executable, windows) => gen2(function* () {
   if (!metadata.isFile() || executable && metadata.size === 0)
     return false;
   if (executable && !windows)
-    yield* try_2(() => fs.accessSync(path, constants6.X_OK));
+    yield* try_2(() => fs.accessSync(path, constants7.X_OK));
   return true;
 }).pipe(orElseSucceed2(() => false));
 var oneFile = (paths, windows) => findFirst2([...new Set(paths)], (path) => checkFile(path, true, windows));
@@ -28965,8 +29317,8 @@ var profileRoot = (browser, env, platform) => {
   const home = envOf(env, windows ? "USERPROFILE" : "HOME", windows) ?? homeDirectory2(env);
   if (browser.id === "firefox") {
     if (windows)
-      return localPath(win324.join(envOf(env, "APPDATA", true) ?? win324.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
-    return localPath(posix4.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
+      return localPath(win325.join(envOf(env, "APPDATA", true) ?? win325.join(home, "AppData", "Roaming"), "Mozilla", "Firefox"), true);
+    return localPath(posix5.join(home, platform === "darwin" ? "Library/Application Support/Firefox" : ".mozilla/firefox"), false);
   }
   const profileEnv = windows ? {
     ...env,
@@ -28992,22 +29344,22 @@ var knownPaths = (browser, env, platform) => {
   if (platform === "win32") {
     const user = envOf(env, "USERPROFILE", true) ?? home;
     const programRoots = [
-      envOf(env, "LOCALAPPDATA", true) ?? win324.join(user, "AppData", "Local"),
+      envOf(env, "LOCALAPPDATA", true) ?? win325.join(user, "AppData", "Local"),
       ...["ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"].map((name) => envOf(env, name, true))
     ];
-    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win324.join(root, rest)) : []);
+    return programRoots.flatMap((root) => root !== undefined && localPath(root, true) !== undefined ? (browser.winInstall ?? []).map((rest) => win325.join(root, rest)) : []);
   }
   if (platform === "darwin" && browser.app !== undefined) {
     const app = browser.app;
-    return ["/Applications", posix4.join(home, "Applications")].filter(posix4.isAbsolute).map((root) => posix4.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
+    return ["/Applications", posix5.join(home, "Applications")].filter(posix5.isAbsolute).map((root) => posix5.join(root, `${app}.app`, "Contents/MacOS", browser.macExe ?? app));
   }
   if (platform === "linux")
-    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix4.join(root, command)));
+    return ["/usr/bin", "/usr/local/bin"].flatMap((root) => (browser.commands ?? []).map((command) => posix5.join(root, command)));
   return [];
 };
 var uniqueWinNames = (browser) => (browser.winExe ?? []).filter((exe) => exe.toLowerCase() !== "launcher.exe" && BROWSERS.filter((candidate) => candidate.winExe?.includes(exe)).length === 1);
 var pathsOnPath = (browser, env, windows) => {
-  const pathApi = windows ? win324 : posix4;
+  const pathApi = windows ? win325 : posix5;
   const names = windows ? uniqueWinNames(browser) : browser.commands ?? [];
   return (envOf(env, "PATH", windows) ?? "").split(pathApi.delimiter).flatMap((entry) => {
     const root = localPath(entry, windows);
@@ -29040,7 +29392,7 @@ var registryReader = fn2("registryReader")(function* (env) {
   const local = root === undefined ? undefined : localPath(root, true);
   if (local === undefined)
     return;
-  const reg = win324.join(local, "System32", "reg.exe");
+  const reg = win325.join(local, "System32", "reg.exe");
   if (!(yield* checkFile(reg, true, true)))
     return;
   const shell = yield* Shell;
@@ -29053,7 +29405,7 @@ var localNames = (directory) => gen2(function* () {
 var identityKey = (name) => name.toLowerCase().replaceAll(/[^a-z\d]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
 var registeredBrowser = fn2("registeredBrowser")(function* (key, name, executable, source, platform) {
   const windows = platform === "win32";
-  const path = windows ? win324 : posix4;
+  const path = windows ? win325 : posix5;
   const folder = path.dirname(executable);
   const isFile = (file) => checkFile(file, false, windows);
   const isLibrary = (base) => isFile(path.join(folder, base));
@@ -29111,7 +29463,7 @@ var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
         const name = /^\s*\(Default\)\s+REG_SZ\s+([^\p{Cc}]{1,100})$/imu.exec(display)?.[1]?.trim() || client;
         return yield* registeredBrowser(client, name, path, "registry", "win32");
       }
-      return browser.winExe?.some((exe) => exe.toLowerCase() === win324.basename(path).toLowerCase()) ? { id: browser.id, path } : undefined;
+      return browser.winExe?.some((exe) => exe.toLowerCase() === win325.basename(path).toLowerCase()) ? { id: browser.id, path } : undefined;
     }), { concurrency: 4 });
     for (const entry of verified) {
       if (entry === undefined)
@@ -29127,9 +29479,9 @@ var windowsRegistrations = fn2("windowsRegistrations")(function* (env) {
   const appNames = ["chrome.exe", "firefox.exe", "helium.exe"].filter((exe) => missing.some(({ winExe }) => winExe?.includes(exe)));
   const appResults = yield* forEach2(roots.flatMap(({ hive, view }) => appNames.map((exe) => ({ hive, view, exe }))), ({ hive, view, exe }) => query(`${hive}\\${AppPaths}\\${exe}`, view, true).pipe(map4((stdout) => ({ exe, path: registryExecutable(stdout, env) }))), { concurrency: 4 });
   for (const { exe, path } of appResults) {
-    if (path === undefined || win324.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
+    if (path === undefined || win325.basename(path).toLowerCase() !== exe || !(yield* checkFile(path, true, true)))
       continue;
-    const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win324.normalize(suffix).toLowerCase()}`)));
+    const browser = missing.find((candidate) => uniqueWinNames(candidate).includes(exe) || candidate.winInstall?.some((suffix) => path.toLowerCase().endsWith(`\\${win325.normalize(suffix).toLowerCase()}`)));
     if (browser !== undefined && !registered.has(browser.id))
       registered.set(browser.id, path);
   }
@@ -29139,12 +29491,12 @@ var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
   const home = homeDirectory2(env);
   const roots = [
     ...new Set([
-      env.XDG_DATA_HOME ?? posix4.join(home, ".local/share"),
+      env.XDG_DATA_HOME ?? posix5.join(home, ".local/share"),
       ...(env.XDG_DATA_DIRS ?? "/usr/local/share:/usr/share").split(":")
     ])
   ].flatMap((root) => {
     const local = localPath(root, false);
-    return local === undefined ? [] : [posix4.join(local, "applications")];
+    return local === undefined ? [] : [posix5.join(local, "applications")];
   });
   const fs = yield* fileSystem;
   const shell = yield* Shell;
@@ -29155,7 +29507,7 @@ var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
       if (seen.has(entry))
         continue;
       seen.add(entry);
-      const file = posix4.join(root, entry);
+      const file = posix5.join(root, entry);
       const metadata = yield* tryPromise2(() => fs.stat(file)).pipe(option2);
       if (metadata._tag === "None" || !metadata.value.isFile() || metadata.value.size > 64 * 1024)
         continue;
@@ -29174,7 +29526,7 @@ var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
       const executable = path ?? (located?._tag === "Some" ? located.value : undefined);
       if (executable === undefined || !(yield* checkFile(executable, true, false)))
         continue;
-      if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix4.basename(executable)))
+      if (["env", "flatpak", "snap", "sh", "bash", "zsh"].includes(posix5.basename(executable)))
         continue;
       extra.push(yield* registeredBrowser(entry.slice(0, -8), name, executable, "desktop-entry", "linux"));
     }
@@ -29184,22 +29536,22 @@ var linuxRegistrations = fn2("linuxRegistrations")(function* (env) {
 var macRegistrations = fn2("macRegistrations")(function* (env) {
   const home = homeDirectory2(env);
   const extra = [];
-  for (const root of ["/Applications", posix4.join(home, "Applications")].filter(posix4.isAbsolute)) {
+  for (const root of ["/Applications", posix5.join(home, "Applications")].filter(posix5.isAbsolute)) {
     const bundles = (yield* localNames(root)).filter((name) => /^[^/\p{Cc}]{1,120}\.app$/u.test(name)).slice(0, 160);
     for (const bundle of bundles) {
       const name = bundle.slice(0, -4);
       if (identityKey(name) === "" || BROWSERS.some(({ app }) => app === name))
         continue;
-      const contents = posix4.join(root, bundle, "Contents");
-      const resources = posix4.join(contents, "Resources");
-      const macos = posix4.join(contents, "MacOS");
+      const contents = posix5.join(root, bundle, "Contents");
+      const resources = posix5.join(contents, "Resources");
+      const macos = posix5.join(contents, "MacOS");
       const executables = (yield* localNames(macos)).filter((entry) => /^[^/\p{Cc}]{1,120}$/u.test(entry));
-      const executable = posix4.join(macos, executables.find((entry) => entry.toLowerCase() === name.toLowerCase()) ?? name);
+      const executable = posix5.join(macos, executables.find((entry) => entry.toLowerCase() === name.toLowerCase()) ?? name);
       if (!(yield* checkFile(executable, true, false)))
         continue;
-      const gecko = (yield* checkFile(posix4.join(macos, "XUL"), false, false)) && (yield* checkFile(posix4.join(resources, "browser", "omni.ja"), false, false));
-      const frameworks = posix4.join(contents, "Frameworks");
-      const engine = gecko ? undefined : yield* findFirst2((yield* localNames(frameworks)).filter((entry) => /^[^/\p{Cc}]{1,120} Framework\.framework$/u.test(entry) && entry !== "Electron Framework.framework"), (entry) => checkFile(posix4.join(frameworks, entry, "Versions/Current/Helpers/chrome_crashpad_handler"), false, false));
+      const gecko = (yield* checkFile(posix5.join(macos, "XUL"), false, false)) && (yield* checkFile(posix5.join(resources, "browser", "omni.ja"), false, false));
+      const frameworks = posix5.join(contents, "Frameworks");
+      const engine = gecko ? undefined : yield* findFirst2((yield* localNames(frameworks)).filter((entry) => /^[^/\p{Cc}]{1,120} Framework\.framework$/u.test(entry) && entry !== "Electron Framework.framework"), (entry) => checkFile(posix5.join(frameworks, entry, "Versions/Current/Helpers/chrome_crashpad_handler"), false, false));
       if (gecko || engine?._tag === "Some")
         extra.push({
           id: `app-${identityKey(name)}`,
@@ -29215,7 +29567,7 @@ var macRegistrations = fn2("macRegistrations")(function* (env) {
 });
 var discoverBrowsers = fn2("discoverBrowsers")(function* (env, platform = process.platform) {
   const windows = platform === "win32";
-  const path = windows ? win324 : posix4;
+  const path = windows ? win325 : posix5;
   if (!windows && platform !== "linux" && platform !== "darwin")
     return [];
   const registry = windows ? yield* windowsRegistrations(env) : undefined;
@@ -29324,7 +29676,7 @@ var checkBrowserExecutable = fn2("checkBrowserExecutable")(function* (env, absol
   } : evidence(browser, "manual", platform, profileRoot(browser, env, platform), clean);
 });
 import { get as get2 } from "http";
-import { posix as posix5, win32 as win325 } from "path";
+import { posix as posix6, win32 as win326 } from "path";
 var DEFAULT_PORT = 19988;
 var validPort = (value) => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535;
 var RelayVersion = fromJsonString2(Struct({ version: String5, runtime: optionalKey2(String5) }));
@@ -29358,7 +29710,7 @@ var browseRelaySafe = (port) => callback2((resume) => {
 var checkLocalBrowseRelay = fn2("checkBrowseDesktopRelay")(function* (env, probe, platform = process.platform) {
   const refuse = (message) => new SetupFailure({ message });
   const windows = platform === "win32";
-  const path = windows ? win325 : posix5;
+  const path = windows ? win326 : posix6;
   const absolute = (candidate) => {
     if (!path.isAbsolute(candidate))
       return false;
@@ -29418,7 +29770,7 @@ import { dirname as dirname14, join as join31 } from "path";
 var {$: $2 } = globalThis.Bun;
 import { lstat as lstat10, mkdir as mkdir11, mkdtemp as mkdtemp4, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile6 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename8, dirname as dirname13, join as join30, posix as posix6, win32 as win326 } from "path";
+import { basename as basename8, dirname as dirname13, join as join30, posix as posix7, win32 as win327 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -30340,7 +30692,7 @@ class TuiUnavailable extends TaggedError2("TuiUnavailable") {
     return this.reason;
   }
 }
-var pathModule = (platform) => platform === "win32" ? win326 : posix6;
+var pathModule = (platform) => platform === "win32" ? win327 : posix7;
 var cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   const { join } = pathModule(platform);
@@ -30668,7 +31020,7 @@ var configureBrowse = fn2("configureBrowse")(function* (env, plan, pair, notify 
           ]
         };
       previous = after;
-      targetLines.push(present(`${NAME}: a new connected profile was confirmed for the ${target.target} handoff`));
+      targetLines.push(present(`${NAME}: a new connection was confirmed during the ${target.target} handoff`));
     }
     if (ready.length === 0 && prior.state === "unpaired")
       return { ok: true, lines: [versionLine, ...targetLines] };
@@ -30730,21 +31082,15 @@ var writeBrowserPreference = (preference, browsers) => writeJsonObjectIfUnchange
 
 var NAME2 = "OpenCode Browse";
 var WAIT_SECONDS = 180;
+var INSTALL_WAIT_MS = 120000;
+var PROFILE_CHECK_MS = 2000;
 var BrowserId = String5.check(isPattern2(/^[a-z][a-z0-9-]{0,99}$/));
 var isBrowserId = is2(BrowserId);
 var isKnownExtension = is2(Literals(BROWSE_EXTENSION_IDS));
-var remoteVariables = [
-  "SSH_CLIENT",
-  "SSH_CONNECTION",
-  "SSH_TTY",
-  "WSL_DISTRO_NAME",
-  "WSL_INTEROP",
-  "CODEX_CAAS_SESSION_ID"
-];
 var failure = (message) => new SetupFailure({ message });
 var failed4 = (detail) => ({ ok: false, lines: [`! ${NAME2}: ${detail}`] });
 var pending = (detail) => ({ ok: true, lines: [hint(`${NAME2}: ${detail}`)] });
-var terminalBrowseUnavailable = (env, mode, platform = process.platform, kernel = release2()) => {
+var terminalBrowseUnavailable = (env, mode, platform = process.platform, kernel = release3()) => {
   if (mode.dryRun)
     return "dry run does not open a browser or start pairing";
   if (mode.nonInteractive)
@@ -30753,14 +31099,16 @@ var terminalBrowseUnavailable = (env, mode, platform = process.platform, kernel 
     return "desktop Browse requires normal form";
   if (!mode.terminal?.stdin || !mode.terminal.stdout || env.TERM?.toLowerCase() === "dumb")
     return "desktop Browse requires an interactive terminal";
-  if (inCi(env) || inCloudSession(env) || remoteVariables.some((name) => firstNonEmpty2(env[name]) !== undefined) || platform === "linux" && /microsoft|wsl/i.test(kernel))
+  const host = localGraphicalHostUnavailable(env, platform, kernel);
+  if (host === "remote")
     return "desktop Browse is not opened in CI, SSH, WSL or a cloud session";
-  if (!["darwin", "linux", "win32"].includes(platform) || !hasDisplay(env, platform) || platform === "linux" && !firstNonEmpty2(env.WAYLAND_DISPLAY) && !/^(?:unix)?:\d+(?:\.\d+)?$/.test(env.DISPLAY ?? "") || platform === "win32" && env.SESSIONNAME?.toLowerCase() === "services")
+  if (host === "no-display")
     return "desktop Browse requires a local graphical session";
   return;
 };
 var safeProfile = (profile) => profile !== "." && profile !== ".." && !/[\p{Cc}/\\]/u.test(profile) && profile.trim() === profile;
-var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requested, platform = process.platform) {
+var browserProfiles = (env, browser, platform = process.platform) => findBrowseProfiles(env, platform, true).pipe(map4((profiles) => profiles.filter(({ browser: name }) => name === browser)));
+var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requested, platform = process.platform, pinnedProfile) {
   if (requested !== undefined && !isBrowserId(requested))
     return yield* failure("use a detected browser id with --browse-browser, for example chrome");
   const detected = yield* discoverBrowsers(env, platform);
@@ -30795,12 +31143,13 @@ var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requeste
     file.mtimeMs,
     file.ctimeMs
   ]);
-  const profiles = (yield* findBrowseProfiles(env, platform, true)).filter(({ browser: name }) => name === browser.name);
+  const profiles = yield* browserProfiles(env, browser.name, platform);
   const enabled = profiles.filter(({ extension }) => extension === "enabled");
-  const profile = enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
-  if (profile === undefined && profiles.length > 1)
+  const profile = pinnedProfile !== undefined ? profiles.find(({ profile: name }) => name === pinnedProfile) : enabled.length === 1 ? enabled[0] : profiles.length === 1 ? profiles[0] : undefined;
+  if (pinnedProfile === undefined && profile === undefined && profiles.length > 1)
     return yield* failure(`${browser.name} has multiple possible profiles. Open the extension's Options in the intended profile and pair manually.`);
-  if (profile !== undefined && (!safeProfile(profile.profile) || profile.profile === ""))
+  const profileName = profile?.profile ?? pinnedProfile ?? "Default";
+  if (!safeProfile(profileName) || profileName === "")
     return yield* failure("the detected profile cannot be opened safely; open it manually");
   if (profile?.extension === "enabled" && !isKnownExtension(profile.extensionId))
     return yield* failure("the detected extension cannot be opened safely; use its Options manually");
@@ -30809,8 +31158,8 @@ var planTerminalBrowse = fn2("planTerminalBrowse")(function* (env, cwd, requeste
     name: browser.name,
     executable,
     executableIdentity,
+    profile: profileName,
     next: profile?.extension === "enabled" ? "pair" : profile?.extension === "disabled" ? "disabled" : "extension",
-    ...profile === undefined ? {} : { profile: profile.profile },
     ...profile?.extensionId === undefined ? {} : { extensionId: profile.extensionId }
   };
 });
@@ -30826,7 +31175,7 @@ var livePair = (command, args, { cwd, env }) => scoped2(gen2(function* () {
   if (batch?.ok === false)
     return 127;
   const windowsRoot = Object.entries(env).find(([name, value]) => /^(systemroot|windir)$/i.test(name) && value !== undefined)?.[1];
-  const application = batch?.ok !== true ? resolved : windowsRoot !== undefined && /^[a-z]:[/\\]/i.test(windowsRoot) ? win327.join(windowsRoot, "System32", "cmd.exe") : undefined;
+  const application = batch?.ok !== true ? resolved : windowsRoot !== undefined && /^[a-z]:[/\\]/i.test(windowsRoot) ? win328.join(windowsRoot, "System32", "cmd.exe") : undefined;
   if (application === undefined)
     return 127;
   const child = yield* acquireRelease2(try_2({
@@ -30863,45 +31212,77 @@ var liveBrowseDesktop = {
       return yield* failure("the selected browser quit before opening Browse");
   }),
   pair: livePair,
-  probeRelay: browseRelaySafe
+  probeRelay: browseRelaySafe,
+  signals: liveHost.signals
 };
-var label3 = (plan) => plan.profile === undefined ? plan.name : `${plan.name}, ${plan.profile}`;
-var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoot, requested, expected, notify, host = liveBrowseDesktop) {
+var label3 = (plan) => `${plan.name}, ${plan.profile}`;
+var waitForInstall = (env, target, host, wait) => scoped2(gen2(function* () {
+  const received = yield* host.signals ?? succeed6(never2);
+  const check = gen2(function* () {
+    while (true) {
+      const installed = (yield* browserProfiles(env, target.name)).find(({ profile, extension }) => profile === target.profile && extension === "enabled");
+      if (isKnownExtension(installed?.extensionId))
+        return installed.extensionId;
+      yield* sleep2(wait.intervalMs ?? PROFILE_CHECK_MS);
+    }
+  });
+  return yield* raceFirst2(check.pipe(timeoutOption2(wait.timeoutMs ?? INSTALL_WAIT_MS)), received.pipe(as2("cancelled")));
+}));
+var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoot, requested, expected, notify, host = liveBrowseDesktop, wait = {}) {
   const shell = yield* Shell;
   const checkLocalRelay = checkLocalBrowseRelay(env, host.probeRelay ?? (() => succeed6(true)));
-  const check = gen2(function* () {
-    const current = yield* planTerminalBrowse(env, cwd, requested);
-    if (JSON.stringify(current) !== JSON.stringify(expected))
+  const check = (snapshot, pin) => gen2(function* () {
+    const current = yield* planTerminalBrowse(env, cwd, requested, process.platform, pin ? snapshot.profile : undefined);
+    if (JSON.stringify(current) !== JSON.stringify(snapshot))
       return yield* failure("the browser or selected profile changed; run setup again");
   });
   const profile = label3(expected);
-  const open = (url) => host.open(expected.executable, [...expected.profile === undefined ? [] : [`--profile-directory=${expected.profile}`], url], {
+  const kept = `existing pairings were kept. Setup did not verify a connection for ${profile}.`;
+  const open = (url) => host.open(expected.executable, [`--profile-directory=${expected.profile}`, url], {
     cwd: homeDirectory2(env),
     env
   });
   const report = yield* gen2(function* () {
-    yield* check;
+    yield* check(expected, false);
     if (expected.next === "disabled")
       return pending(`extension is disabled in ${profile}. Enable it in the browser and rerun setup.`);
-    if (expected.next === "extension") {
+    yield* checkLocalRelay;
+    if (!wait.reopenPaired && (yield* readBrowsePairing(env)).state === "paired")
+      return pending(kept);
+    const ready = yield* gen2(function* () {
+      if (expected.next !== "extension")
+        return expected;
       yield* open(BROWSE_EXTENSION_STORE);
-      return pending(`opened the official extension store in ${profile}. Installation and pairing are pending. Add the extension, then rerun setup.`);
-    }
-    if (!isKnownExtension(expected.extensionId))
+      yield* notify(`${NAME2}: add the official extension in ${profile}. Setup will wait for it, then pair. Ctrl+C stops waiting.`);
+      const installed = yield* waitForInstall(env, expected, host, wait);
+      if (installed === "cancelled")
+        return;
+      if (isNone2(installed))
+        return null;
+      return { ...expected, next: "pair", extensionId: installed.value };
+    });
+    if (ready === undefined)
+      return pending(`stopped waiting for installation in ${profile}. Pairing did not start. Rerun setup when ready.`);
+    if (ready === null)
+      return pending(`installation and pairing are pending in ${profile}. Setup did not confirm the extension. Add it in that profile, then rerun setup.`);
+    yield* check(ready, true);
+    if (!isKnownExtension(ready.extensionId))
       return yield* failure("unsupported extension");
-    const options = `chrome-extension://${expected.extensionId}/settings.html`;
+    const options = `chrome-extension://${ready.extensionId}/settings.html`;
     yield* checkLocalRelay;
     const pairing = yield* readBrowsePairing(env);
     if (pairing.state === "paired") {
+      if (!wait.reopenPaired)
+        return pending(kept);
       yield* open(options);
-      return pending(`opened extension Options in ${profile}. Existing pairings were kept. Setup did not verify a connection for this profile.`);
+      return pending(`opened extension Options in ${profile}; ${kept}`);
     }
     const plan = yield* planBrowse(env, packageRoot);
     if (plan.action === undefined || plan.next !== "pair")
       return yield* failure(`automatic pairing is not available. ${plan.state}`);
     let handoffFailure;
     const pair = (command, args, processOptions) => gen2(function* () {
-      yield* check;
+      yield* check(ready, true);
       yield* checkLocalRelay;
       if ((yield* readBrowsePairing(env)).state !== "unpaired")
         return yield* failure("pairing state changed; existing pairings were kept");
@@ -30921,7 +31302,7 @@ var runTerminalBrowse = fn2("runTerminalBrowse")(function* (env, cwd, packageRoo
         hint(`${NAME2}: Browse confirms code redemption, not which local profile received it.`)
       ]
     } : result;
-  }).pipe(timeoutOption2((WAIT_SECONDS + 55) * 1000), map4(getOrElse(() => failed4("handoff timed out; pairing was not confirmed"))), catchTag2("SetupFailure", ({ message }) => succeed6(failed4(message))));
+  }).pipe(timeoutOption2((WAIT_SECONDS + 55) * 1000 + (expected.next === "extension" ? wait.timeoutMs ?? INSTALL_WAIT_MS : 0)), map4(getOrElse(() => failed4("handoff timed out; pairing was not confirmed"))), catchTag2("SetupFailure", ({ message }) => succeed6(failed4(message))));
   return report;
 });
 
@@ -30938,7 +31319,7 @@ import {
   writeFile as writeFile7
 } from "fs/promises";
 import { tmpdir as tmpdir4 } from "os";
-import { basename as basename9, dirname as dirname16, isAbsolute as isAbsolute13, join as join34, posix as posix7, resolve as resolve14, win32 as win328 } from "path";
+import { basename as basename9, dirname as dirname16, isAbsolute as isAbsolute13, join as join34, posix as posix8, resolve as resolve14, win32 as win329 } from "path";
 
 var recover_work_default = `## Recover existing work
 
@@ -31202,7 +31583,7 @@ var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
   }
   return join34(yield* io2(ancestor, () => realpath8(ancestor)), ...suffix);
 });
-var inside = fn2("codexSetupPath")(function* (home, relativePath) {
+var inside2 = fn2("codexSetupPath")(function* (home, relativePath) {
   let path = home;
   const root = yield* statOptional(home);
   if (root !== undefined && !root.isDirectory())
@@ -31219,7 +31600,7 @@ var inside = fn2("codexSetupPath")(function* (home, relativePath) {
   return path;
 });
 var read2 = fn2("codexSetupRead")(function* (home, entry) {
-  const file = yield* inside(home, entry);
+  const file = yield* inside2(home, entry);
   const stat = yield* statOptional(file);
   if (stat === undefined)
     return;
@@ -31234,7 +31615,7 @@ var checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expecte
     for (let parent = dirname16(path);parent !== root; parent = dirname16(parent))
       directories.add(parent);
   for (const directory of directories) {
-    const absolute = yield* inside(home, directory);
+    const absolute = yield* inside2(home, directory);
     const stat = yield* statOptional(absolute);
     if (stat === undefined && !complete)
       continue;
@@ -31265,7 +31646,7 @@ var localMarketplacePath = (path, platform) => {
   if (path.split(platform === "win32" ? /[\\/]/ : "/").some((part) => part === "." || part === ".."))
     return;
   if (platform !== "win32")
-    return posix7.isAbsolute(path) ? posix7.normalize(path) : undefined;
+    return posix8.isAbsolute(path) ? posix8.normalize(path) : undefined;
   const extended = path.startsWith("\\\\?\\");
   if (extended && (path.includes("/") || path.slice(4).includes("\\\\")))
     return;
@@ -31274,7 +31655,7 @@ var localMarketplacePath = (path, platform) => {
     return;
   if (drivePath.slice(3).split("\\").some((part) => /[<>:"|?*]|[. ]$/u.test(part)))
     return;
-  return win328.normalize(drivePath);
+  return win329.normalize(drivePath);
 };
 var sameCodexMarketplacePath = (first, second, platform = process.platform) => {
   const a = localMarketplacePath(first, platform);
@@ -31301,7 +31682,7 @@ var priorMarketplaceProof = fn2("priorCodexMarketplaceProof")(function* (market)
   const expected = join34(oldHome, CODEX_STARTUP_MARKETPLACE);
   if (!sameCodexMarketplacePath(expected, market))
     return;
-  const prior = yield* resolvedLocalPath(yield* inside(oldHome, CODEX_STARTUP_MARKETPLACE));
+  const prior = yield* resolvedLocalPath(yield* inside2(oldHome, CODEX_STARTUP_MARKETPLACE));
   if (prior === undefined || !(yield* sameResolvedMarketplace(market, prior)))
     return;
   const snapshot = yield* read2(oldHome, receiptFile2);
@@ -31403,7 +31784,7 @@ var checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
 var store2 = fn2("writeOwnedCodexSetupFile")(function* (home, relativePath, expected, content) {
   if (expected === content)
     return;
-  const path = yield* inside(home, relativePath);
+  const path = yield* inside2(home, relativePath);
   yield* io2(path, () => mkdir12(dirname16(path), { recursive: true }));
   if ((yield* read2(home, relativePath)) !== expected)
     return yield* fail9(`Profile changed during setup: ${path}`);
@@ -31505,7 +31886,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
     path: join34(cache, path.slice(sourceRoot.length + 1)),
     content
   }));
-  const cached = yield* statOptional(yield* inside(home, cache));
+  const cached = yield* statOptional(yield* inside2(home, cache));
   if (cached !== undefined)
     yield* checkPluginTree(home, cache, expectedCache, true);
   const install = plugin.enabled !== true || cached === undefined;
@@ -31656,7 +32037,7 @@ var setupCodex = fn2("setupCodex")(function* (env, options) {
   })));
   return { ok: true, lines, fingerprint };
 });
-import { posix as posix8, win32 as win329 } from "path";
+import { posix as posix9, win32 as win3210 } from "path";
 var CODEX_BROWSER_GUIDE = "https://learn.chatgpt.com/docs/chrome-extension";
 var browserIds = ["chrome", "edge", "brave", "opera", "vivaldi"];
 var desktopPlatforms = ["darwin", "win32", "linux"];
@@ -31673,7 +32054,7 @@ var windowsDesktop = "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | "
 var windowsDrivePath = /^[a-z]:[\\/]/i;
 var powershell = (env) => {
   const root = firstNonEmpty2(env["SystemRoot"], env["SYSTEMROOT"], env["WINDIR"]);
-  return root !== undefined && windowsDrivePath.test(root) ? win329.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
+  return root !== undefined && windowsDrivePath.test(root) ? win3210.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined;
 };
 var powershellArgs = (command) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command];
 var versionText = decodeUnknownOption2(String5.check(isPattern2(/^\d[\w.+:~-]{0,63}$/)));
@@ -31696,9 +32077,9 @@ var detectDesktop = fn2("detectCodexDesktop")(function* (env, platform, cwd) {
     return result.exitCode === 0 && version !== undefined ? desktopEvidence(platform, version) : undefined;
   }
   if (platform === "darwin") {
-    for (const directory of ["/Applications", posix8.join(home, "Applications")]) {
+    for (const directory of ["/Applications", posix9.join(home, "Applications")]) {
       for (const app of ["ChatGPT.app", "Codex.app"]) {
-        const plist = posix8.join(directory, app, "Contents", "Info.plist");
+        const plist = posix9.join(directory, app, "Contents", "Info.plist");
         const read = (key) => shell.run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], input);
         const id = yield* read("CFBundleIdentifier");
         if (id.exitCode !== 0 || id.stdout.trim() !== "com.openai.codex")
@@ -31729,7 +32110,7 @@ var nonlocal = (env, platform) => {
     return "Use the native desktop outside WSL to connect your browser.";
   return hasDisplay(env, platform) ? undefined : "No local desktop display was detected.";
 };
-var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix8.isAbsolute(executable));
+var browserPath = (executable, platform) => executable !== undefined && (platform === "win32" ? windowsDrivePath.test(executable) && executable.toLowerCase().endsWith(".exe") : posix9.isAbsolute(executable));
 var steps = [
   "Update the ChatGPT desktop app. Find your browser in Settings > Computer Use, under More browsers if needed.",
   "Follow any plugin prompt. Use Install to open the extension store and review the permission prompts there.",
@@ -32388,7 +32769,7 @@ var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) 
 });
 var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]";
 var CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]";
-var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--open-browse [--browse-browser <id>]]");
+var PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive] [--browse-browser <id>]");
 var CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--form headless|normal] [--dry-run] [--non-interactive]";
 var PublicManifest = Struct({ name: Literal2("holyagent"), version: String5 });
 var codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan, managedInstructions) => gen2(function* () {
@@ -32553,21 +32934,16 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       };
       const capabilities = yield* capabilitySwitches(args, usage);
       const form = yield* formOf(args, env, usage);
-      const openBrowse = surface === "public" && target === "pi" && booleanFlag(args, "open-browse");
+      const openBrowse = surface === "public" && target === "pi" && booleanFlag(args, "no-tui") && capabilities.browserUse === true;
       const browseBrowser = stringFlag(args, "browse-browser");
-      if (browseBrowser !== undefined && !openBrowse)
+      if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
         return yield* new Usage({
-          message: "--browse-browser requires --open-browse",
-          hint: `Usage: holyagent ${usage}`
-        });
-      if (openBrowse && (!booleanFlag(args, "no-tui") || capabilities.browserUse !== true))
-        return yield* new Usage({
-          message: "--open-browse requires --no-tui and --browser-use on",
+          message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
           hint: `Usage: holyagent ${usage}`
         });
       if (openBrowse && stringFlag(args, "browser-executable") !== undefined)
         return yield* new Usage({
-          message: "--open-browse selects a detected browser by id, not --browser-executable",
+          message: "Terminal Browse selects a detected browser by id, not --browser-executable",
           hint: `Usage: holyagent ${usage}`
         });
       const browseUnavailable = openBrowse ? terminalBrowseUnavailable(env, {
@@ -32583,6 +32959,12 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         });
       const apply = (choices, chosen, notes = [], selected) => gen2(function* () {
         const selectedTarget = selected?.target ?? target;
+        const devicePreparation = selected === undefined && surface === "public" && selectedTarget === "pi" && resolved.scope === "user" && booleanFlag(args, "no-tui") && choices.deviceAccess === true && !booleanFlag(args, "undo") ? terminalBrowseUnavailable(env, {
+          terminal,
+          form,
+          dryRun: booleanFlag(args, "dry-run"),
+          nonInteractive: booleanFlag(args, "non-interactive")
+        }) === undefined ? "apply" : "preview" : undefined;
         const report = yield* setup2(coreContext2(cwd, env), {
           scope: resolved.scope,
           ...selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget },
@@ -32594,6 +32976,8 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
           skipCtx7: selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
           ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
           ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
+          ...devicePreparation === undefined ? {} : { devicePreparation },
+          ...openBrowse && browseUnavailable === undefined && selected === undefined ? { desktopBrowseHandoff: true } : {},
           capabilities: selectedTarget === "claude" ? {} : chosen,
           ...selectedTarget === "claude" || choices.piProviders === undefined ? {} : { piProviders: choices.piProviders },
           form
@@ -32685,23 +33069,22 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
             });
         }
       }
-      const terminalBrowse = openBrowse && browseUnavailable === undefined ? yield* gen2(function* () {
-        const config = yield* loadPiConfig(env, cwd, resolved.scope, capabilities);
-        if (!(yield* piInUse(env)) || !config.pi.enable || !config.pi.features.mcp)
-          return yield* new SetupFailure({
-            message: "desktop Browse requires an enabled Pi installation and MCP"
-          });
-        return yield* planTerminalBrowse(env, cwd, browseBrowser);
-      }).pipe(catchTag2("SetupFailure", (error) => succeed6(error))) : undefined;
-      if (terminalBrowse instanceof SetupFailure)
-        return printed({ ok: false, lines: [`! OpenCode Browse: ${terminalBrowse.message}`] });
       const report = yield* apply(flagged, capabilities, [
         ...interactive.notes,
         ...browseUnavailable === undefined ? [] : [hint(`OpenCode Browse: ${browseUnavailable}`)]
       ]);
-      if (!report.ok || terminalBrowse === undefined)
+      if (!report.ok || !openBrowse || browseUnavailable !== undefined)
         return printed(report);
-      const handoff = yield* runTerminalBrowse(env, cwd, installedPackageRoot, browseBrowser, terminalBrowse, emit).pipe(provide3(Shell.live(env)));
+      const handoff = yield* gen2(function* () {
+        const config = yield* loadPiConfig(env, cwd, resolved.scope);
+        if (!(yield* piInUse(env)) || !config.pi.enable || !config.pi.features.mcp || !config.pi.features.browserUse)
+          return yield* new SetupFailure({
+            message: "enable Pi, MCP and Browser Use before running the desktop handoff"
+          });
+        const plan = yield* planTerminalBrowse(env, cwd, browseBrowser);
+        return yield* runTerminalBrowse(env, cwd, installedPackageRoot, browseBrowser, plan, (line) => emit(`${line.trimEnd()}
+`), undefined, { reopenPaired: booleanFlag(args, "open-browse") });
+      }).pipe(catchTag2("SetupFailure", ({ message }) => succeed6({ ok: true, lines: [hint(`OpenCode Browse pending: ${message}`)] })), provide3(Shell.live(env)));
       return printed({ ok: handoff.ok, lines: [...report.lines, ...handoff.lines] });
     }).pipe(provide3(shellLive(env)))
   };
@@ -32767,7 +33150,8 @@ var publicPiSetup = (target) => {
       "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
       "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
       ...target === "pi" ? [
-        "In a local graphical terminal, --no-tui --browser-use on --open-browse opens Browse in one compatible browser. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Installation and pairing require your action in the browser."
+        "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. The former --open-browse flag is accepted but not needed.",
+        "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode."
       ] : []
     ]
   };
@@ -33193,7 +33577,7 @@ var readAgentReport = (path) => gen2(function* () {
   if (!file.isFile() || (yield* aliasesStdin(file)))
     return yield* fail();
   return yield* acquireUseRelease2(tryPromise2({
-    try: () => open8(path, constants7.O_RDONLY | constants7.O_NONBLOCK),
+    try: () => open8(path, constants8.O_RDONLY | constants8.O_NONBLOCK),
     catch: fail
   }), (handle) => gen2(function* () {
     const opened = yield* tryPromise2({ try: () => handle.stat(), catch: fail });

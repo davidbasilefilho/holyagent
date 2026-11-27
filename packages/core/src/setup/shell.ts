@@ -255,7 +255,7 @@ export class Shell extends Context.Service<
     readonly run: (
       command: string,
       args: ReadonlyArray<string>,
-      options: { readonly cwd: string; readonly env?: Env },
+      options: { readonly cwd: string; readonly env?: Env; readonly stdin?: "closed" },
     ) => Effect.Effect<ShellResult>
   }
 >()("holyagent/Shell") {

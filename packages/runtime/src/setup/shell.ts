@@ -7,7 +7,7 @@ import { Effect, Layer } from "effect"
 import { findCommand, pathWithBunBin, Shell } from "../../../core/src/setup/shell.ts"
 import { definedEnv, type Env, homeDirectory } from "./environment.ts"
 
-/** Supplies the CLI's Bun-backed process adapter to shared setup operations. */
+/** Supplies Bun Shell for normal setup and a cancellable, closed input for device installers. */
 export const shellLive = (env: Env) => {
   const bunBin = pathWithBunBin(
     { ...env },
@@ -18,22 +18,28 @@ export const shellLive = (env: Env) => {
     Shell.of({
       which: (command, options) => Effect.sync(() => findCommand(env, command, options, Bun.which)),
       run: (command, args, options) =>
-        Effect.tryPromise({
-          try: () =>
-            $`${command} ${args}`
-              .cwd(options.cwd)
-              .env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value }))
-              .quiet()
-              .nothrow()
-              .then((result) => ({
-                exitCode: result.exitCode,
-                stdout: result.stdout.toString(),
-                stderr: result.stderr.toString(),
-              })),
-          catch: (error) => String(error),
-        }).pipe(
-          Effect.catch((message) => Effect.succeed({ exitCode: 127, stdout: "", stderr: message })),
-        ),
+        options.stdin === "closed"
+          ? Effect.flatMap(Shell, (native) => native.run(command, args, options)).pipe(
+              Effect.provide(Shell.live(env)),
+            )
+          : Effect.tryPromise({
+              try: () =>
+                $`${command} ${args}`
+                  .cwd(options.cwd)
+                  .env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value }))
+                  .quiet()
+                  .nothrow()
+                  .then((result) => ({
+                    exitCode: result.exitCode,
+                    stdout: result.stdout.toString(),
+                    stderr: result.stderr.toString(),
+                  })),
+              catch: (error) => String(error),
+            }).pipe(
+              Effect.catch((message) =>
+                Effect.succeed({ exitCode: 127, stdout: "", stderr: message }),
+              ),
+            ),
     }),
   )
 }

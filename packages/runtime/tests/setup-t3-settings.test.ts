@@ -93,6 +93,8 @@ const runSetup = (
     t3Workflow?: boolean
     undo?: boolean
     shell?: ReturnType<typeof fakeShell>
+    deviceAccess?: boolean
+    devicePreparation?: "preview" | "apply"
   } = {},
 ) =>
   Effect.runPromise(
@@ -104,6 +106,10 @@ const runSetup = (
       skipCtx7: true,
       t3Workflow: extra.t3Workflow ?? false,
       undo: extra.undo ?? false,
+      ...(extra.deviceAccess === undefined ? {} : { deviceAccess: extra.deviceAccess }),
+      ...(extra.devicePreparation === undefined
+        ? {}
+        : { devicePreparation: extra.devicePreparation }),
     }).pipe(Effect.provide((extra.shell ?? withPi()).layer)),
   )
 
@@ -419,6 +425,66 @@ describe("T3 settings, device access", () => {
     expect(written).not.toHaveProperty("enableAgentDeviceAccess")
     expect(written).toMatchObject(PROVIDER)
     expect(t3Lines(report)[0]).toContain("device access left out: no Xcode or Android SDK found")
+  })
+
+  test("screenless preparation does not enable a simulator from an empty SDK directory", async () => {
+    await machine()
+    const lines = await install({ dryRun: false, deviceAccess: true, deviceReadiness: null })
+    expect(lines.join("\n")).toContain("simulator readiness was not verified")
+    expect(await read(settingsFile())).toMatchObject(PROVIDER)
+    expect(await read(settingsFile())).not.toHaveProperty("enableAgentDeviceAccess")
+    // The probe's negative result is not permission to remove an existing user setting.
+    await write(settingsFile(), { ...PROVIDER, ...DEVICES })
+    await install({ dryRun: false, deviceAccess: true, deviceReadiness: null })
+    expect(await read(settingsFile())).toMatchObject(DEVICES)
+  })
+
+  test("screenless setup can enable verified simulator readiness without legacy path guessing", async () => {
+    await machine({ sdk: false })
+    const options = { deviceAccess: true, deviceReadiness: "verified local Android AVD" } as const
+    await install({ ...options, dryRun: true })
+    expect(await exists(settingsFile())).toBe(false)
+    await install({ ...options, dryRun: false })
+    expect(await read(settingsFile())).toMatchObject(DEVICES)
+  })
+
+  test("the screenless device phase keeps its unverified result through T3 setup", async () => {
+    await machine()
+    const shell = withPi()
+    const preview = await runSetup({
+      t3Workflow: true,
+      dryRun: true,
+      deviceAccess: true,
+      devicePreparation: "apply",
+      shell,
+    })
+    expect(t3Lines(preview)[0]).toContain("simulator readiness was not verified")
+    expect(await exists(settingsFile())).toBe(false)
+    expect(
+      shell.lines().some((line) => /(?:sdkmanager|xcodebuild|simctl|emulator).*install/.test(line)),
+    ).toBe(false)
+  })
+
+  test("screenless opt-in never overrides existing T3 opt-outs or prepares against corrupt settings", async () => {
+    await machine()
+    const options = { t3Workflow: true, deviceAccess: true, devicePreparation: "apply" } as const
+    for (const flag of ["enableDeviceSupport", "enableAgentDeviceAccess"]) {
+      await write(settingsFile(), { [flag]: false })
+      const result = await runSetup(options)
+      expect(result.lines.join("\n")).toContain(`${flag} setting is not enabled`)
+      expect(await read(settingsFile())).toMatchObject({ [flag]: false })
+      expect(await read(settingsFile())).not.toHaveProperty(
+        flag === "enableDeviceSupport" ? "enableAgentDeviceAccess" : "enableDeviceSupport",
+      )
+    }
+    const corrupt = "{not-json"
+    await write(settingsFile(), corrupt)
+    const result = await runSetup(options)
+    expect(result.ok).toBe(false)
+    expect(result.lines.join("\n")).toContain(
+      "not prepared because T3 Code settings could not be read",
+    )
+    expect(await readText(settingsFile())).toBe(corrupt)
   })
 
   test("is written where Xcode's iOS simulator platform is found on macOS only", async () => {

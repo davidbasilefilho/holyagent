@@ -87,7 +87,7 @@ const CLAUDE_USAGE =
   "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]"
 const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace(
   "[--no-tui]",
-  "[--no-tui|--non-interactive] [--open-browse [--browse-browser <id>]]",
+  "[--no-tui|--non-interactive] [--browse-browser <id>]",
 )
 
 const CODEX_USAGE =
@@ -344,21 +344,19 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         const capabilities = yield* capabilitySwitches(args, usage)
         const form = yield* formOf(args, env, usage)
         const openBrowse =
-          surface === "public" && target === "pi" && booleanFlag(args, "open-browse")
+          surface === "public" &&
+          target === "pi" &&
+          booleanFlag(args, "no-tui") &&
+          capabilities.browserUse === true
         const browseBrowser = stringFlag(args, "browse-browser")
-        if (browseBrowser !== undefined && !openBrowse)
+        if ((booleanFlag(args, "open-browse") || browseBrowser !== undefined) && !openBrowse)
           return yield* new Usage({
-            message: "--browse-browser requires --open-browse",
-            hint: `Usage: holyagent ${usage}`,
-          })
-        if (openBrowse && (!booleanFlag(args, "no-tui") || capabilities.browserUse !== true))
-          return yield* new Usage({
-            message: "--open-browse requires --no-tui and --browser-use on",
+            message: "--browse-browser and --open-browse require --no-tui and --browser-use on",
             hint: `Usage: holyagent ${usage}`,
           })
         if (openBrowse && stringFlag(args, "browser-executable") !== undefined)
           return yield* new Usage({
-            message: "--open-browse selects a detected browser by id, not --browser-executable",
+            message: "Terminal Browse selects a detected browser by id, not --browser-executable",
             hint: `Usage: holyagent ${usage}`,
           })
         const browseUnavailable = openBrowse
@@ -394,6 +392,23 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         ) =>
           Effect.gen(function* () {
             const selectedTarget = selected?.target ?? target
+            const devicePreparation =
+              selected === undefined &&
+              surface === "public" &&
+              selectedTarget === "pi" &&
+              resolved.scope === "user" &&
+              booleanFlag(args, "no-tui") &&
+              choices.deviceAccess === true &&
+              !booleanFlag(args, "undo")
+                ? terminalBrowseUnavailable(env, {
+                    terminal,
+                    form,
+                    dryRun: booleanFlag(args, "dry-run"),
+                    nonInteractive: booleanFlag(args, "non-interactive"),
+                  }) === undefined
+                  ? "apply"
+                  : "preview"
+                : undefined
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
               ...(selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget }),
@@ -410,6 +425,10 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                 selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
+              ...(devicePreparation === undefined ? {} : { devicePreparation }),
+              ...(openBrowse && browseUnavailable === undefined && selected === undefined
+                ? { desktopBrowseHandoff: true }
+                : {}),
               capabilities: selectedTarget === "claude" ? {} : chosen,
               ...(selectedTarget === "claude" || choices.piProviders === undefined
                 ? {}
@@ -555,34 +574,41 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
               })
           }
         }
-        const terminalBrowse =
-          openBrowse && browseUnavailable === undefined
-            ? yield* Effect.gen(function* () {
-                const config = yield* loadPiConfig(env, cwd, resolved.scope, capabilities)
-                if (!(yield* piInUse(env)) || !config.pi.enable || !config.pi.features.mcp)
-                  return yield* new SetupFailure({
-                    message: "desktop Browse requires an enabled Pi installation and MCP",
-                  })
-                return yield* planTerminalBrowse(env, cwd, browseBrowser)
-              }).pipe(Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)))
-            : undefined
-        if (terminalBrowse instanceof SetupFailure)
-          return printed({ ok: false, lines: [`! OpenCode Browse: ${terminalBrowse.message}`] })
         const report = yield* apply(flagged, capabilities, [
           ...interactive.notes,
           ...(browseUnavailable === undefined
             ? []
             : [hint(`OpenCode Browse: ${browseUnavailable}`)]),
         ])
-        if (!report.ok || terminalBrowse === undefined) return printed(report)
-        const handoff = yield* runTerminalBrowse(
-          env,
-          cwd,
-          installedPackageRoot,
-          browseBrowser,
-          terminalBrowse,
-          emit,
-        ).pipe(Effect.provide(Shell.live(env)))
+        if (!report.ok || !openBrowse || browseUnavailable !== undefined) return printed(report)
+        const handoff = yield* Effect.gen(function* () {
+          const config = yield* loadPiConfig(env, cwd, resolved.scope)
+          if (
+            !(yield* piInUse(env)) ||
+            !config.pi.enable ||
+            !config.pi.features.mcp ||
+            !config.pi.features.browserUse
+          )
+            return yield* new SetupFailure({
+              message: "enable Pi, MCP and Browser Use before running the desktop handoff",
+            })
+          const plan = yield* planTerminalBrowse(env, cwd, browseBrowser)
+          return yield* runTerminalBrowse(
+            env,
+            cwd,
+            installedPackageRoot,
+            browseBrowser,
+            plan,
+            (line) => emit(`${line.trimEnd()}\n`),
+            undefined,
+            { reopenPaired: booleanFlag(args, "open-browse") },
+          )
+        }).pipe(
+          Effect.catchTag("SetupFailure", ({ message }) =>
+            Effect.succeed({ ok: true, lines: [hint(`OpenCode Browse pending: ${message}`)] }),
+          ),
+          Effect.provide(Shell.live(env)),
+        )
         return printed({ ok: handoff.ok, lines: [...report.lines, ...handoff.lines] })
       }).pipe(Effect.provide(shellLive(env))),
   }
@@ -667,7 +693,8 @@ const publicPiSetup = (target?: "pi"): Command => {
       "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
       ...(target === "pi"
         ? [
-            "In a local graphical terminal, --no-tui --browser-use on --open-browse opens Browse in one compatible browser. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Installation and pairing require your action in the browser.",
+            "In a local graphical terminal, --no-tui --browser-use on opens Browse after Pi setup. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Setup waits briefly for you to install the extension, then starts pairing. The former --open-browse flag is accepted but not needed.",
+            "Local user setup with --no-tui --device-access on prepares T3 Device Simulator tools. It can use installed official Android tooling without stdin. Android SDK, emulator, and full Xcode readiness are reported separately. Missing licenses, first launch, or App Store actions are left to you. No installer runs in preview or strict unattended mode.",
           ]
         : []),
     ],
