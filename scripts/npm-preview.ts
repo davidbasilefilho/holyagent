@@ -105,8 +105,8 @@ const reviewAllows = (pull: Pull, reviewers: ReadonlySet<string>) => {
   )
 }
 
-const inScope = (pull: Pull) => pull.open && (pull.base === "main" || pull.base === "dev")
 const eligible = (pull: Pull, source: string, reviewers: ReadonlySet<string>) =>
+  (pull.base === "main" || pull.base === "dev") &&
   !pull.draft &&
   pull.sameRepository &&
   pull.head !== pull.base &&
@@ -150,7 +150,7 @@ export const planPreview = (input: unknown): Effect.Effect<PreviewPlan, PreviewB
 
     const desired = new Map<string, string>()
     // Rank open heads even if we could not publish one. Do not quietly substitute an older PR.
-    const selection = s.candidates.filter(inScope).toSorted(rank)
+    const selection = s.candidates.filter(({ open }) => open).toSorted(rank)
     const candidates: PreviewPlan["candidates"][number][] = []
     for (const pull of selection) {
       if (!eligible(pull, s.source.sha, reviewers)) {

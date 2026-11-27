@@ -122,7 +122,7 @@ describe("packed npm publication", () => {
           return Promise.resolve(github.shift() ?? new Response("", { status: 500 }))
         }
         const result = await Effect.runPromiseExit(
-          publishArtifact(path, tag, context, run, request),
+          publishArtifact(path, tag, context, run, request, Effect.void),
         )
         return { result, calls, urls }
       }
@@ -177,6 +177,12 @@ describe("packed npm publication", () => {
         expect(Exit.isFailure(result.result)).toBe(true)
         expect(result.calls.map(([command]) => command)).toEqual(["view", "publish"])
       }
+      const propagated = await exercise(
+        [...absent(), devHead(), devTag("previous"), devHead(), devTag(), devHead()],
+        [missing, ok()],
+      )
+      expect(Exit.isSuccess(propagated.result)).toBe(true)
+      expect(propagated.calls.map(([command]) => command)).toEqual(["view", "publish"])
       for (const github of [
         [new Response("{}"), object("commit", other)],
         [new Response("{}"), object("tag", other), object("commit", other)],

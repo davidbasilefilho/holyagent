@@ -3,6 +3,7 @@ import { expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import { executePreview, type PreviewExecution } from "./npm-preview-execute.ts"
+import { previewTagArgs, reconcilePreviews } from "./npm-preview-publisher.ts"
 import { type PreviewEvidence, previewVersion } from "./npm-preview.ts"
 
 const head = "1".repeat(40)
@@ -162,4 +163,38 @@ test("a failed or misdirected registry write is reported rather than retried or 
     _tag: "PreviewBlocked",
   })
   expect(x.observed().tags["pr-172"]).toBeUndefined()
+})
+
+test("the reconciler stages first, promotes both channels, then cleans only its temporary tag", async () => {
+  const x = fixture()
+  const current = await Effect.runPromise(reconcilePreviews(x.io))
+  expect(current.changes).toEqual([])
+  expect(x.calls).toEqual([
+    `pack 172 ${head} ${time}`,
+    `publish ${version}`,
+    "tag pr-172",
+    "tag pr",
+    `tag pr-staged-172-${head}`,
+  ])
+  expect(x.observed().tags).toEqual({
+    latest: "0.3.4",
+    dev: "0.4.0-dev.1",
+    "pr-172": version,
+    pr: version,
+  })
+  const steady = [...x.calls]
+  await Effect.runPromise(reconcilePreviews(x.io))
+  expect(x.calls).toEqual(steady)
+})
+
+test("no npm command can address dev/latest or a stage not owning that immutable version", () => {
+  for (const name of ["dev", "latest", "pr-171", `pr-staged-171-${head}`, "--registry"]) {
+    expect(previewTagArgs({ op: "add", tag: name, version })).toBeUndefined()
+  }
+  for (const name of ["dev", "latest", `pr-staged-171-${head}`, "--registry"]) {
+    expect(previewTagArgs({ op: "remove", tag: name, previous: version })).toBeUndefined()
+  }
+  expect(previewTagArgs({ op: "remove", tag: `pr-staged-172-${head}`, previous: version })).toEqual(
+    ["dist-tag", "rm", "holyagent", `pr-staged-172-${head}`],
+  )
 })

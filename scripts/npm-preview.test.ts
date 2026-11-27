@@ -3,7 +3,11 @@ import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import { comparePreviewControls, packPreview, previewTree } from "./npm-preview-archive.ts"
-import { readPreviewEvidence, readPreviewPlan } from "./npm-preview-live.ts"
+import {
+  type PreviewConfirmation,
+  readPreviewEvidence,
+  readPreviewPlan,
+} from "./npm-preview-live.ts"
 import { planPreview, previewVersion, verifyPreviewTransition } from "./npm-preview.ts"
 
 const head = "1".repeat(40)
@@ -65,6 +69,7 @@ describe("preview channel evidence", () => {
   test("does not promote an older ready preview when latest HEAD is not eligible or ready", async () => {
     for (const top of [
       { ...first(), sameRepository: false },
+      { ...first(), base: "unprotected/topic" },
       { ...first(), draft: true },
       { ...first(), reviews: [] },
       { ...first(), controls: { source: policy, sha: head, unchanged: false } },
@@ -227,6 +232,9 @@ test("live read binds a reviewed HEAD and workflow attempt, but a newer fork sti
   let moved = false
   let listReads = 0
   let attempt = ""
+  let runAttempt = 2
+  let reviewState = "APPROVED"
+  let confirm: PreviewConfirmation | undefined
   const request = (url: string, init: RequestInit) => {
     const path = new URL(url).pathname
     const headers = new Headers(init.headers)
@@ -246,36 +254,37 @@ test("live read binds a reviewed HEAD and workflow attempt, but a newer fork sti
     auth.push(path)
     if (path.endsWith("/branches/dev"))
       return json({ name: "dev", protected: true, commit: { sha: source } })
-    if (path.endsWith("/pulls")) {
-      listReads++
+    if (path.endsWith("/pulls") || path.endsWith("/pulls/1")) {
+      if (path.endsWith("/pulls")) listReads++
       const row = {
         state: "open",
         draft: false,
         user: { login: "writer" },
         base: { ref: "dev", sha: source, repo: { id: 10 } },
       }
-      return json([
+      const rows = [
         { ...row, number: 1, head: { ref: "approved/pr", sha: source, repo: { id: 10 } } },
         {
           ...row,
           number: 2,
           head: { ref: "fork/pr", sha: moved && listReads === 2 ? prior : head, repo: { id: 20 } },
         },
-      ])
+      ]
+      return json(path.endsWith("/pulls/1") ? rows[0] : rows)
     }
     if (path.endsWith(`/git/commits/${source}`))
       return json({ sha: source, committer: { date: utc } })
     if (path.endsWith(`/git/commits/${head}`))
       return json({ sha: head, committer: { date: "2099-01-01T00:00:00Z" } })
     if (path.endsWith("/pulls/1/reviews"))
-      return json([{ user: { login: "maintainer" }, commit_id: source, state: "APPROVED" }])
+      return json([{ user: { login: "maintainer" }, commit_id: source, state: reviewState }])
     if (path.endsWith("/actions/workflows/validation.yml/runs"))
       return json({
         total_count: 1,
         workflow_runs: [
           {
             id: 51,
-            run_attempt: 2,
+            run_attempt: runAttempt,
             path: ".github/workflows/validation.yml",
             event: "pull_request",
             head_branch: "approved/pr",
@@ -302,7 +311,16 @@ test("live read binds a reviewed HEAD and workflow attempt, but a newer fork sti
     throw new Error(`Unexpected request: ${path}`)
   }
   const raw = await Effect.runPromise(
-    readPreviewEvidence(process.cwd(), ["maintainer"], "test-token", request),
+    readPreviewEvidence(
+      process.cwd(),
+      ["maintainer"],
+      "test-token",
+      request,
+      undefined,
+      (verify) => {
+        confirm = verify
+      },
+    ),
   )
   expect(raw.candidates.find((pull) => pull.number === 1)).toMatchObject({
     sha: source,
@@ -321,6 +339,20 @@ test("live read binds a reviewed HEAD and workflow attempt, but a newer fork sti
   ])
   expect(attempt).toEndWith("/actions/runs/51/attempts/2/jobs")
   expect(auth.some((url) => url.endsWith("/pulls/2/reviews"))).toBe(false)
+  if (!confirm) throw new Error("Missing write confirmation")
+  await Effect.runPromise(confirm(1, source, false))
+  await expect(Effect.runPromise(confirm(1, source, true))).rejects.toMatchObject({
+    detail: expect.stringContaining("not the global winner"),
+  })
+  runAttempt = 3
+  await expect(Effect.runPromise(confirm(1, source, false))).rejects.toMatchObject({
+    detail: expect.stringContaining("attempt changed"),
+  })
+  reviewState = "DISMISSED"
+  await expect(Effect.runPromise(confirm(1, source, false))).rejects.toMatchObject({
+    detail: expect.stringContaining("no longer has independent approval"),
+  })
+  reviewState = "APPROVED"
   moved = true
   listReads = 0
   expect(

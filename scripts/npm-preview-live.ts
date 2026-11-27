@@ -2,7 +2,12 @@ import { $ } from "bun"
 import { Console, Effect, Schema } from "effect"
 
 import { comparePreviewControls, packPreview } from "./npm-preview-archive.ts"
-import { parsePreviewEvidence, planPreview, PreviewBlocked } from "./npm-preview.ts"
+import {
+  parsePreviewEvidence,
+  planPreview,
+  PreviewBlocked,
+  type PreviewEvidence,
+} from "./npm-preview.ts"
 
 const repo = "davidbasilefilho/holyagent"
 const github = `https://api.github.com/repos/${repo}/`
@@ -107,6 +112,13 @@ const approved = (
   )
 }
 
+/** Recheck the chosen operation after the full read; no caller-supplied approval. */
+export type PreviewConfirmation = (
+  number: number,
+  head: string,
+  global: boolean,
+) => Effect.Effect<void, PreviewBlocked>
+
 /**
  * Read only public npm and GitHub metadata and local exact Git objects; never fetch or execute
  * candidate source.
@@ -116,6 +128,8 @@ export const readPreviewEvidence = (
   reviewers: readonly string[],
   token: string | undefined,
   request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+  obtain?: (number: number, head: string) => Effect.Effect<void, PreviewBlocked>,
+  setConfirmation?: (confirm: PreviewConfirmation) => void,
 ) =>
   Effect.tryPromise({
     try: async () => {
@@ -159,39 +173,7 @@ export const readPreviewEvidence = (
         .trim()
       if (!source.protected || source.commit.sha !== checkout)
         throw denied("Use a trusted checkout of the current protected dev SHA")
-      const candidates = []
-      for (const p of all.filter(({ base }) => base.ref === "main" || base.ref === "dev")) {
-        const commit = await git(`git/commits/${p.head.sha}`, GitCommit)
-        if (commit.sha !== p.head.sha) throw denied("GitHub returned a different PR HEAD")
-        const sameRepository = p.head.repo !== null && p.head.repo.id === p.base.repo?.id
-        const reviews =
-          !p.draft && sameRepository ? await paginate(`pulls/${p.number}/reviews?`, Review) : []
-        const candidate = {
-          number: p.number,
-          open: true,
-          draft: p.draft,
-          base: p.base.ref,
-          head: p.head.ref,
-          sameRepository,
-          author: p.user.login,
-          sha: p.head.sha,
-          committerUtc: commit.committer.date,
-          reviews: reviews.flatMap((review) =>
-            review.user && review.commit_id
-              ? [{ reviewer: review.user.login, state: review.state, sha: review.commit_id }]
-              : [],
-          ),
-          validation: { sha: p.head.sha, state: "pending" },
-        }
-        if (!approved(reviews, p.user.login, p.head.sha, trusted)) {
-          candidates.push(candidate)
-          continue
-        }
-        const controls = await Effect.runPromise(comparePreviewControls(root, checkout, p.head.sha))
-        if (!controls.unchanged) {
-          candidates.push({ ...candidate, controls })
-          continue
-        }
+      const validationOf = async (p: typeof Pull.Type) => {
         const runs = await git(
           `actions/workflows/validation.yml/runs?event=pull_request&head_sha=${p.head.sha}&per_page=100`,
           Runs,
@@ -213,7 +195,7 @@ export const readPreviewEvidence = (
               ),
           )
           .toSorted((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)[0]
-        let state = "pending"
+        let state: "pending" | "success" | "failure" = "pending"
         if (run?.status === "completed") {
           const jobs = await git(
             `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
@@ -241,6 +223,48 @@ export const readPreviewEvidence = (
               ? "success"
               : "failure"
         }
+        return { state, attempt: run ? `${run.id}:${run.run_attempt}` : null }
+      }
+      const confirmed = new Map<number, Awaited<ReturnType<typeof validationOf>>>()
+      const candidates: PreviewEvidence["candidates"][number][] = []
+      for (const p of all) {
+        const commit = await git(`git/commits/${p.head.sha}`, GitCommit)
+        if (commit.sha !== p.head.sha) throw denied("GitHub returned a different PR HEAD")
+        const sameRepository = p.head.repo !== null && p.head.repo.id === p.base.repo?.id
+        const reviews =
+          !p.draft && sameRepository && (p.base.ref === "main" || p.base.ref === "dev")
+            ? await paginate(`pulls/${p.number}/reviews?`, Review)
+            : []
+        const candidate: PreviewEvidence["candidates"][number] = {
+          number: p.number,
+          open: true,
+          draft: p.draft,
+          base: p.base.ref,
+          head: p.head.ref,
+          sameRepository,
+          author: p.user.login,
+          sha: p.head.sha,
+          committerUtc: commit.committer.date,
+          reviews: reviews.flatMap((review) =>
+            review.user && review.commit_id
+              ? [{ reviewer: review.user.login, state: review.state, sha: review.commit_id }]
+              : [],
+          ),
+          validation: { sha: p.head.sha, state: "pending" },
+        }
+        if (!approved(reviews, p.user.login, p.head.sha, trusted)) {
+          candidates.push(candidate)
+          continue
+        }
+        if (obtain) await Effect.runPromise(obtain(p.number, p.head.sha))
+        const controls = await Effect.runPromise(comparePreviewControls(root, checkout, p.head.sha))
+        if (!controls.unchanged) {
+          candidates.push({ ...candidate, controls })
+          continue
+        }
+        const validation = await validationOf(p)
+        const { state } = validation
+        confirmed.set(p.number, validation)
         const packed = await Effect.runPromise(
           packPreview(root, p.number, p.head.sha, commit.committer.date),
         )
@@ -258,7 +282,7 @@ export const readPreviewEvidence = (
         candidates.push({
           ...candidate,
           controls,
-          baseVersion: packed.version.split("-pr.")[0],
+          baseVersion: packed.version.slice(0, packed.version.indexOf("-pr.")),
           validation: { sha: p.head.sha, state },
           artifact: { sha: p.head.sha, expectedIntegrity: packed.integrity, registryIntegrity },
         })
@@ -275,6 +299,55 @@ export const readPreviewEvidence = (
       )
         throw denied("Protected dev or the open PR set moved during the evidence read")
       if (!tags.ok) throw denied("The public npm dist-tags could not be read")
+      if (setConfirmation)
+        setConfirmation((number, head, global) =>
+          Effect.tryPromise({
+            try: async () => {
+              const selected = all.find((p) => p.number === number && p.head.sha === head)
+              const observed = confirmed.get(number)
+              if (!selected || observed?.state !== "success")
+                throw denied("The target lacks exact reviewed validation")
+              if (global) {
+                const before = await Effect.runPromise(
+                  planPreview({
+                    repository: repo,
+                    source: { sha: current.commit.sha, checkout, protected: true },
+                    trustedReviewers: reviewers,
+                    complete: true,
+                    candidates,
+                    tags: {},
+                  }),
+                )
+                if (before.selected !== number)
+                  throw denied("The chosen head is not the global winner")
+              }
+              const [protectedDev, exact, newest] = await Promise.all([
+                git("branches/dev", Branch),
+                git(`pulls/${number}`, Pull),
+                global ? openPRs() : Promise.resolve(all),
+              ])
+              if (
+                !protectedDev.protected ||
+                protectedDev.commit.sha !== checkout ||
+                JSON.stringify(observedPRs([exact])) !== JSON.stringify(observedPRs([selected])) ||
+                JSON.stringify(observedPRs(newest)) !== JSON.stringify(observedPRs(all))
+              )
+                throw denied(
+                  "The protected source, selected PR, or global winner moved before the write",
+                )
+              const reviews = await paginate(`pulls/${number}/reviews?`, Review)
+              if (!approved(reviews, exact.user.login, head, trusted))
+                throw denied("The exact HEAD no longer has independent approval")
+              const now = await validationOf(exact)
+              if (now.state !== "success" || now.attempt !== observed.attempt)
+                throw denied("The approved validation attempt changed before the write")
+            },
+            catch: (cause) =>
+              cause instanceof PreviewBlocked
+                ? cause
+                : denied("Could not recheck the chosen preview immediately before the write"),
+          }),
+        )
       return {
         repository: repo,
         source: { sha: current.commit.sha, checkout, protected: current.protected },

@@ -211,6 +211,7 @@ export const publishArtifact = (
   context: TagContext,
   run: NpmRunner = npm,
   request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+  waitForReadback: Effect.Effect<void> = Effect.sleep("15 seconds"),
 ) =>
   Effect.gen(function* () {
     if (!path || !/^[a-z][a-z0-9-]*$/.test(tag))
@@ -257,8 +258,32 @@ export const publishArtifact = (
           detail: `npm publish failed: ${published.stderr || published.stdout}`,
         })
       if (tag === "dev") {
-        yield* checkDevReadback(manifest.name, manifest.version, request)
-        yield* currentProtectedDev(context, request)
+        const postcheck = currentProtectedDev(context, request).pipe(
+          Effect.mapError(
+            () =>
+              new PublishError({
+                detail:
+                  "npm publish already succeeded but the protected dev head could not be reconfirmed; inspect before retrying",
+              }),
+          ),
+        )
+        for (let attempt = 0; attempt < 17; attempt++) {
+          if (attempt > 0) {
+            yield* waitForReadback
+            yield* postcheck
+          }
+          const visible = yield* checkDevReadback(manifest.name, manifest.version, request).pipe(
+            Effect.option,
+          )
+          if (visible._tag === "Some") {
+            yield* postcheck
+            return
+          }
+        }
+        return yield* new PublishError({
+          detail:
+            "npm publish already succeeded but dev was not confirmed within the readback window; inspect before retrying",
+        })
       }
       return
     }
