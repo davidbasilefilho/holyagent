@@ -18204,6 +18204,13 @@ var whichInDirectory = (fs, command, directory) => {
   try {
     const physical = fs.realpathSync(cwd);
     const roots = new Set([cwd, physical]);
+    if (options.home !== undefined) {
+      const physicalHome = fs.realpathSync(options.home);
+      for (const root of roots) {
+        if (api.relative(options.home, root) === "" || api.relative(physicalHome, root) === "")
+          roots.delete(root);
+      }
+    }
     if (options.includeCheckout) {
       for (const root of [
         ...checkoutAncestors(api, cwd, fs),
@@ -18213,11 +18220,7 @@ var whichInDirectory = (fs, command, directory) => {
         roots.add(fs.realpathSync(root));
       }
     }
-    if (options.home === undefined)
-      return [...roots];
-    const home = options.home;
-    const physicalHome = fs.realpathSync(home);
-    return [...roots].filter((dir) => api.relative(home, dir) !== "" && api.relative(physicalHome, dir) !== "");
+    return [...roots];
   } catch {
     return;
   }

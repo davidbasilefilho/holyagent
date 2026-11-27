@@ -412,16 +412,18 @@ test.skipIf(!["linux", "win32"].includes(process.platform) || process.arch !== "
             return bad()
           }),
       })
-      for (const [cwd, configured] of [
-        [nested, sdk],
-        [join(cwdAlias, "frontend", "src"), sdk],
-        [nested, sdkAlias],
+      for (const [cwd, configured, profile] of [
+        [nested, sdk, home],
+        [join(cwdAlias, "frontend", "src"), sdk, home],
+        [nested, sdkAlias, home],
+        [nested, sdk, checkout],
+        [checkout, sdk, checkout],
       ] as const) {
         const result = await Effect.runPromise(
           deviceToolchains(
             {
-              HOME: home,
-              USERPROFILE: home,
+              HOME: profile,
+              USERPROFILE: profile,
               ANDROID_HOME: configured,
               DISPLAY: ":0",
             },
