@@ -29906,7 +29906,21 @@ var systemDefaultBrowser = fn2("systemDefaultBrowser")(function* (env, cwd, dete
     const entry = result.stdout.trim();
     const registered = detected.find((candidate) => candidate.desktopEntry === entry);
     const id = registered?.id ?? LINUX_BROWSER_IDS.get(entry);
-    return candidates.find((candidate) => candidate.id === id)?.id;
+    const direct = candidates.find((candidate) => candidate.id === id);
+    if (direct !== undefined)
+      return direct.id;
+    const executable = registered?.executable;
+    if (executable === undefined || registered?.family !== "unknown")
+      return;
+    const fs = yield* fileSystem;
+    const canonical = (path) => tryPromise2(() => fs.realpath(path)).pipe(orElseSucceed2(() => {
+      return;
+    }));
+    const target = yield* canonical(executable);
+    if (target === undefined)
+      return;
+    const aliases = yield* filter3(candidates, ({ executable: other }) => other === undefined ? succeed6(false) : canonical(other).pipe(map4((path) => path === target)));
+    return aliases.length === 1 ? aliases[0]?.id : undefined;
   }
   if (platform === "darwin" && (yield* checkFile("/usr/bin/osascript", true, false))) {
     const result = yield* shell.run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_DEFAULT], {
