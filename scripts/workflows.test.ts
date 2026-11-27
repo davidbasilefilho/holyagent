@@ -238,7 +238,10 @@ describe("release readiness", () => {
 describe("publish.yml", () => {
   const publish = parse(".github/workflows/publish.yml") as {
     on: { push: Record<string, unknown> }
-    jobs: Record<string, { uses?: string; needs?: string; if?: string }>
+    jobs: Record<
+      string,
+      { uses?: string; needs?: string; if?: string; permissions?: Record<string, string> }
+    >
   }
 
   test("runs on main and dev pushes only, leaving work branches to pull-request validation", () => {
@@ -259,6 +262,16 @@ describe("publish.yml", () => {
       uses: "./.github/workflows/dev.yml",
     })
   })
+
+  test("the reusable validation caller grants the read-only permissions its branch model requests", () => {
+    const called = parse(".github/workflows/validation.yml") as {
+      jobs: Record<string, { permissions?: Record<string, string> }>
+    }
+    expect(publish.jobs["validation"]?.permissions).toEqual(
+      called.jobs["branch-model"]?.permissions,
+    )
+    expect(publish.jobs["validation"]?.permissions).toEqual({ contents: "read", actions: "read" })
+  })
 })
 
 describe("validation.yml", () => {
@@ -269,7 +282,15 @@ describe("validation.yml", () => {
       string,
       {
         if?: string
-        steps?: Array<{ name?: string; uses?: string; run?: string; env?: Record<string, string> }>
+        permissions?: Record<string, string>
+        steps?: Array<{
+          name?: string
+          if?: string
+          uses?: string
+          run?: string
+          with?: Record<string, unknown>
+          env?: Record<string, string>
+        }>
       }
     >
   }
@@ -313,6 +334,25 @@ describe("validation.yml", () => {
     )
     expect(step?.env).toEqual({ HEAD_REF: "${{ github.head_ref }}" })
     expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
+  })
+
+  test("exact promotions use the protected dev checker in the existing branch-model job", () => {
+    const job = validation.jobs["branch-model"]
+    const steps = job?.steps ?? []
+    const original = steps.find((step) => step.name === "Check out")
+    const policy = steps.find((step) => step.name === "Check out protected development policy")
+    const verifier = steps.find((step) => step.name === "Check exact promotion evidence")
+    expect(job?.permissions).toEqual({ contents: "read", actions: "read" })
+    expect(original?.if).toContain("!startsWith(github.head_ref, 'release/0.4.0/promote/')")
+    expect(policy?.if).toBe(verifier?.if)
+    expect(policy?.with).toEqual({ ref: "refs/heads/dev", "persist-credentials": false })
+    expect(verifier?.env).toMatchObject({
+      BASE_SHA: "${{ github.event.pull_request.base.sha }}",
+      HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+    })
+    expect(verifier?.run).toBe(
+      'bun scripts/exact-promotion.ts "$GITHUB_REPOSITORY" "$HEAD_REF" "$BASE_SHA" "$HEAD_SHA"',
+    )
   })
 
   test("the vendor validator runs only in the isolated Linux CI step", () => {
