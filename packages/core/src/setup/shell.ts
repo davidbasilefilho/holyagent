@@ -1,5 +1,5 @@
 import { constants, realpathSync } from "node:fs"
-import { delimiter, dirname, join, posix, win32 } from "node:path"
+import { delimiter, dirname, isAbsolute, join, posix, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Context, Effect, Layer, Option } from "effect"
@@ -9,26 +9,36 @@ import { nodeFileSystem } from "../ports/filesystem.ts"
 import { spawn } from "../state/process.ts"
 import { definedEnv, type Env, homeDirectory } from "./environment.ts"
 
+const whichInDirectory = (
+  fs: typeof nodeFileSystem,
+  command: string,
+  directory: string,
+): string | null => {
+  const names =
+    process.platform === "win32" && !/\.[^\\/]+$/.test(command)
+      ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`)
+      : [command]
+  for (const name of names) {
+    const candidate = join(directory || ".", name)
+    try {
+      fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK)
+      if (fs.statSync(candidate).isFile()) return candidate
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return null
+}
+
 /** Searches an explicit PATH using the given filesystem. */
 export const whichWith = (
   fs: typeof nodeFileSystem,
   command: string,
   options: { readonly PATH: string },
 ): string | null => {
-  const names =
-    process.platform === "win32" && !/\.[^\\/]+$/.test(command)
-      ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`)
-      : [command]
   for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join(directory || ".", name)
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK)
-        if (fs.statSync(candidate).isFile()) return candidate
-      } catch {
-        /* try the next candidate */
-      }
-    }
+    const found = whichInDirectory(fs, command, directory)
+    if (found !== null) return found
   }
   return null
 }
@@ -92,6 +102,8 @@ export interface StrictLookup {
 export interface WhichOptions {
   /** Also search Bun's global bin directory. */
   readonly includeBunBin?: boolean
+  /** Check one literal absolute directory instead of searching PATH. */
+  readonly directory?: string
   /** Trust only what {@link StrictLookup} allows. */
   readonly strict?: StrictLookup
 }
@@ -160,9 +172,13 @@ export const findCommand = (
   )
   const path = options?.includeBunBin ? bunBin.value : (env[bunBin.key] ?? "")
   return Option.fromNullishOr(
-    options?.strict === undefined
-      ? lookup(command, { PATH: path })
-      : strictWhich(command, path, options.strict, lookup),
+    options?.directory !== undefined
+      ? isAbsolute(options.directory)
+        ? whichInDirectory(nodeFileSystem, command, options.directory)
+        : null
+      : options?.strict === undefined
+        ? lookup(command, { PATH: path })
+        : strictWhich(command, path, options.strict, lookup),
   )
 }
 

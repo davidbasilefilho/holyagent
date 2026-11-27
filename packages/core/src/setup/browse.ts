@@ -283,6 +283,8 @@ export interface BrowseProfile {
   readonly browser: string
   readonly profile: string
   readonly extension: "enabled" | "disabled" | "missing"
+  /** The verified store or unpacked ID, returned only to callers that request it. */
+  readonly extensionId?: string
 }
 
 /**
@@ -294,6 +296,7 @@ export interface BrowseProfile {
 export const findBrowseProfiles = (
   env: Env,
   platform: string = process.platform,
+  includeExtensionId = false,
 ): Effect.Effect<ReadonlyArray<BrowseProfile>> =>
   Effect.forEach(browserDirectories(env, platform), ({ name, directory }) =>
     Effect.gen(function* () {
@@ -326,14 +329,17 @@ export const findBrowseProfiles = (
           )
           if (state === undefined && settings.every((value) => value === undefined)) return []
           const entry = settings.flatMap((entries = {}) =>
-            BROWSE_EXTENSION_IDS.flatMap((id) => (entries[id] === undefined ? [] : [entries[id]])),
+            BROWSE_EXTENSION_IDS.flatMap((id) =>
+              entries[id] === undefined ? [] : [{ id, value: entries[id] }],
+            ),
           )[0]
           return [
             {
               browser: name,
               profile,
               extension:
-                entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled",
+                entry === undefined ? "missing" : isDisabled(entry.value) ? "disabled" : "enabled",
+              ...(includeExtensionId && entry !== undefined ? { extensionId: entry.id } : {}),
             } satisfies BrowseProfile,
           ]
         }),

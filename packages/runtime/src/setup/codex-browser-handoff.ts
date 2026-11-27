@@ -43,8 +43,17 @@ export interface CodexBrowserChoice {
   readonly executable: string
 }
 
+/** A detected browser for which the official flow is not available. */
+export interface CodexBrowserUnavailable {
+  readonly id: string
+  readonly name: string
+  readonly reason: string
+}
+
 /** An optional handoff to OpenAI's setup guide, or why that action cannot be offered. */
-export type CodexBrowserHandoff =
+export type CodexBrowserHandoff = {
+  readonly unavailableBrowsers?: ReadonlyArray<CodexBrowserUnavailable>
+} & (
   | {
       readonly status: "candidate"
       readonly desktop: CodexDesktopEvidence
@@ -58,6 +67,7 @@ export type CodexBrowserHandoff =
       readonly reason: string
       readonly desktop?: CodexDesktopEvidence
     }
+)
 
 /** The setup project and the platform on which the installed applications run. */
 export interface CodexBrowserHandoffOptions {
@@ -65,7 +75,7 @@ export interface CodexBrowserHandoffOptions {
   readonly platform?: NodeJS.Platform
 }
 
-type Discovered = { readonly id: string; readonly executable?: string }
+type Discovered = { readonly id: string; readonly name?: string; readonly executable?: string }
 
 const windowsDesktop =
   "Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | " +
@@ -199,21 +209,38 @@ export const detectCodexBrowserHandoff = Effect.fn("detectCodexBrowserHandoff")(
       reason: "No supported local ChatGPT desktop installation was detected.",
     }
   const choices: Array<CodexBrowserChoice> = []
+  const unavailable = new Map<string, CodexBrowserUnavailable>()
   for (const browser of browsers) {
     const id = Option.getOrUndefined(decodeBrowser(browser.id))
+    if (choices.some((choice) => choice.id === id)) continue
+    const unsupported =
+      id === undefined
+        ? "OpenAI does not document extension support for this browser."
+        : platform === "linux" && id !== "chrome"
+          ? "The Linux preview documents browser actions in Chrome only."
+          : undefined
     if (
       id === undefined ||
-      (platform === "linux" && id !== "chrome") ||
-      !browserPath(browser.executable, platform) ||
-      choices.some((choice) => choice.id === id)
-    )
+      unsupported !== undefined ||
+      !browserPath(browser.executable, platform)
+    ) {
+      unavailable.set(browser.id, {
+        id: browser.id,
+        name: browser.name ?? (id === undefined ? browser.id : labels[id]),
+        reason: unsupported ?? "No local executable could be verified.",
+      })
       continue
+    }
     choices.push({ id, name: labels[id], executable: browser.executable })
+    unavailable.delete(id)
   }
+  const unavailableBrowsers =
+    unavailable.size === 0 ? {} : { unavailableBrowsers: [...unavailable.values()] }
   if (choices.length === 0)
     return {
       status: "unavailable",
       desktop,
+      ...unavailableBrowsers,
       reason:
         platform === "linux"
           ? "No local Google Chrome installation was detected. The Linux preview documents Chrome browser actions."
@@ -223,6 +250,7 @@ export const detectCodexBrowserHandoff = Effect.fn("detectCodexBrowserHandoff")(
     status: "candidate",
     desktop,
     browsers: choices,
+    ...unavailableBrowsers,
     url: CODEX_BROWSER_GUIDE,
     detail:
       "Confirm availability in the desktop app. Browser support depends on rollout and your workspace settings.",
@@ -271,7 +299,7 @@ export const openCodexBrowserHandoff = Effect.fn("openCodexBrowserHandoff")(func
     ? {
         ok: true,
         lines: [
-          `~ browser extension: requested the setup guide in ${labels[selected]}. Finish in ChatGPT desktop.`,
+          `= browser extension: requested the setup guide in ${target.name}. Finish in ChatGPT desktop.`,
         ],
       }
     : {

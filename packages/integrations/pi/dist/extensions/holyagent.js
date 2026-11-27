@@ -1649,6 +1649,15 @@ var isArrayNonEmpty2 = isArrayNonEmpty;
 var isReadonlyArrayNonEmpty = isArrayNonEmpty;
 var empty2 = () => [];
 var map = /* @__PURE__ */ dual(2, (self, f) => self.map(f));
+var getSomes = (self) => {
+  const out = [];
+  for (const a of self) {
+    if (isSome2(a)) {
+      out.push(a.value);
+    }
+  }
+  return out;
+};
 
 var TypeId4 = "~effect/Duration";
 var bigint0 = /* @__PURE__ */ BigInt(0);
@@ -3694,6 +3703,13 @@ var forEachConcurrent = /* @__PURE__ */ iterateConcurrentImpl({
   }
 });
 var filterOrElse = /* @__PURE__ */ dual(3, (self, predicate, orElse) => flatMap(self, (a) => predicate(a) ? succeed3(a) : orElse(a)));
+var filter2 = /* @__PURE__ */ dual((args) => isIterable(args[0]) && !isEffect(args[0]), (elements, predicate, options) => map2(forEach(elements, (a, i) => {
+  const result = predicate(a, i);
+  if (typeof result === "boolean") {
+    return succeed3(result ? some2(a) : none2());
+  }
+  return map2(result, (keep) => keep ? some2(a) : none2());
+}, options), getSomes));
 var forkChild = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => withFiber((fiber) => {
   interruptChildrenPatch();
   return succeed3(forkUnsafe(fiber, self, options?.startImmediately, false, options?.uninterruptible ?? false));
@@ -4377,6 +4393,7 @@ var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOption2 = timeoutOption;
 var timeoutOrElse2 = timeoutOrElse;
+var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
 var match4 = match3;
 var matchCause2 = matchCause;
@@ -14513,6 +14530,214 @@ var schemas3 = {
     update: optional2(Int)
   })
 };
+import { posix as posix2, win32 as win322 } from "node:path";
+
+import { homedir as homedir2 } from "node:os";
+import { join as join12 } from "node:path";
+var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
+var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
+var homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback();
+var claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join12(homeDirectory2(env, home), ".claude");
+var userFiles = (env) => {
+  const home = homeDirectory2(env);
+  const claudeDir = claudeConfigDirectory(env, () => home);
+  return {
+    claudeDir,
+    settings: join12(claudeDir, "settings.json"),
+    ctx7Credentials: join12(home, ".config", "context7", "credentials.json")
+  };
+};
+
+import { constants as constants4, realpathSync } from "node:fs";
+import { delimiter, dirname as dirname7, isAbsolute as isAbsolute7, join as join13, posix, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
+
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
+var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
+
+var whichInDirectory = (fs, command, directory) => {
+  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
+  for (const name of names) {
+    const candidate = join13(directory || ".", name);
+    try {
+      fs.accessSync(candidate, process.platform === "win32" ? constants4.F_OK : constants4.X_OK);
+      if (fs.statSync(candidate).isFile())
+        return candidate;
+    } catch {}
+  }
+  return null;
+};
+var whichWith = (fs, command, options) => {
+  for (const directory of options.PATH.split(delimiter)) {
+    const found = whichInDirectory(fs, command, directory);
+    if (found !== null)
+      return found;
+  }
+  return null;
+};
+var which = (command, options) => whichWith(nodeFileSystem, command, options);
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join13(options.home, ".bun");
+  const bunBin = join13(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+};
+var strictWhich = (command, path, strict, lookup = which) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  if (!api.isAbsolute(strict.cwd))
+    return null;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  if (trusted.length === 0)
+    return null;
+  const acceptable = (found) => {
+    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
+      return false;
+    if (windows && !found.toLowerCase().endsWith(".exe"))
+      return false;
+    if (strict.which === undefined) {
+      try {
+        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
+          return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
+    return acceptable(found) ? found : null;
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory });
+    if (acceptable(found))
+      return found;
+  }
+  return null;
+};
+var findCommand = (env, command, options, lookup = which) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.directory !== undefined ? isAbsolute7(options.directory) ? whichInDirectory(nodeFileSystem, command, options.directory) : null : options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
+};
+var EMPTY_BUNFIG = join13(dirname7(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => {
+        const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
+        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
+        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
+        if (batch !== undefined && !batch.ok)
+          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
+        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
+          exitCode: result.code,
+          stdout: new TextDecoder().decode(result.stdout),
+          stderr: result.stderr
+        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
+      }
+    }));
+  };
+}
+
+var Installed = Struct({
+  version: String5,
+  install_path: String5,
+  installed: Boolean3,
+  active: Boolean3,
+  requested_version: optional2(String5),
+  source: optional2(Record(String5, String5)),
+  sources: optional2(ArraySchema(Record(String5, String5))),
+  symlinked_to: optional2(String5),
+  broken: optional2(Boolean3),
+  scheduled_for_pruning: optional2(Boolean3),
+  prune_after: optional2(String5)
+});
+var Inventory = fromJsonString2(ArraySchema(Installed));
+var Bins = fromJsonString2(ArraySchema(Struct({ name: String5, path: String5, symlink: Boolean3 })));
+var tool = "npm:ctx7";
+var discoveryOptions = {
+  MISE_OFFLINE: "1",
+  MISE_AUTO_INSTALL: "0",
+  MISE_NOT_FOUND_AUTO_INSTALL: "0"
+};
+var versionNumber = /^\d+\.\d+\.\d+(?:[-+][\dA-Za-z.-]+)*$/;
+var controls = /\p{Cc}/u;
+var lookupCtx7 = fn2("lookupCtx7")(function* (env, cwd = process.cwd(), platform = process.platform) {
+  const shell = yield* Shell;
+  const onPath = yield* shell.which("ctx7");
+  if (isSome2(onPath))
+    return { kind: "path", path: onPath.value };
+  const inBun = yield* shell.which("ctx7", { includeBunBin: true });
+  if (isSome2(inBun))
+    return { kind: "bun", path: inBun.value };
+  const mise = yield* shell.which("mise", { strict: { cwd, platform } });
+  if (isNone2(mise))
+    return { kind: isSome2(yield* shell.which("mise")) ? "unverified" : "missing" };
+  const options = { cwd: homeDirectory2(env), env: discoveryOptions };
+  const inventory = yield* shell.run(mise.value, ["--no-config", "ls", "--installed", "--json", tool], options);
+  const records = decodeUnknownOption2(Inventory)(inventory.stdout, {
+    onExcessProperty: "error"
+  });
+  if (inventory.exitCode !== 0 || isNone2(records))
+    return { kind: "unverified" };
+  if (records.value.length === 0)
+    return { kind: inventory.stderr.trim() === "" ? "missing" : "unverified" };
+  const api = platform === "win32" ? win322 : posix2;
+  const absolute = (path) => api.isAbsolute(path) && !controls.test(path) && (platform !== "win32" || /^(?:[a-z]:[\\/]|\\\\[^?.])/i.test(path));
+  const installed = records.value.filter((record) => record.installed && !record.broken && versionNumber.test(record.version) && absolute(record.install_path));
+  for (const record of installed.toReversed()) {
+    const reported = yield* shell.run(mise.value, ["--no-config", "bin-paths", "--json", `${tool}@${record.version}`], options);
+    const bins = decodeUnknownOption2(Bins)(reported.stdout, { onExcessProperty: "error" });
+    if (reported.exitCode !== 0 || isNone2(bins))
+      continue;
+    for (const bin of bins.value) {
+      if (!absolute(bin.path))
+        continue;
+      const name = api.basename(bin.path);
+      if (platform === "win32" ? !/^ctx7(?:\.(?:exe|cmd|bat))?$/i.test(name) : name !== "ctx7")
+        continue;
+      const relative = api.relative(record.install_path, bin.path);
+      if (relative === "" || relative === ".." || relative.startsWith(`..${api.sep}`) || api.isAbsolute(relative))
+        continue;
+      const found = yield* shell.which("ctx7", { directory: api.dirname(bin.path) });
+      if (isSome2(found) && api.relative(bin.path, found.value) === "")
+        return { kind: "mise", path: found.value };
+    }
+  }
+  return { kind: "unverified" };
+});
+var CTX7_MISE_UNVERIFIED = "could not verify mise's npm:ctx7 installation; make an existing ctx7 available on PATH or check mise";
+
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
@@ -14613,25 +14838,9 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   return names.map((name) => piPackageSource(name));
 };
 
-import { isAbsolute as isAbsolute7, join as join14 } from "node:path";
+import { isAbsolute as isAbsolute8, join as join15 } from "node:path";
 
-import { homedir as homedir2 } from "node:os";
-import { join as join12 } from "node:path";
-var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
-var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
-var homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback();
-var claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join12(homeDirectory2(env, home), ".claude");
-var userFiles = (env) => {
-  const home = homeDirectory2(env);
-  const claudeDir = claudeConfigDirectory(env, () => home);
-  return {
-    claudeDir,
-    settings: join12(claudeDir, "settings.json"),
-    ctx7Credentials: join12(home, ".config", "context7", "credentials.json")
-  };
-};
-
-import { basename as basename6, dirname as dirname7, join as join13 } from "node:path";
+import { basename as basename6, dirname as dirname8, join as join14 } from "node:path";
 var JsonObjectText = fromJsonString2(Record(String5, Unknown2), {
   space: 2
 });
@@ -14678,8 +14887,8 @@ var replaceJsonObject = (path, value, options, snapshot) => gen2(function* () {
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => fs.stat(target))).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join13(dirname7(target), `.${basename6(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname7(target), "write", () => fs.mkdir(dirname7(target), { recursive: true }));
+  const temporary = join14(dirname8(target), `.${basename6(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname8(target), "write", () => fs.mkdir(dirname8(target), { recursive: true }));
   yield* tryPromise2({
     try: () => fs.writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -14757,9 +14966,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty2(env["XDG_DATA_HOME"]);
-  return join14(data !== undefined && isAbsolute7(data) ? data : join14(homeDirectory2(env), ".local", "share"), "browse");
+  return join15(data !== undefined && isAbsolute8(data) ? data : join15(homeDirectory2(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join14(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join15(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String5, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String5.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -14798,7 +15007,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
-    const support = join14(home, "Library", "Application Support");
+    const support = join15(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -14810,22 +15019,22 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Vivaldi", "Vivaldi"],
       ["Helium", "net.imput.helium"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join14(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join15(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join14(home, "AppData", "Local");
-    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join14(home, "AppData", "Roaming");
+    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join15(home, "AppData", "Local");
+    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join15(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join14(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join14(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join14(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join14(local, "Vivaldi", "User Data") },
-      { name: "Helium", directory: join14(local, "imput", "Helium", "User Data") },
-      { name: "Opera", directory: join14(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join15(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join15(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join15(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join15(local, "Vivaldi", "User Data") },
+      { name: "Helium", directory: join15(local, "imput", "Helium", "User Data") },
+      { name: "Opera", directory: join15(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty2(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute7(configured) ? configured : join14(home, ".config");
+  const config = configured !== undefined && isAbsolute8(configured) ? configured : join15(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -14836,7 +15045,7 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"],
     ["Helium", "net.imput.helium"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join14(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join15(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String5, Open)) }), [Open]))
@@ -14851,15 +15060,15 @@ var isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
-var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join14(directory, "Local State"));
+var findBrowseProfiles = (env, platform = process.platform, includeExtensionId = false) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
+  const state = yield* readOptional(join15(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
     if (profile === "." || profile === ".." || /[/\\]/.test(profile) || profile.includes("\x00"))
       return [];
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join14(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join15(directory, profile, file)).pipe(map4((text) => {
       if (text === undefined)
         return;
       const parsed = decodeUnknownOption2(Preferences)(text, {
@@ -14869,12 +15078,13 @@ var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserD
     })));
     if (state === undefined && settings.every((value) => value === undefined))
       return [];
-    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
+    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [{ id, value: entries[id] }]))[0];
     return [
       {
         browser: name,
         profile,
-        extension: entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled"
+        extension: entry === undefined ? "missing" : isDisabled(entry.value) ? "disabled" : "enabled",
+        ...includeExtensionId && entry !== undefined ? { extensionId: entry.id } : {}
       }
     ];
   }));
@@ -14906,123 +15116,7 @@ var describeBrowseState = (state, runner = "npm") => {
 };
 
 import { existsSync as existsSync2, readdirSync as readdirSync2 } from "node:fs";
-import { posix as posix2, win32 as win322 } from "node:path";
-
-import { constants as constants4, realpathSync } from "node:fs";
-import { delimiter, dirname as dirname8, join as join15, posix, win32 } from "node:path";
-import { fileURLToPath } from "node:url";
-
-var UNQUOTABLE = /["%^!]|\p{Cc}/u;
-var BARE_SYNTAX = /[&|<>()]/;
-var cmdExeArguments = (command, args) => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
-      };
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
-      };
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
-};
-var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
-
-var whichWith = (fs, command, options) => {
-  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
-  for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join15(directory || ".", name);
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants4.F_OK : constants4.X_OK);
-        if (fs.statSync(candidate).isFile())
-          return candidate;
-      } catch {}
-    }
-  }
-  return null;
-};
-var which = (command, options) => whichWith(nodeFileSystem, command, options);
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join15(options.home, ".bun");
-  const bunBin = join15(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
-};
-var strictWhich = (command, path, strict, lookup = which) => {
-  const windows = (strict.platform ?? process.platform) === "win32";
-  const api = windows ? win32 : posix;
-  if (!api.isAbsolute(strict.cwd))
-    return null;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
-  if (trusted.length === 0)
-    return null;
-  const acceptable = (found) => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
-      return false;
-    if (windows && !found.toLowerCase().endsWith(".exe"))
-      return false;
-    if (strict.which === undefined) {
-      try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
-          return false;
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  };
-  if (strict.which !== undefined) {
-    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
-    return acceptable(found) ? found : null;
-  }
-  for (const directory of trusted) {
-    const found = lookup(command, { PATH: directory });
-    if (acceptable(found))
-      return found;
-  }
-  return null;
-};
-var findCommand = (env, command, options, lookup = which) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
-  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
-};
-var EMPTY_BUNFIG = join15(dirname8(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => {
-        const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
-        const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
-        const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
-        if (batch !== undefined && !batch.ok)
-          return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
-        return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map4((result) => ({
-          exitCode: result.code,
-          stdout: new TextDecoder().decode(result.stdout),
-          stderr: result.stderr
-        })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
-      }
-    }));
-  };
-}
-
+import { posix as posix3, win32 as win323 } from "node:path";
 var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH";
 var LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
 var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
@@ -15034,7 +15128,7 @@ var BUILD_EXECUTABLES = {
   ],
   win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
 };
-var pathsOf = (platform) => platform === "win32" ? win322 : posix2;
+var pathsOf = (platform) => platform === "win32" ? win323 : posix3;
 var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
 var inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
@@ -15531,7 +15625,7 @@ var removeRecorded = fn2("removeRecorded")(function* (env, file, removed) {
   yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]));
 });
 
-import { dirname as dirname9, isAbsolute as isAbsolute8, join as join18, relative as relative3, resolve as resolve10, sep as sep5 } from "node:path";
+import { dirname as dirname9, isAbsolute as isAbsolute9, join as join18, relative as relative3, resolve as resolve10, sep as sep5 } from "node:path";
 
 var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
 var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
@@ -15676,7 +15770,7 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
 var SCOPES = ["user", "project", "local"];
 var within = (parent, child) => {
   const path = relative3(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep5}`) && !isAbsolute8(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep5}`) && !isAbsolute9(path);
 };
 var real = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.realpath(path))), orElseSucceed2(() => {
   return;
@@ -16282,7 +16376,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
 });
 
 import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
-import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
+import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute10, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
 
 var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
   return;
@@ -16315,7 +16409,7 @@ var installedPackage = fn2("installedPiPackage")(function* (path) {
   const invalid = new SetupFailure({
     message: `${JSON.stringify(path)} is not an installed HolyAgent ${package_default.version} package; install the CLI globally and run it again`
   });
-  if (!isAbsolute9(path) || !installedLayout(path))
+  if (!isAbsolute10(path) || !installedLayout(path))
     return yield* invalid;
   const root = resolve12(path);
   const physical = yield* realPath(root);
@@ -16327,7 +16421,7 @@ var installedPackage = fn2("installedPiPackage")(function* (path) {
   return { root, physical, version: String(manifest.version) };
 });
 var piLocalSourcePath = (env, file, source) => {
-  if (isAbsolute9(source))
+  if (isAbsolute10(source))
     return resolve12(source);
   if (/^(?:[a-z][a-z0-9+.-]*:|[^/\\]+@[^/\\]+:)/i.test(source))
     return;
@@ -16337,17 +16431,22 @@ var piLocalSourcePath = (env, file, source) => {
 };
 var sourcePackageRoot = (path) => basename7(path) === "holyagent.js" && basename7(dirname10(path)) === "extensions" ? dirname10(dirname10(path)) : path;
 var localHolyagentPackageAt = (path) => readJsonObject(join22(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
+var matchesRegistration = (target, source, physical) => target.physical === undefined ? source === target.source : physical !== undefined && relative4(target.physical, physical) === "";
+var exactHolyagentPin = /^npm:holyagent@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*))*)?(?:\+[\dA-Za-z-]+(?:\.[\dA-Za-z-]+)*)?$/;
 var registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
   const { root, physical, version } = yield* installedPackage(path);
-  const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
+  const cached = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path));
+  const target = cached ? { source: `npm:holyagent@${version}` } : { source: root, physical };
   let listedIn;
+  let matches = 0;
   const conflicts = [];
   for (const { file, sources } of settings) {
     for (const entry of sources) {
       const local = piLocalSourcePath(env, file, entry.trim());
       const actual = local === undefined ? undefined : yield* realPath(local);
-      if (entry.trim() === source || source === root && actual !== undefined && relative4(physical, actual) === "") {
+      if (matchesRegistration(target, entry, actual)) {
         listedIn ??= file;
+        matches++;
       } else if (isHolyagentSource(entry.trim()) || actual !== undefined && (yield* localHolyagentPackageAt(actual))) {
         conflicts.push({ file, prior: entry });
       }
@@ -16355,13 +16454,14 @@ var registration = fn2("planPiPackageRegistration")(function* (env, path, settin
   }
   const [conflict] = conflicts;
   if (conflict !== undefined) {
-    if (!replace || conflicts.length !== 1 || conflict.file !== settings[0]?.file || listedIn !== undefined)
+    const repair = target.physical !== undefined && conflicts.length === 1 && conflict.file === settings[0]?.file && matches === 1 && listedIn === conflict.file && conflict.prior === conflict.prior.trim() && exactHolyagentPin.test(conflict.prior);
+    if (!replace || conflicts.length !== 1 || conflict.file !== settings[0]?.file || listedIn !== undefined && !repair)
       return yield* new SetupFailure({
-        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; review the existing registration in interactive setup at its scope before replacing it`
+        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; ${replace && (listedIn !== undefined || conflicts.length > 1) && !repair ? "the duplicate registrations cannot be repaired safely. Keep only the intended HolyAgent source in the applicable Pi settings before reopening setup" : "review the existing registration in interactive setup at its scope before replacing it"}`
       });
-    return { source, prior: conflict.prior };
+    return { target, prior: conflict.prior, repair };
   }
-  return listedIn === undefined ? { source } : { listedIn };
+  return listedIn === undefined ? { target } : { listedIn };
 });
 var entrySource = (entry) => isJsonObject(entry) ? entry.source : entry;
 var PiRegistrationReview = Reference("holyagent/setup/PiRegistrationReview", { defaultValue: () => {
@@ -16373,6 +16473,34 @@ var registrationEntry = (settings, source) => {
   const matching = settings.packages.filter((entry) => entrySource(entry) === source);
   return matching.length === 1 ? matching[0] : undefined;
 };
+var matchingEntries = (env, file, packages, target) => filter3(packages, (entry) => gen2(function* () {
+  const source = entrySource(entry);
+  if (typeof source !== "string")
+    return false;
+  const local = target.physical === undefined ? undefined : piLocalSourcePath(env, file, source.trim());
+  return matchesRegistration(target, source, local === undefined ? undefined : yield* realPath(local));
+}));
+var packageFilters = (entry) => isJsonObject(entry) ? Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "source")) : {};
+var planDuplicateRepair = fn2("planDuplicatePiRegistrationRepair")(function* (env, file, target, prior, settings) {
+  const packages = Array.isArray(settings.packages) ? settings.packages : [];
+  const entry = registrationEntry(settings, prior);
+  const matching = yield* matchingEntries(env, file, packages, target);
+  const [local] = matching;
+  const source = entrySource(local);
+  if (entry === undefined || matching.length !== 1 || typeof source !== "string")
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registrations changed; review them again`
+    });
+  const priorFilters = packageFilters(entry);
+  const localFilters = packageFilters(local);
+  if (Object.entries(priorFilters).some(([key, value]) => Object.hasOwn(localFilters, key) && JSON.stringify(localFilters[key]) !== JSON.stringify(value)))
+    return yield* new SetupFailure({
+      message: `${file}: the old pin and the installed HolyAgent registration have different package filters. Reconcile the filters in Pi settings and review setup again; both entries were kept`
+    });
+  const keep = isJsonObject(entry) || isJsonObject(local) ? { ...priorFilters, ...localFilters, source } : source;
+  const next = packages.filter((item) => item !== entry).map((item) => item === local ? keep : item);
+  return { source, entry, next, packages };
+});
 var backupRegistration = fn2("backupPiRegistration")(function* (file, source, entry) {
   const path = `${file}.holyagent-package.${randomUUID4()}.bak`;
   const fs = yield* fileSystem;
@@ -16397,21 +16525,25 @@ var restoreRegistration = fn2("restorePiRegistration")(function* (file, prior, b
     return false;
   return yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: before.packages }, current.text);
 });
-var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, source, previousEntry) {
+var retireRegistration = fn2("retirePiRegistration")(function* (env, file, prior, target, previousEntry, before) {
   const current = yield* readJsonObjectSnapshot(file);
   const packages = Array.isArray(current.value.packages) ? current.value.packages : [];
   const old = packages.filter((entry) => entrySource(entry) === prior);
-  if (current.text === undefined || packages.filter((entry) => entrySource(entry) === source).length !== 1 || old.length > 1 || old.length === 1 && JSON.stringify(old[0]) !== JSON.stringify(previousEntry))
+  const saved = yield* matchingEntries(env, file, packages, target);
+  const [installed] = saved;
+  const savedSource = entrySource(installed);
+  const replacement = isJsonObject(previousEntry) ? { ...previousEntry, source: savedSource } : savedSource;
+  const replacedPin = old.length === 0 && target.physical === undefined && parseNpmSource(prior)?.name === parseNpmSource(target.source)?.name;
+  const expected = replacedPin ? before.filter((entry) => entrySource(entry) !== prior) : before;
+  if (current.text === undefined || saved.length !== 1 || typeof savedSource !== "string" || old.length > 1 || JSON.stringify(packages.filter((entry) => entry !== installed)) !== JSON.stringify(expected) || typeof installed !== "string" && (!replacedPin || JSON.stringify(installed) !== JSON.stringify(replacement)))
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed during install; kept the previous source where it was still present`
     });
-  const replacement = isJsonObject(previousEntry) ? { ...previousEntry, source } : source;
   const next = packages.flatMap((entry) => {
-    const key = entrySource(entry);
-    if (key === prior)
+    if (entrySource(entry) === prior)
       return [replacement];
-    if (key === source)
-      return old.length === 0 ? [replacement] : [];
+    if (entry === installed)
+      return replacedPin ? [replacement] : [];
     return [entry];
   });
   if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text)))
@@ -16446,32 +16578,69 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
     lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
   const review = yield* PiRegistrationReview;
+  let repair;
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
-    if (match.source === undefined)
+    if (match.target === undefined)
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
     else {
       if (match.prior !== undefined) {
-        const { source, prior } = match;
-        const entry = registrationEntry(yield* readJsonObject(file), prior);
-        const fingerprint = createHash7("sha256").update(JSON.stringify([file, prior, source, entry])).digest("hex");
-        if (entry === undefined || !options.dryRun && review !== undefined && review.expected !== fingerprint)
+        const { target, prior } = match;
+        const settings = yield* readJsonObject(file);
+        if (match.repair && (!Array.isArray(settings.packages) || JSON.stringify(settings.packages.map(entrySource)) !== JSON.stringify(listed)))
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`
+          });
+        const pending = match.repair ? yield* planDuplicateRepair(env, file, target, prior, settings) : undefined;
+        const source = pending?.source ?? target.source;
+        const entry = pending?.entry ?? registrationEntry(settings, prior);
+        const fingerprint = createHash7("sha256").update(JSON.stringify([
+          file,
+          prior,
+          source,
+          entry,
+          ...pending === undefined ? [] : [target.physical, pending.packages]
+        ])).digest("hex");
+        if (entry === undefined || !options.dryRun && (pending !== undefined || review !== undefined) && review?.expected !== fingerprint)
           return yield* new SetupFailure({
             message: `${file}: the Pi registration changed after review; review it again`
           });
         if (options.dryRun && review?.preview !== undefined)
           yield* sync2(() => review.preview?.({ file, prior, source, fingerprint }));
-        replacement = { source, prior, entry };
-        lines.unshift(added(`pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`));
+        if (pending === undefined)
+          replacement = { target, prior, entry };
+        else
+          repair = { target, prior, source, packages: pending.packages };
+        lines.unshift(added(pending === undefined ? `pi package: replace ${JSON.stringify(prior)} with ${JSON.stringify(source)} in ${file}` : `pi package: remove ${JSON.stringify(prior)} from ${file}; keep ${JSON.stringify(source)} without reinstalling`));
       }
-      installs.unshift(match.source);
+      if (repair === undefined)
+        installs.unshift(match.target.source);
     }
   }
-  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+  if (replacement === undefined && repair === undefined && !options.dryRun && review?.expected !== undefined)
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed after review; review it again`
     });
+  if (repair !== undefined && !options.dryRun) {
+    yield* reportSetupActivity(`Keeping the verified registration ${repair.source}`);
+    yield* refuseLinks(options.cwd, options.scope, file, "repair the installed HolyAgent package registration");
+    const snapshot = yield* readJsonObjectSnapshot(file);
+    if (snapshot.text === undefined || JSON.stringify(snapshot.value.packages) !== JSON.stringify(repair.packages))
+      return [
+        ...lines,
+        `! pi package: ${file} changed after review; the previous registration was not removed`
+      ];
+    const current = yield* planDuplicateRepair(env, file, repair.target, repair.prior, snapshot.value);
+    const backup = yield* backupRegistration(file, current.source, current.entry);
+    lines.push(added(`pi package: saved the previous registration in ${backup}`));
+    if (!(yield* writeJsonObjectIfUnchanged(file, { ...snapshot.value, packages: current.next }, snapshot.text)))
+      return [
+        ...lines,
+        `! pi package: ${file} changed while repairing the package; did not remove the previous source`
+      ];
+    lines.push(present(`pi package: kept the installed HolyAgent registration in ${file}`));
+  }
   if (installs.length === 0 && removals.length === 0)
     return lines;
   if (isNone2(yield* shell.which("pi"))) {
@@ -16489,7 +16658,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(added(`pi ${source}: would install with ${command}`));
       continue;
     }
-    const commit = replacement?.source === source ? replacement : undefined;
+    const commit = replacement?.target.source === source ? replacement : undefined;
     yield* reportSetupActivity(`Installing ${source}`);
     const install = shell.run("pi", args, {
       cwd,
@@ -16516,7 +16685,8 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
     });
     const backupHint = added(`pi package: saved the previous registration in ${backup}`);
     const beforeInstall = yield* readRegistration;
-    if (!priorIsUnchanged(beforeInstall) || Array.isArray(beforeInstall.packages) && beforeInstall.packages.some((entry) => entrySource(entry) === source))
+    const beforePackages = Array.isArray(beforeInstall.packages) ? beforeInstall.packages : [];
+    if (!priorIsUnchanged(beforeInstall) || (yield* matchingEntries(env, file, beforePackages, commit.target)).length > 0)
       return [
         ...lines,
         backupHint,
@@ -16535,7 +16705,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
         failed2(command, result)
       ];
     }
-    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(result2);
+    const retirement = yield* retireRegistration(env, file, commit.prior, commit.target, commit.entry, beforePackages).pipe(result2);
     if (retirement._tag === "Failure")
       return [
         ...lines,
@@ -16936,32 +17106,30 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
 
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory2(env);
-var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
-  const shell = yield* Shell;
-  if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present(`${command}: already installed`)] };
-  }
-  if (dryRun) {
-    return {
-      usable: true,
-      lines: [added(`${command}: would install with bun add -g ${packageName}`)]
-    };
-  }
-  yield* reportSetupActivity(`Installing ${packageName}`);
-  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
-  if (result.exitCode !== 0)
-    return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
-  const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
-  const onPath = yield* shell.which(command);
-  const anywhere = yield* shell.which(command, { includeBunBin: true });
-  if (isNone2(onPath) && isSome2(anywhere)) {
-    lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`));
-  }
-  return { usable: true, lines };
-});
 var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
-  const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
-  return result.lines;
+  const installed = yield* lookupCtx7(env);
+  if (installed.kind === "mise")
+    return [
+      present(`ctx7: already installed with mise at ${installed.path} (not on PATH; add its directory to PATH)`)
+    ];
+  if (installed.kind === "unverified")
+    return [`! ctx7: ${CTX7_MISE_UNVERIFIED}`];
+  if (installed.kind === "path" || installed.kind === "bun")
+    return [present("ctx7: already installed")];
+  if (dryRun)
+    return [added("ctx7: would install with bun add -g ctx7")];
+  const shell = yield* Shell;
+  yield* reportSetupActivity("Installing ctx7");
+  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", "ctx7"], { cwd: neutralDirectory(env) });
+  if (result.exitCode !== 0)
+    return [failed2("bun add -g ctx7", result)];
+  const lines = [added("ctx7: installed with bun add -g ctx7")];
+  const onPath = yield* shell.which("ctx7");
+  const anywhere = yield* shell.which("ctx7", { includeBunBin: true });
+  if (isNone2(onPath) && isSome2(anywhere)) {
+    lines.push(hint(`ctx7: ${anywhere.value} is not on PATH; add its directory to PATH`));
+  }
+  return lines;
 });
 var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`])));
 var SETUP_TARGETS = ["pi", "claude"];
@@ -17080,19 +17248,26 @@ var checkBun = gen2(function* () {
   const found = yield* shell.which("bun");
   return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
 });
-var checkCommand = (env, command, fix = FIX) => gen2(function* () {
+var checkCtx7 = (env, fix = FIX) => gen2(function* () {
   if (inCloudSession(env))
-    return pass(command, "not installed in a claude.ai cloud session, by design");
-  const shell = yield* Shell;
-  const onPath = yield* shell.which(command);
-  if (isSome2(onPath))
-    return pass(command, onPath.value);
-  const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${fix}`);
+    return pass("ctx7", "not installed in a claude.ai cloud session, by design");
+  const found = yield* lookupCtx7(env);
+  switch (found.kind) {
+    case "path":
+      return pass("ctx7", found.path);
+    case "bun":
+      return pass("ctx7", `${found.path} (not on PATH; add its directory to PATH)`);
+    case "mise":
+      return pass("ctx7", `${found.path} (installed with mise, not on PATH; add its directory to PATH)`);
+    case "unverified":
+      return fail8("ctx7", CTX7_MISE_UNVERIFIED);
+    case "missing":
+      return fail8("ctx7", `not found on PATH, in Bun's bin directory, or installed by mise; ${fix}`);
+  }
 });
 var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
 var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message))));
-var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
+var checks = (env, file, scope) => all2([checkBun, checkCtx7(env), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
   const cwd = options.cwd ?? process.cwd();
@@ -17108,14 +17283,14 @@ var doctor = fn2("doctor")(function* (env, options) {
   ];
   if (options.t3Workflow === true) {
     const blockers = yield* checkT3Prerequisites(env, piUsed);
-    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
-    const ctx7 = yield* checkCtx7;
+    const ctx7Check = checkCtx7(env, "run holyagent doctor --fix");
+    const ctx7 = yield* ctx7Check;
     const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
     const lines = [
       ...blockers.map((line) => `FAIL ${line}`),
       yield* checkBun,
       ...fixes,
-      ...fixes.length > 0 ? [yield* checkCtx7] : [ctx7],
+      ...fixes.length > 0 ? [yield* ctx7Check] : [ctx7],
       ...pi
     ];
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
@@ -17124,7 +17299,7 @@ var doctor = fn2("doctor")(function* (env, options) {
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
       checkBun,
-      checkCommand(env, "ctx7"),
+      checkCtx7(env),
       succeed6(fail8("settings", located.message))
     ]);
     return {
@@ -28449,7 +28624,7 @@ var checkModelCatalog = (config, catalog) => {
 };
 var validateModelCatalog = (run, config) => listModelCatalog(run).pipe(flatMap2((catalog) => checkModelCatalog(config, catalog)));
 
-import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute10, join as join27, relative as relative6, resolve as resolve13, sep as sep7 } from "node:path";
+import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute11, join as join27, relative as relative6, resolve as resolve13, sep as sep7 } from "node:path";
 var APPLY_PATCH_DESCRIPTION = `Edit files with a patch. Put the whole patch in \`input\`:
 
 *** Begin Patch
@@ -28669,14 +28844,14 @@ ${changes.map(({ status, path }) => `${status} ${path}`).join(`
 `)}`;
 var isBelow = (root, file) => {
   const inside = relative6(root, file);
-  return inside !== ".." && !inside.startsWith(`..${sep7}`) && !isAbsolute10(inside);
+  return inside !== ".." && !inside.startsWith(`..${sep7}`) && !isAbsolute11(inside);
 };
 var applyPatch = (text, cwd, fs) => gen2(function* () {
   const operations = yield* parsePatch(text);
   const realCwd = yield* fs.real(cwd);
   const lexical = (path) => {
     const file = resolve13(cwd, path);
-    return path === "" || isAbsolute10(path) || !isBelow(cwd, file) ? fail5(new PatchPathError({ path })) : succeed6(file);
+    return path === "" || isAbsolute11(path) || !isBelow(cwd, file) ? fail5(new PatchPathError({ path })) : succeed6(file);
   };
   const inside = (path, real) => isBelow(realCwd, real) ? succeed6(real) : fail5(new PatchPathError({ path }));
   const locate = (path) => lexical(path).pipe(flatMap2(fs.real), flatMap2((real) => inside(path, real)));
@@ -28739,7 +28914,7 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
 });
 import { lstatSync, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
-import { posix as posix3, win32 as win323 } from "node:path";
+import { posix as posix4, win32 as win324 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var REVIEW_MODEL = "gpt-6-luna";
 var REVIEW_TIMEOUT_MS = 90000;
@@ -29131,7 +29306,7 @@ var PROTECTED_FOLDERS = [
   ".agents"
 ];
 var currentHost = () => ({ platform: process.platform, home: homedir3() });
-var pathsOf2 = (host) => host.platform === "win32" ? win323 : posix3;
+var pathsOf2 = (host) => host.platform === "win32" ? win324 : posix4;
 var UNICODE_SPACES = /[  -   　]/g;
 var SHELL_DRIVE_PATH = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i;
 var shellDrivePath = (path) => {

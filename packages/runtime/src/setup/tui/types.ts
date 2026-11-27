@@ -79,6 +79,11 @@ export interface Offer {
       readonly name: string
       readonly version?: string
       readonly extensionBrowsers?: ReadonlyArray<{ readonly id: string; readonly name: string }>
+      readonly extensionUnavailableBrowsers?: ReadonlyArray<{
+        readonly id: string
+        readonly name: string
+        readonly reason: string
+      }>
     }
   }
 }

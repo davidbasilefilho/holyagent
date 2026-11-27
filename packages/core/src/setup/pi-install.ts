@@ -128,6 +128,24 @@ interface PackageSources {
   readonly sources: ReadonlyArray<string>
 }
 
+interface RegistrationSource {
+  readonly source: string
+  /** The verified installed directory for a local source. Registry pins stay opaque. */
+  readonly physical?: string
+}
+
+const matchesRegistration = (
+  target: RegistrationSource,
+  source: string,
+  physical: string | undefined,
+) =>
+  target.physical === undefined
+    ? source === target.source
+    : physical !== undefined && relative(target.physical, physical) === ""
+
+const exactHolyagentPin =
+  /^npm:holyagent@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*))*)?(?:\+[\dA-Za-z-]+(?:\.[\dA-Za-z-]+)*)?$/
+
 const registration = Effect.fn("planPiPackageRegistration")(function* (
   env: Env,
   path: string,
@@ -135,22 +153,22 @@ const registration = Effect.fn("planPiPackageRegistration")(function* (
   replace: boolean,
 ) {
   const { root, physical, version } = yield* installedPackage(path)
-  const source = [root, physical].some(
+  const cached = [root, physical].some(
     (path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path),
   )
-    ? `npm:holyagent@${version}`
-    : root
+  const target: RegistrationSource = cached
+    ? { source: `npm:holyagent@${version}` }
+    : { source: root, physical }
   let listedIn: string | undefined
+  let matches = 0
   const conflicts: Array<{ readonly file: string; readonly prior: string }> = []
   for (const { file, sources } of settings) {
     for (const entry of sources) {
       const local = piLocalSourcePath(env, file, entry.trim())
       const actual = local === undefined ? undefined : yield* realPath(local)
-      if (
-        entry.trim() === source ||
-        (source === root && actual !== undefined && relative(physical, actual) === "")
-      ) {
+      if (matchesRegistration(target, entry, actual)) {
         listedIn ??= file
+        matches++
       } else if (
         isHolyagentSource(entry.trim()) ||
         (actual !== undefined && (yield* localHolyagentPackageAt(actual)))
@@ -161,18 +179,30 @@ const registration = Effect.fn("planPiPackageRegistration")(function* (
   }
   const [conflict] = conflicts
   if (conflict !== undefined) {
+    const repair =
+      target.physical !== undefined &&
+      conflicts.length === 1 &&
+      conflict.file === settings[0]?.file &&
+      matches === 1 &&
+      listedIn === conflict.file &&
+      conflict.prior === conflict.prior.trim() &&
+      exactHolyagentPin.test(conflict.prior)
     if (
       !replace ||
       conflicts.length !== 1 ||
       conflict.file !== settings[0]?.file ||
-      listedIn !== undefined
+      (listedIn !== undefined && !repair)
     )
       return yield* new SetupFailure({
-        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; review the existing registration in interactive setup at its scope before replacing it`,
+        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; ${
+          replace && (listedIn !== undefined || conflicts.length > 1) && !repair
+            ? "the duplicate registrations cannot be repaired safely. Keep only the intended HolyAgent source in the applicable Pi settings before reopening setup"
+            : "review the existing registration in interactive setup at its scope before replacing it"
+        }`,
       })
-    return { source, prior: conflict.prior }
+    return { target, prior: conflict.prior, repair }
   }
-  return listedIn === undefined ? { source } : { listedIn }
+  return listedIn === undefined ? { target } : { listedIn }
 })
 
 const entrySource = (entry: unknown): unknown => (isJsonObject(entry) ? entry.source : entry)
@@ -198,6 +228,69 @@ const registrationEntry = (settings: Readonly<Record<string, unknown>>, source: 
   )
   return matching.length === 1 ? matching[0] : undefined
 }
+
+const matchingEntries = (
+  env: Env,
+  file: string,
+  packages: ReadonlyArray<unknown>,
+  target: RegistrationSource,
+) =>
+  Effect.filter(packages, (entry) =>
+    Effect.gen(function* () {
+      const source = entrySource(entry)
+      if (typeof source !== "string") return false
+      const local =
+        target.physical === undefined ? undefined : piLocalSourcePath(env, file, source.trim())
+      return matchesRegistration(
+        target,
+        source,
+        local === undefined ? undefined : yield* realPath(local),
+      )
+    }),
+  )
+
+const packageFilters = (entry: unknown) =>
+  isJsonObject(entry)
+    ? Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "source"))
+    : {}
+
+const planDuplicateRepair = Effect.fn("planDuplicatePiRegistrationRepair")(function* (
+  env: Env,
+  file: string,
+  target: RegistrationSource,
+  prior: string,
+  settings: Readonly<Record<string, unknown>>,
+) {
+  const packages: ReadonlyArray<unknown> = Array.isArray(settings.packages) ? settings.packages : []
+  const entry = registrationEntry(settings, prior)
+  const matching = yield* matchingEntries(env, file, packages, target)
+  const [local] = matching
+  const source = entrySource(local)
+  if (entry === undefined || matching.length !== 1 || typeof source !== "string")
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registrations changed; review them again`,
+    })
+  const priorFilters = packageFilters(entry)
+  const localFilters = packageFilters(local)
+  if (
+    Object.entries(priorFilters).some(
+      ([key, value]) =>
+        Object.hasOwn(localFilters, key) &&
+        JSON.stringify(localFilters[key]) !== JSON.stringify(value),
+    )
+  )
+    return yield* new SetupFailure({
+      message: `${file}: the old pin and the installed HolyAgent registration have different package filters. Reconcile the filters in Pi settings and review setup again; both entries were kept`,
+    })
+  const keep =
+    isJsonObject(entry) || isJsonObject(local)
+      ? { ...priorFilters, ...localFilters, source }
+      : source
+  const next = packages
+    .filter((item) => item !== entry)
+    .map((item) => (item === local ? keep : item))
+  return { source, entry, next, packages }
+})
 
 const backupRegistration = Effect.fn("backupPiRegistration")(function* (
   file: string,
@@ -241,30 +334,46 @@ const restoreRegistration = Effect.fn("restorePiRegistration")(function* (
 
 /** Keep the old source until Pi has installed the new one. Preserve its package filters in place. */
 const retireRegistration = Effect.fn("retirePiRegistration")(function* (
+  env: Env,
   file: string,
   prior: string,
-  source: string,
+  target: RegistrationSource,
   previousEntry: unknown,
+  before: ReadonlyArray<unknown>,
 ) {
   const current = yield* readJsonObjectSnapshot(file)
   const packages: ReadonlyArray<unknown> = Array.isArray(current.value.packages)
     ? current.value.packages
     : []
   const old = packages.filter((entry) => entrySource(entry) === prior)
+  const saved = yield* matchingEntries(env, file, packages, target)
+  const [installed] = saved
+  const savedSource = entrySource(installed)
+  const replacement = isJsonObject(previousEntry)
+    ? { ...previousEntry, source: savedSource }
+    : savedSource
+  // Pi appends a new local source as a native relative path. An npm pin can instead replace an
+  // entry in place because Pi matches npm registrations by package name, not by pin.
+  const replacedPin =
+    old.length === 0 &&
+    target.physical === undefined &&
+    parseNpmSource(prior)?.name === parseNpmSource(target.source)?.name
+  const expected = replacedPin ? before.filter((entry) => entrySource(entry) !== prior) : before
   if (
     current.text === undefined ||
-    packages.filter((entry) => entrySource(entry) === source).length !== 1 ||
+    saved.length !== 1 ||
+    typeof savedSource !== "string" ||
     old.length > 1 ||
-    (old.length === 1 && JSON.stringify(old[0]) !== JSON.stringify(previousEntry))
+    JSON.stringify(packages.filter((entry) => entry !== installed)) !== JSON.stringify(expected) ||
+    (typeof installed !== "string" &&
+      (!replacedPin || JSON.stringify(installed) !== JSON.stringify(replacement)))
   )
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed during install; kept the previous source where it was still present`,
     })
-  const replacement = isJsonObject(previousEntry) ? { ...previousEntry, source } : source
   const next = packages.flatMap((entry) => {
-    const key = entrySource(entry)
-    if (key === prior) return [replacement]
-    if (key === source) return old.length === 0 ? [replacement] : []
+    if (entrySource(entry) === prior) return [replacement]
+    if (entry === installed) return replacedPin ? [replacement] : []
     return [entry]
   })
   if (
@@ -369,8 +478,16 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       ),
     )
   const review = yield* PiRegistrationReview
+  let repair:
+    | {
+        readonly target: RegistrationSource
+        readonly prior: string
+        readonly source: string
+        readonly packages: ReadonlyArray<unknown>
+      }
+    | undefined
   let replacement:
-    | { readonly source: string; readonly prior: string; readonly entry: unknown }
+    | { readonly target: RegistrationSource; readonly prior: string; readonly entry: unknown }
     | undefined
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(
@@ -379,38 +496,108 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       [{ file, sources: listed }, ...elsewhere],
       options.replacePiRegistration === true,
     )
-    if (match.source === undefined)
+    if (match.target === undefined)
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`))
     else {
       if (match.prior !== undefined) {
-        const { source, prior } = match
-        const entry = registrationEntry(yield* readJsonObject(file), prior)
+        const { target, prior } = match
+        const settings = yield* readJsonObject(file)
+        if (
+          match.repair &&
+          (!Array.isArray(settings.packages) ||
+            JSON.stringify(settings.packages.map(entrySource)) !== JSON.stringify(listed))
+        )
+          return yield* new SetupFailure({
+            message: `${file}: the Pi registration changed after review; review it again`,
+          })
+        const pending = match.repair
+          ? yield* planDuplicateRepair(env, file, target, prior, settings)
+          : undefined
+        const source = pending?.source ?? target.source
+        const entry = pending?.entry ?? registrationEntry(settings, prior)
         const fingerprint = createHash("sha256")
-          .update(JSON.stringify([file, prior, source, entry]))
+          .update(
+            JSON.stringify([
+              file,
+              prior,
+              source,
+              entry,
+              ...(pending === undefined ? [] : [target.physical, pending.packages]),
+            ]),
+          )
           .digest("hex")
         if (
           entry === undefined ||
-          (!options.dryRun && review !== undefined && review.expected !== fingerprint)
+          (!options.dryRun &&
+            (pending !== undefined || review !== undefined) &&
+            review?.expected !== fingerprint)
         )
           return yield* new SetupFailure({
             message: `${file}: the Pi registration changed after review; review it again`,
           })
         if (options.dryRun && review?.preview !== undefined)
           yield* Effect.sync(() => review.preview?.({ file, prior, source, fingerprint }))
-        replacement = { source, prior, entry }
+        if (pending === undefined) replacement = { target, prior, entry }
+        else repair = { target, prior, source, packages: pending.packages }
         lines.unshift(
           added(
-            `pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`,
+            pending === undefined
+              ? `pi package: replace ${JSON.stringify(prior)} with ${JSON.stringify(source)} in ${file}`
+              : `pi package: remove ${JSON.stringify(prior)} from ${file}; keep ${JSON.stringify(source)} without reinstalling`,
           ),
         )
       }
-      installs.unshift(match.source)
+      if (repair === undefined) installs.unshift(match.target.source)
     }
   }
-  if (replacement === undefined && !options.dryRun && review?.expected !== undefined)
+  if (
+    replacement === undefined &&
+    repair === undefined &&
+    !options.dryRun &&
+    review?.expected !== undefined
+  )
     return yield* new SetupFailure({
       message: `${file}: the Pi registration changed after review; review it again`,
     })
+  if (repair !== undefined && !options.dryRun) {
+    yield* reportSetupActivity(`Keeping the verified registration ${repair.source}`)
+    yield* refuseLinks(
+      options.cwd,
+      options.scope,
+      file,
+      "repair the installed HolyAgent package registration",
+    )
+    const snapshot = yield* readJsonObjectSnapshot(file)
+    if (
+      snapshot.text === undefined ||
+      JSON.stringify(snapshot.value.packages) !== JSON.stringify(repair.packages)
+    )
+      return [
+        ...lines,
+        `! pi package: ${file} changed after review; the previous registration was not removed`,
+      ]
+    const current = yield* planDuplicateRepair(
+      env,
+      file,
+      repair.target,
+      repair.prior,
+      snapshot.value,
+    )
+    const backup = yield* backupRegistration(file, current.source, current.entry)
+    lines.push(added(`pi package: saved the previous registration in ${backup}`))
+    if (
+      !(yield* writeJsonObjectIfUnchanged(
+        file,
+        { ...snapshot.value, packages: current.next },
+        snapshot.text,
+      ))
+    )
+      return [
+        ...lines,
+        `! pi package: ${file} changed while repairing the package; did not remove the previous source`,
+      ]
+    lines.push(present(`pi package: kept the installed HolyAgent registration in ${file}`))
+  }
   if (installs.length === 0 && removals.length === 0) return lines
 
   if (Option.isNone(yield* shell.which("pi"))) {
@@ -432,7 +619,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(added(`pi ${source}: would install with ${command}`))
       continue
     }
-    const commit = replacement?.source === source ? replacement : undefined
+    const commit = replacement?.target.source === source ? replacement : undefined
     yield* reportSetupActivity(`Installing ${source}`)
     const install = shell.run("pi", args, {
       cwd,
@@ -468,10 +655,12 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     })
     const backupHint = added(`pi package: saved the previous registration in ${backup}`)
     const beforeInstall = yield* readRegistration
+    const beforePackages: ReadonlyArray<unknown> = Array.isArray(beforeInstall.packages)
+      ? beforeInstall.packages
+      : []
     if (
       !priorIsUnchanged(beforeInstall) ||
-      (Array.isArray(beforeInstall.packages) &&
-        beforeInstall.packages.some((entry) => entrySource(entry) === source))
+      (yield* matchingEntries(env, file, beforePackages, commit.target)).length > 0
     )
       return [
         ...lines,
@@ -499,9 +688,14 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
         failed(command, result),
       ]
     }
-    const retirement = yield* retireRegistration(file, commit.prior, source, commit.entry).pipe(
-      Effect.result,
-    )
+    const retirement = yield* retireRegistration(
+      env,
+      file,
+      commit.prior,
+      commit.target,
+      commit.entry,
+      beforePackages,
+    ).pipe(Effect.result)
     if (retirement._tag === "Failure")
       return [
         ...lines,

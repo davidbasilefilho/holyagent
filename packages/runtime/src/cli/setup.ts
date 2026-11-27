@@ -6,6 +6,11 @@ import { Effect, Schema } from "effect"
 import { CAPABILITIES } from "../config/capabilities.ts"
 import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
+import {
+  planTerminalBrowse,
+  runTerminalBrowse,
+  terminalBrowseUnavailable,
+} from "../setup/browse-handoff.ts"
 import { defaultCodexHome, setupCodex } from "../setup/codex/setup.ts"
 import type { Env } from "../setup/environment.ts"
 import { SetupFailure } from "../setup/errors.ts"
@@ -13,6 +18,7 @@ import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
 import {
   type CapabilityChoices,
   isHolyagentSource,
+  loadPiConfig,
   loadPiConfigSource,
   piInUse,
   piPresenceFiles,
@@ -27,7 +33,7 @@ import {
   SCOPES,
 } from "../setup/scope.ts"
 import { CACHE_TTLS } from "../setup/settings.ts"
-import { type Shell, shellLive } from "../setup/shell.ts"
+import { Shell, shellLive } from "../setup/shell.ts"
 import type { SetupTarget } from "../setup/steps.ts"
 import { saveSetupResult } from "../setup/tui/result-file.ts"
 import { runInteractive } from "../setup/tui/session.ts"
@@ -81,7 +87,7 @@ const CLAUDE_USAGE =
   "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]"
 const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace(
   "[--no-tui]",
-  "[--no-tui|--non-interactive]",
+  "[--no-tui|--non-interactive] [--open-browse [--browse-browser <id>]]",
 )
 
 const CODEX_USAGE =
@@ -287,7 +293,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
-      "graphical public Pi setup offers a Browser Use page. Configure or Update is selected when Browser Use is enabled; choose Skip there to keep current pairing untouched. Setup runs only the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
+      "in graphical Pi setup, open browser-use to enable or disable it and mark compatible detected browsers. If nothing was saved, only a compatible detected system default is selected. Apply saves the selection. Setup runs the pinned Browse CLI with the HolyAgent package runner after review and closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -337,6 +343,32 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         }
         const capabilities = yield* capabilitySwitches(args, usage)
         const form = yield* formOf(args, env, usage)
+        const openBrowse =
+          surface === "public" && target === "pi" && booleanFlag(args, "open-browse")
+        const browseBrowser = stringFlag(args, "browse-browser")
+        if (browseBrowser !== undefined && !openBrowse)
+          return yield* new Usage({
+            message: "--browse-browser requires --open-browse",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        if (openBrowse && (!booleanFlag(args, "no-tui") || capabilities.browserUse !== true))
+          return yield* new Usage({
+            message: "--open-browse requires --no-tui and --browser-use on",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        if (openBrowse && stringFlag(args, "browser-executable") !== undefined)
+          return yield* new Usage({
+            message: "--open-browse selects a detected browser by id, not --browser-executable",
+            hint: `Usage: holyagent ${usage}`,
+          })
+        const browseUnavailable = openBrowse
+          ? terminalBrowseUnavailable(env, {
+              terminal,
+              form,
+              dryRun: booleanFlag(args, "dry-run"),
+              nonInteractive: booleanFlag(args, "non-interactive"),
+            })
+          : undefined
         if (
           booleanFlag(args, "undo") &&
           (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined)
@@ -523,7 +555,35 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
               })
           }
         }
-        return printed(yield* apply(flagged, capabilities, interactive.notes))
+        const terminalBrowse =
+          openBrowse && browseUnavailable === undefined
+            ? yield* Effect.gen(function* () {
+                const config = yield* loadPiConfig(env, cwd, resolved.scope, capabilities)
+                if (!(yield* piInUse(env)) || !config.pi.enable || !config.pi.features.mcp)
+                  return yield* new SetupFailure({
+                    message: "desktop Browse requires an enabled Pi installation and MCP",
+                  })
+                return yield* planTerminalBrowse(env, cwd, browseBrowser)
+              }).pipe(Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)))
+            : undefined
+        if (terminalBrowse instanceof SetupFailure)
+          return printed({ ok: false, lines: [`! OpenCode Browse: ${terminalBrowse.message}`] })
+        const report = yield* apply(flagged, capabilities, [
+          ...interactive.notes,
+          ...(browseUnavailable === undefined
+            ? []
+            : [hint(`OpenCode Browse: ${browseUnavailable}`)]),
+        ])
+        if (!report.ok || terminalBrowse === undefined) return printed(report)
+        const handoff = yield* runTerminalBrowse(
+          env,
+          cwd,
+          installedPackageRoot,
+          browseBrowser,
+          terminalBrowse,
+          emit,
+        ).pipe(Effect.provide(Shell.live(env)))
+        return printed({ ok: handoff.ok, lines: [...report.lines, ...handoff.lines] })
       }).pipe(Effect.provide(shellLive(env))),
   }
 }
@@ -593,6 +653,7 @@ const publicPiSetup = (target?: "pi"): Command => {
       ...flags,
       "non-interactive": "boolean",
       "browser-executable": "string",
+      ...(target === "pi" ? { "open-browse": "boolean", "browse-browser": "string" } : {}),
       ...(target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}),
     },
     notes: [
@@ -603,7 +664,12 @@ const publicPiSetup = (target?: "pi"): Command => {
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),
       "In graphical Pi setup, --browser-executable <absolute-path> adds a portable browser candidate without launching it. Only confirmed Browse-compatible profiles can be selected for automatic pairing.",
-      "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal.",
+      "--no-tui and --non-interactive use line-based setup. Neither reads stdin for answers. --non-interactive never opens a browser. Interactive setup remains the default in a terminal.",
+      ...(target === "pi"
+        ? [
+            "In a local graphical terminal, --no-tui --browser-use on --open-browse opens Browse in one compatible browser. Use --browse-browser <id> to choose. Without a saved choice, only a verified system default is considered. Installation and pairing require your action in the browser.",
+          ]
+        : []),
     ],
   }
 }

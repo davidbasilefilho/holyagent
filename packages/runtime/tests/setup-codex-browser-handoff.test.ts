@@ -82,6 +82,46 @@ describe("official Codex desktop browser extension handoff", () => {
     })
   })
 
+  test("only documented Windows browsers can open the guide, in each selected executable", async () => {
+    const shell = fakeShell({
+      commands: [],
+      respond: (line) =>
+        line.includes("Get-AppxPackage") ? { stdout: "26.1109.1905.0" } : { exitCode: 0 },
+    })
+    const detected = [
+      { id: "chrome", name: "Google Chrome", executable: "C:\\Chrome\\chrome.exe" },
+      { id: "edge", name: "Microsoft Edge", executable: "C:\\Edge\\msedge.exe" },
+      { id: "aurora-browser", name: "Aurora Browser", executable: "C:\\Aurora\\aurora.exe" },
+      { id: "firefox", name: "Firefox", executable: "C:\\Firefox\\firefox.exe" },
+    ]
+    const offer = await detect(shell, detected, windowsEnv, windows)
+    expect(offer).toMatchObject({
+      status: "candidate",
+      browsers: detected.slice(0, 2),
+      unavailableBrowsers: [
+        {
+          id: "aurora-browser",
+          name: "Aurora Browser",
+          reason: expect.stringContaining("does not document"),
+        },
+        { id: "firefox", name: "Firefox", reason: expect.stringContaining("does not document") },
+      ],
+    })
+    expect(shell.calls).toHaveLength(1)
+    for (const id of ["chrome", "edge", "brave"] as const) {
+      const result = await Effect.runPromise(
+        openCodexBrowserHandoff(windowsEnv, offer, id, windows).pipe(Effect.provide(shell.layer)),
+      )
+      expect(result.ok).toBe(id !== "brave")
+      if (result.ok) expect(result.lines.join("\n")).toContain("Finish in ChatGPT desktop")
+    }
+    expect(shell.calls.slice(1).map(({ env }) => env)).toEqual([
+      { HOLYAGENT_SETUP_BROWSER_EXE: detected[0]?.executable },
+      { HOLYAGENT_SETUP_BROWSER_EXE: detected[1]?.executable },
+    ])
+    expect(shell.calls.slice(1).every(({ line }) => line.includes(CODEX_BROWSER_GUIDE))).toBe(true)
+  })
+
   test("the CLI or a bare command named chatgpt is insufficient evidence", async () => {
     const cliOnly = fakeShell({ commands: ["codex"] })
     expect(await detect(cliOnly)).toEqual({

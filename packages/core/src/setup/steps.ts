@@ -5,6 +5,7 @@ import type { PiProviderSelection } from "../config/schema.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { reportBrowserUse } from "./browser-use.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
+import { CTX7_MISE_UNVERIFIED, lookupCtx7 } from "./context7.ts"
 import { type Env, homeDirectory } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice } from "./form.ts"
@@ -34,48 +35,36 @@ const CLOUD_SKIP =
  */
 const neutralDirectory = (env: Env) => homeDirectory(env)
 
-/**
- * Installs a command with `bun add -g` unless it is already available. Returns the report lines and
- * whether the command can be used afterwards (on a dry run, whether it would be).
- */
-const ensureGlobal = Effect.fn("ensureGlobal")(function* (
-  env: Env,
-  command: string,
-  packageName: string,
-  dryRun: boolean,
-) {
-  const shell = yield* Shell
-  if (Option.isSome(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present(`${command}: already installed`)] }
-  }
-  if (dryRun) {
-    return {
-      usable: true,
-      lines: [added(`${command}: would install with bun add -g ${packageName}`)],
-    }
-  }
-  // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
-  yield* reportSetupActivity(`Installing ${packageName}`)
-  const result = yield* shell.run(
-    "bun",
-    ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName],
-    { cwd: neutralDirectory(env) },
-  )
-  if (result.exitCode !== 0)
-    return { usable: false, lines: [failed(`bun add -g ${packageName}`, result)] }
-  const lines = [added(`${command}: installed with bun add -g ${packageName}`)]
-  const onPath = yield* shell.which(command)
-  const anywhere = yield* shell.which(command, { includeBunBin: true })
-  if (Option.isNone(onPath) && Option.isSome(anywhere)) {
-    lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`))
-  }
-  return { usable: true, lines }
-})
-
 /** Install the Context7 CLI without installing external instructions or accessing credentials. */
 export const installCtx7 = Effect.fn("installCtx7")(function* (env: Env, dryRun: boolean) {
-  const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun)
-  return result.lines
+  const installed = yield* lookupCtx7(env)
+  if (installed.kind === "mise")
+    return [
+      present(
+        `ctx7: already installed with mise at ${installed.path} (not on PATH; add its directory to PATH)`,
+      ),
+    ]
+  if (installed.kind === "unverified") return [`! ctx7: ${CTX7_MISE_UNVERIFIED}`]
+  if (installed.kind === "path" || installed.kind === "bun")
+    return [present("ctx7: already installed")]
+  if (dryRun) return [added("ctx7: would install with bun add -g ctx7")]
+
+  const shell = yield* Shell
+  // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
+  yield* reportSetupActivity("Installing ctx7")
+  const result = yield* shell.run(
+    "bun",
+    ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", "ctx7"],
+    { cwd: neutralDirectory(env) },
+  )
+  if (result.exitCode !== 0) return [failed("bun add -g ctx7", result)]
+  const lines = [added("ctx7: installed with bun add -g ctx7")]
+  const onPath = yield* shell.which("ctx7")
+  const anywhere = yield* shell.which("ctx7", { includeBunBin: true })
+  if (Option.isNone(onPath) && Option.isSome(anywhere)) {
+    lines.push(hint(`ctx7: ${anywhere.value} is not on PATH; add its directory to PATH`))
+  }
+  return lines
 })
 
 /** Turns a step that cannot finish (an unreadable settings file) into a failed line, not an abort. */
